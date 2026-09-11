@@ -110,10 +110,15 @@ const CONFIG = {
   REDIRECT_URL:  "https://harrynaccy.github.io/homey-scrips/raamsensor-tegels-kiosk.html",
 
   DEVICES: [
+    { id: "ea3ef8e0-a77a-4ad9-b1a3-16e551e4dce9", name: "Slaapkamer" },
     { id: "e16950a6-5b9b-4609-a9de-b33e8175f816", name: "Voordeur" },
-    { id: "8b30e65a-1177-4540-b5eb-04c3429dcf7f", name: "Keuken" },
-    { id: "ea3ef8e0-a77a-4ad9-b1a3-16e551e4dce9", name: "Slaapkamer" }
-  ]
+    { id: "8b30e65a-1177-4540-b5eb-04c3429dcf7f", name: "Keuken" }
+  ],
+
+  // Extra veiligheidsnet: elke X ms alle apparaten opnieuw ophalen,
+  // zodat de status ook bijwerkt als er ooit een live update gemist
+  // wordt (bv. na een korte verbindingshapering op de achtergrond).
+  REFRESH_MS: 15000
 };
 /* ---------------------------------- */
 
@@ -206,7 +211,22 @@ async function start(){
   // Live updates via de socket-verbinding (loopt ook via de cloud)
   await homeyApi.devices.connect();
   homeyApi.devices.on("device.update", readAndPaint);
+
+  // Veiligheidsnet: ook op de achtergrond periodiek alles opnieuw ophalen,
+  // zodat de status altijd actueel blijft, zelfs als een live update
+  // ooit gemist wordt of de socket-verbinding stilletjes wegvalt.
+  if(backgroundRefreshTimer) clearInterval(backgroundRefreshTimer);
+  backgroundRefreshTimer = setInterval(async () => {
+    try{
+      const freshDevices = await homeyApi.devices.getDevices();
+      Object.values(freshDevices).forEach(readAndPaint);
+    }catch(err){
+      console.warn("Achtergrond-refresh mislukt:", err);
+    }
+  }, CONFIG.REFRESH_MS);
 }
+
+let backgroundRefreshTimer = null;
 
 start().catch(err => {
   console.error("Kon geen cloudverbinding met Homey maken:", err);
