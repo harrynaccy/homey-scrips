@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Raamsensoren</title>
+<!-- Officiële Athom Web API client (levert window.AthomCloudAPI en window.HomeyAPI) -->
+<script type="text/javascript" src="https://cdn.athom.com/homey-api/3.19.4.js"></script>
 <style>
   :root{
     --closed-a:#153328; --closed-b:#2E7D5B;
@@ -70,7 +72,24 @@
     font-size:clamp(22px, 5vw, 42px);
     font-weight:600;
   }
- 
+
+  /* Kleine inlog-knop, alleen zichtbaar als er nog geen sessie is */
+  .login-screen{
+    position:fixed; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    background:#0b0d0f; color:var(--ink);
+    font-size:4vw; text-align:center; padding:0 6vw;
+  }
+  .login-screen button{
+    margin-top:1.2em;
+    font-size:0.5em;
+    padding:.7em 1.4em;
+    border-radius:.6em;
+    border:none;
+    background:#2E7D5B;
+    color:white;
+    cursor:pointer;
+  }
 </style>
 </head>
 <body>
@@ -80,9 +99,16 @@
 <script type="module">
 /* ---------- CONFIGURATIE ---------- */
 const CONFIG = {
-  HOMEY_ADDRESS: "http://192.168.178.13",
-  HOMEY_TOKEN:   "194f1a72-2955-4fe1-a4a3-0614d3db72f0:4312e543-7017-43e9-8d6f-1191f6e81d31:6c11b4c4574cc4777a56cbc7994789411f258e8c",
-  POLL_MS: 5000, // alleen gebruikt als REST-fallback actief is
+  // Client ID + Secret van je eigen Web API Client, aan te maken via
+  // https://tools.developer.homey.app  ->  "Web API Clients" / "OAuth2 Clients".
+  CLIENT_ID:     "6aa3a9c70f8789ee9cd9a05e",
+  CLIENT_SECRET: "641d1c8de1d35f2b9875451623a0509f",
+
+  // Moet exact overeenkomen met de Redirect URL die je bij het aanmaken
+  // van de Web API Client hebt opgegeven, én met de URL waarop dit
+  // bestand daadwerkelijk wordt gehost (dus geen file://, wel https://...).
+  REDIRECT_URL:  "https://harrynaccy.github.io/homey-scrips/raamsensor-tegels-kiosk.html",
+
   DEVICES: [
     { id: "e16950a6-5b9b-4609-a9de-b33e8175f816", name: "Voordeur" },
     { id: "8b30e65a-1177-4540-b5eb-04c3429dcf7f", name: "Keuken" },
@@ -123,84 +149,71 @@ function paint(id, isOpen){
   valueEl.textContent = isOpen ? "Open" : "Gesloten";
 }
 
-function paintError(id){
-  const tile = tilesById[id];
-  if(!tile) return;
-  tile.dataset.state = "wait";
-  tile.querySelector(".value").textContent = "Geen verbinding";
+function paintError(){
+  Object.values(tilesById).forEach(tile => {
+    tile.dataset.state = "wait";
+    tile.querySelector(".value").textContent = "Geen verbinding";
+  });
 }
 
+function showLoginScreen(loginUrl){
+  const screen = document.createElement("div");
+  screen.className = "login-screen";
+  screen.innerHTML = `
+    Log in bij Athom om deze kiosk te koppelen aan je Homey
+    <br>
+    <button id="loginBtn">Inloggen</button>`;
+  document.body.appendChild(screen);
+  document.getElementById("loginBtn").addEventListener("click", () => {
+    window.location.href = loginUrl;
+  });
+}
 
-/* ---------- Route A: officiële homey-api library, met live events ---------- */
-async function startWithLibrary(){
-  const { HomeyAPI } = await import("https://cdn.jsdelivr.net/npm/homey-api/+esm");
+function readAndPaint(device){
+  if(!device || !tilesById[device.id]) return;
+  const cap = device.capabilitiesObj && device.capabilitiesObj.alarm_contact;
+  if(!cap) return;
+  paint(device.id, !!cap.value);
+}
 
-  const homeyApi = await HomeyAPI.createLocalAPI({
-    address: CONFIG.HOMEY_ADDRESS,
-    token: CONFIG.HOMEY_TOKEN,
+/* ---------- Verbinden via de officiële Athom Cloud API (OAuth2) ---------- */
+async function start(){
+  const cloudApi = new AthomCloudAPI({
+    clientId: CONFIG.CLIENT_ID,
+    clientSecret: CONFIG.CLIENT_SECRET,
+    redirectUrl: CONFIG.REDIRECT_URL,
+    // AthomCloudAPI bewaart het token standaard in de browseropslag,
+    // zodat de kiosk na een herstart niet telkens opnieuw hoeft in te loggen.
   });
 
-  const devices = await homeyApi.devices.getDevices();
-
-  function readAndPaint(device){
-    if(!device || !tilesById[device.id]) return;
-    const cap = device.capabilitiesObj && device.capabilitiesObj.alarm_contact;
-    if(!cap) return;
-    paint(device.id, !!cap.value, nowLabel());
-  }
-
-  Object.values(devices).forEach(readAndPaint);
-
-  await homeyApi.devices.connect();
-  homeyApi.devices.on("device.update", readAndPaint);
-
-  return true; // gelukt, geen fallback nodig
-}
-
-/* ---------- Route B: rechtstreekse REST-aanroep als fallback ---------- */
-async function fetchDeviceRest(id){
-  const url = `${CONFIG.HOMEY_ADDRESS}/api/manager/devices/device/${id}`;
-  const res = await fetch(url, {
-    headers: { "Authorization": `Bearer ${CONFIG.HOMEY_TOKEN}` }
-  });
-  if(!res.ok) throw new Error("HTTP " + res.status);
-  return res.json();
-}
-
-function readContactValueRest(data){
-  if(data.capabilitiesObj && data.capabilitiesObj.alarm_contact){
-    return !!data.capabilitiesObj.alarm_contact.value;
-  }
-  if(data.capabilities && typeof data.capabilities.alarm_contact !== "undefined"){
-    return !!data.capabilities.alarm_contact;
-  }
-  throw new Error("alarm_contact niet gevonden");
-}
-
-function startRestPolling(){
-  async function refreshAll(){
-    for(const dev of CONFIG.DEVICES){
-      try{
-        const data = await fetchDeviceRest(dev.id);
-        paint(dev.id, readContactValueRest(data));
-      }catch(err){
-        paintError(dev.id);
-      }
+  const loggedIn = await cloudApi.isLoggedIn();
+  if(!loggedIn){
+    if(cloudApi.hasAuthorizationCode()){
+      await cloudApi.authenticateWithAuthorizationCode();
+    }else{
+      showLoginScreen(cloudApi.getLoginUrl());
+      return;
     }
   }
-  refreshAll();
-  setInterval(refreshAll, CONFIG.POLL_MS);
+
+  const user = await cloudApi.getAuthenticatedUser();
+  const homey = await user.getFirstHomey();
+  const homeyApi = await homey.authenticate();
+
+  const devices = await homeyApi.devices.getDevices();
+  Object.values(devices).forEach(readAndPaint);
+
+  // Live updates via de socket-verbinding (loopt ook via de cloud)
+  await homeyApi.devices.connect();
+  homeyApi.devices.on("device.update", readAndPaint);
 }
 
-/* ---------- Opstarten: probeer library, val terug op REST ---------- */
-(async () => {
-  try{
-    await startWithLibrary();
-  }catch(err){
-    console.warn("homey-api library niet bruikbaar in deze browser, val terug op REST:", err);
-    startRestPolling();
-  }
-})();
+start().catch(err => {
+  console.error("Kon geen cloudverbinding met Homey maken:", err);
+  paintError();
+  // Probeer het na een tijdje automatisch opnieuw (bv. als Homey even offline was)
+  setTimeout(() => start().catch(() => {}), 30000);
+});
 </script>
 
 </body>
