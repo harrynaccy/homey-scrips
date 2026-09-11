@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Raamsensoren</title>
+<style>
+  :root{
+    --closed-a:#153328; --closed-b:#2E7D5B;
+    --open-a:#3A1712;   --open-b:#B3452F;
+    --wait-a:#24272b;   --wait-b:#3b4046;
+    --ink:#f4f7f5;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0;
+    width:100%; height:100%;
+    overflow:hidden;
+    background:#0b0d0f;
+    font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-user-select:none; user-select:none;
+    -webkit-touch-callout:none;
+    overscroll-behavior:none;
+  }
+  .row{
+    display:flex;
+    width:100vw;
+    height:100vh;
+  }
+  .tile{
+    flex:1 1 0;
+    height:100%;
+    padding:5vw 4vw;
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+    color:var(--ink);
+    background:linear-gradient(160deg, var(--wait-a), var(--wait-b));
+    transition:background 600ms ease;
+    position:relative;
+    overflow:hidden;
+  }
+  .tile[data-state="closed"]{ background:linear-gradient(160deg, var(--closed-a), var(--closed-b)); }
+  .tile[data-state="open"]{   background:linear-gradient(160deg, var(--open-a),  var(--open-b)); }
+
+  .name{
+    font-size:clamp(14px, 2.4vw, 20px);
+    font-weight:500;
+    opacity:.78;
+    letter-spacing:.01em;
+  }
+
+  .icon{
+    align-self:flex-start;
+    width:clamp(28px, 6vw, 56px);
+    height:clamp(28px, 6vw, 56px);
+  }
+  .icon .sash{
+    transform-origin: 4px 27px;
+    transition: transform 600ms ease;
+  }
+  .tile[data-state="open"] .sash{ transform: rotate(-38deg); }
+
+  .status{
+    display:flex;
+    flex-direction:column;
+    gap:.3em;
+  }
+  .status .value{
+    font-size:clamp(22px, 5vw, 42px);
+    font-weight:600;
+  }
+ 
+</style>
+</head>
+<body>
+
+<div class="row" id="row"></div>
+
+<script type="module">
+/* ---------- CONFIGURATIE ---------- */
+const CONFIG = {
+  HOMEY_ADDRESS: "http://192.168.178.13",
+  HOMEY_TOKEN:   "194f1a72-2955-4fe1-a4a3-0614d3db72f0:4312e543-7017-43e9-8d6f-1191f6e81d31:6c11b4c4574cc4777a56cbc7994789411f258e8c",
+  POLL_MS: 5000, // alleen gebruikt als REST-fallback actief is
+  DEVICES: [
+    { id: "e16950a6-5b9b-4609-a9de-b33e8175f816", name: "Voordeur" },
+    { id: "8b30e65a-1177-4540-b5eb-04c3429dcf7f", name: "Keuken" },
+    { id: "ea3ef8e0-a77a-4ad9-b1a3-16e551e4dce9", name: "Slaapkamer" }
+  ]
+};
+/* ---------------------------------- */
+
+const iconSVG = `
+  <svg class="icon" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="3" y="3" width="28" height="28" rx="3" stroke="currentColor" stroke-width="2" opacity="0.55"/>
+    <line class="sash" x1="4" y1="27" x2="30" y2="27" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+  </svg>`;
+
+const row = document.getElementById("row");
+const tilesById = {};
+
+CONFIG.DEVICES.forEach(dev => {
+  const tile = document.createElement("div");
+  tile.className = "tile";
+  tile.dataset.state = "wait";
+  tile.dataset.id = dev.id;
+  tile.innerHTML = `
+    <div class="name">${dev.name}</div>
+    ${iconSVG}
+    <div class="status">
+      <div class="value">Verbinden…</div>
+    </div>`;
+  row.appendChild(tile);
+  tilesById[dev.id] = tile;
+});
+
+function paint(id, isOpen){
+  const tile = tilesById[id];
+  if(!tile) return;
+  const valueEl = tile.querySelector(".value");
+  tile.dataset.state = isOpen ? "open" : "closed";
+  valueEl.textContent = isOpen ? "Open" : "Gesloten";
+}
+
+function paintError(id){
+  const tile = tilesById[id];
+  if(!tile) return;
+  tile.dataset.state = "wait";
+  tile.querySelector(".value").textContent = "Geen verbinding";
+}
+
+
+/* ---------- Route A: officiële homey-api library, met live events ---------- */
+async function startWithLibrary(){
+  const { HomeyAPI } = await import("https://cdn.jsdelivr.net/npm/homey-api/+esm");
+
+  const homeyApi = await HomeyAPI.createLocalAPI({
+    address: CONFIG.HOMEY_ADDRESS,
+    token: CONFIG.HOMEY_TOKEN,
+  });
+
+  const devices = await homeyApi.devices.getDevices();
+
+  function readAndPaint(device){
+    if(!device || !tilesById[device.id]) return;
+    const cap = device.capabilitiesObj && device.capabilitiesObj.alarm_contact;
+    if(!cap) return;
+    paint(device.id, !!cap.value, nowLabel());
+  }
+
+  Object.values(devices).forEach(readAndPaint);
+
+  await homeyApi.devices.connect();
+  homeyApi.devices.on("device.update", readAndPaint);
+
+  return true; // gelukt, geen fallback nodig
+}
+
+/* ---------- Route B: rechtstreekse REST-aanroep als fallback ---------- */
+async function fetchDeviceRest(id){
+  const url = `${CONFIG.HOMEY_ADDRESS}/api/manager/devices/device/${id}`;
+  const res = await fetch(url, {
+    headers: { "Authorization": `Bearer ${CONFIG.HOMEY_TOKEN}` }
+  });
+  if(!res.ok) throw new Error("HTTP " + res.status);
+  return res.json();
+}
+
+function readContactValueRest(data){
+  if(data.capabilitiesObj && data.capabilitiesObj.alarm_contact){
+    return !!data.capabilitiesObj.alarm_contact.value;
+  }
+  if(data.capabilities && typeof data.capabilities.alarm_contact !== "undefined"){
+    return !!data.capabilities.alarm_contact;
+  }
+  throw new Error("alarm_contact niet gevonden");
+}
+
+function startRestPolling(){
+  async function refreshAll(){
+    for(const dev of CONFIG.DEVICES){
+      try{
+        const data = await fetchDeviceRest(dev.id);
+        paint(dev.id, readContactValueRest(data));
+      }catch(err){
+        paintError(dev.id);
+      }
+    }
+  }
+  refreshAll();
+  setInterval(refreshAll, CONFIG.POLL_MS);
+}
+
+/* ---------- Opstarten: probeer library, val terug op REST ---------- */
+(async () => {
+  try{
+    await startWithLibrary();
+  }catch(err){
+    console.warn("homey-api library niet bruikbaar in deze browser, val terug op REST:", err);
+    startRestPolling();
+  }
+})();
+</script>
+
+</body>
+</html>
