@@ -177,7 +177,11 @@ function showLoginScreen(loginUrl){
 function readAndPaint(device){
   if(!device || !tilesById[device.id]) return;
   const cap = device.capabilitiesObj && device.capabilitiesObj.alarm_contact;
-  if(!cap) return;
+  if(!cap){
+    console.warn(`Geen alarm_contact-capability gevonden voor ${device.name || device.id}`, device.capabilitiesObj);
+    return;
+  }
+  console.debug(`[${new Date().toLocaleTimeString()}] ${device.name || device.id}: alarm_contact =`, cap.value);
   paint(device.id, !!cap.value);
 }
 
@@ -206,15 +210,33 @@ async function start(){
   const homeyApi = await homey.authenticate();
 
   const devices = await homeyApi.devices.getDevices();
-  Object.values(devices).forEach(readAndPaint);
 
-  // Live updates via de socket-verbinding (loopt ook via de cloud)
+  // Verbind met de Socket.io-namespace van de devices-manager.
+  // Dit is nodig voordat individuele capability-subscripties werken.
   await homeyApi.devices.connect();
-  homeyApi.devices.on("device.update", readAndPaint);
+
+  // Voor elk raamsensor-apparaat: direct de huidige stand tonen,
+  // en daarna een échte live subscription op de alarm_contact-capability
+  // zetten. Homey pusht dan zelf een update zodra de waarde verandert,
+  // in plaats van dat wij moeten wachten op een grotere 'device.update'.
+  CONFIG.DEVICES.forEach(dev => {
+    const device = devices[dev.id];
+    if(!device){
+      console.warn(`Apparaat ${dev.name} (${dev.id}) niet gevonden bij deze Homey.`);
+      return;
+    }
+
+    readAndPaint(device); // initiële stand
+
+    device.makeCapabilityInstance("alarm_contact", (value) => {
+      console.debug(`[live] ${dev.name}: alarm_contact =`, value);
+      paint(dev.id, !!value);
+    });
+  });
 
   // Veiligheidsnet: ook op de achtergrond periodiek alles opnieuw ophalen,
-  // zodat de status altijd actueel blijft, zelfs als een live update
-  // ooit gemist wordt of de socket-verbinding stilletjes wegvalt.
+  // zodat de status altijd actueel blijft, zelfs als een live capability-
+  // update ooit gemist wordt (bv. na een korte verbindingshapering).
   if(backgroundRefreshTimer) clearInterval(backgroundRefreshTimer);
   backgroundRefreshTimer = setInterval(async () => {
     try{
