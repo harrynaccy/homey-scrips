@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0" stop-color="#24374f"/>
+      <stop offset="1" stop-color="#0a0e15"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffc34d" stop-opacity=".75"/>
+      <stop offset="1" stop-color="#ffc34d" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="bulb" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe29a"/>
+      <stop offset="1" stop-color="#ffb42e"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#bg)"/>
+  <rect x="8.5" y="8.5" width="239" height="239" rx="55.5" fill="none" stroke="#5aa9ff" stroke-opacity=".35" stroke-width="3"/>
+  <!-- huis -->
+  <path d="M46 118 128 50l82 68" fill="none" stroke="#5aa9ff" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M68 112v82a12 12 0 0 0 12 12h96a12 12 0 0 0 12-12v-82" fill="none" stroke="#e9f1fb" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- lampje met gloed -->
+  <circle cx="128" cy="140" r="58" fill="url(#glow)"/>
+  <path d="M128 106a30 30 0 0 0-17 54.7c2.6 1.9 4 4.7 4 7.8V172h26v-3.5c0-3.1 1.4-5.9 4-7.8A30 30 0 0 0 128 106z" fill="url(#bulb)"/>
+  <rect x="115" y="176" width="26" height="8" rx="4" fill="#e9f1fb"/>
+  <rect x="119" y="187" width="18" height="7" rx="3.5" fill="#e9f1fb"/>
+</svg>
