@@ -287,3 +287,24 @@ input, select, textarea { font: inherit; }
 .manual-hd b { flex: 1; font-size: 16px; }
 .manual-hd a.btn { text-decoration: none; }
 iframe.manual { flex: 1; width: 100%; border: 0; background: #0b1018; }
+
+/* ---------- gekleurde pictogrammen, merken en kleurstijlen ---------- */
+.ic.img { object-fit: contain; }
+.kb .face > .ic.img, .kb .paddle > .ic.img { filter: none; }
+.kb.is-on .face > .ic.img { filter: drop-shadow(0 0 .35em color-mix(in srgb, var(--kon) 60%, transparent)); }
+.kb-icon .face > .ic.img { width: 86%; height: 86%; }
+.badge .ic.img { width: 1.5em; height: 1.5em; }
+.badge.xl .ic.img { width: 2.2em; height: 2.2em; }
+.badge.on:has(.ic.img), .badge.on:has(.ic.brand) { background: color-mix(in srgb, var(--lamp, var(--on)) 28%, transparent); }
+/* uit = grijs (gekleurde plaatjes en merklogo's), tenzij "kleur behouden" of niet gekoppeld */
+.t-button:not(.is-on):not(.nolink):not(.keepcolor) :is(.kb .face, .kb .paddle, .kb-mini) > .ic:is(.img, .brand),
+.t-device:not(.on):not(.is-on) .badge .ic:is(.img, .brand) { filter: grayscale(1) opacity(.5); }
+.kb.is-on .face > .ic.brand, .kb .face > .ic.brand { filter: none; }
+.t-button:not(.is-on):not(.nolink):not(.keepcolor) .kb .face > .ic.brand { filter: grayscale(1) opacity(.5); }
+/* kleurstijlen voor eenkleurige pictogrammen */
+.kb { --ic1: var(--koff); }
+.kb.is-on { --ic1: var(--kon); }
+.icst-verloop .kb .face > .ic.grad, .icst-verloop .kb .paddle > .ic.grad { filter: drop-shadow(0 0 .2em color-mix(in srgb, var(--ic1) 40%, transparent)); }
+.icst-cirkel .kb .face > .ic.mdi { background: var(--ic1); color: var(--ic2, #ffffff) !important; border-radius: 50%; padding: 18%; box-sizing: border-box; filter: none; }
+.icst-duo .kb .face > .ic.mdi { background: color-mix(in srgb, var(--ic2, var(--ic1)) 26%, transparent); color: var(--ic1) !important; border-radius: 50%; padding: 18%; box-sizing: border-box; }
+.icst-cirkel .kb-icon .face > .ic.mdi, .icst-duo .kb-icon .face > .ic.mdi { width: 80%; height: 80%; }

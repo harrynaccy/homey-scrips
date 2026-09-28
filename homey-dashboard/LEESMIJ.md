@@ -130,7 +130,7 @@ Het klikgeluid komt uit de tablet, dus zet het mediavolume van de tablet aan.
 
 ## Pictogrammen
 
-Onder **Pictogrammen** staan ruim 7000 pictogrammen (Material Design Icons), ingedeeld in categorieën zoals Lampen, Sensoren,
+Onder **Pictogrammen** staan ruim 14.000 pictogrammen in zes sets: eenkleurig (Material Design Icons), gekleurd plat en 3D (Microsoft Fluent), merken (Simple Icons), Hue-lampen (hass-hue-icons) en aan/uit-paren. Licenties: zie `server/iconsets/LICENTIES.md`. Eenkleurig is ingedeeld in categorieën zoals Lampen, Sensoren,
 Deuren en ramen, Klimaat en Huishoudelijke apparaten. Zoeken kan in het Nederlands en het Engels, bijvoorbeeld *lamp*, *raam*, *wasmachine* of *rookmelder*.
 Tik op een pictogram en kies:
 - **Op het dashboard, gekoppeld**: het pictogram kleurt mee met het apparaat. Lamp aan = verlicht, raam open = oranje.

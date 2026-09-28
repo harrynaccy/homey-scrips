@@ -54,7 +54,9 @@
   const flash = (el, ok = true) => { el.classList.remove('flash-ok', 'flash-bad'); void el.offsetWidth; el.classList.add(ok ? 'flash-ok' : 'flash-bad'); };
   const titleOf = t => (t.opts && t.opts.title) || (tiles[t.type].title ? tiles[t.type].title(t) : tiles[t.type].label);
   D.titleOf = titleOf;
-  const head = (t, ic, sub, on) => `<div class="hd"><span class="badge${on ? ' on' : ''}">${anyIcon(ic)}</span><div class="ht"><div class="name">${esc(titleOf(t))}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div></div>`;
+  const head = (t, ic, sub, on) => `<div class="hd"><span class="badge${on ? ' on' : ''}">${anyIcon(ic, '', { brand: !t.opts || t.opts.brand !== false })}</span><div class="ht"><div class="name">${esc(titleOf(t))}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div></div>`;
+  // pictogram bij aan of uit: opts.mdi = aan (of altijd), opts.mdiOff = uit
+  D.pic = (t, on, dflt) => (on ? t.opts.mdi : (t.opts.mdiOff || t.opts.mdi)) || dflt;
   const size = t => ({ big: t.w * t.h >= 6 || (t.w >= 3 && t.h >= 2), wide: t.w >= 3, tall: t.h >= 3 });
 
   // schuifregelaar
@@ -86,7 +88,7 @@
         const main = c[capId]; const rest = D.measures(d).filter(k => k !== capId).slice(0, sz.big ? 4 : 0);
         const alarm = main && typeof main.value === 'boolean' && main.value;
         el.classList.toggle('alarm-on', !!(alarm && capId.startsWith('alarm_'))); el.classList.toggle('is-on', !!alarm);
-        inner.innerHTML = head(t, t.opts.mdi || D.devIcon(d), esc(zone), alarm) +
+        inner.innerHTML = head(t, D.pic(t, alarm, D.devIcon(d)), esc(zone), alarm) +
           `<div class="big${alarm ? ' alarm' : ''}">${esc(D.fmt(main, capId))}</div>` +
           (rest.length ? `<div class="chips">${rest.map(k => `<span class="chip${typeof c[k].value === 'boolean' && c[k].value ? ' alert' : ''}">${esc(D.fmt(c[k], k))}</span>`).join('')}</div>` : '');
         D.pressable(el, { long: () => tiles.device.sheet(d.id) });
@@ -114,7 +116,7 @@
       }
       if (kind === 'lock') {
         const lk = !!c.locked.value;
-        inner.innerHTML = head(t, t.opts.mdi || (lk ? 'lock' : 'unlock'), esc(zone), !lk) + `<div class="big${lk ? '' : ' alarm'}">${lk ? 'Op slot' : 'Open'}</div><div class="hint">Tik om te ${lk ? 'openen' : 'vergrendelen'}</div>`;
+        inner.innerHTML = head(t, D.pic(t, lk, lk ? 'lock' : 'unlock'), esc(zone), !lk) + `<div class="big${lk ? '' : ' alarm'}">${lk ? 'Op slot' : 'Open'}</div><div class="hint">Tik om te ${lk ? 'openen' : 'vergrendelen'}</div>`;
         D.pressable(el, { tap: async () => { if (await D.confirm(`${d.name} ${lk ? 'openen' : 'vergrendelen'}?`)) D.setCap(d.id, 'locked', !lk); }, long: () => tiles.device.sheet(d.id) });
         return;
       }
@@ -132,7 +134,7 @@
       if (on && c.light_hue && c.light_saturation && (!c.light_mode || c.light_mode.value !== 'temperature')) color = `hsl(${Math.round(c.light_hue.value * 360)},${Math.round(c.light_saturation.value * 100)}%,60%)`;
       if (color) el.style.setProperty('--lamp', color); else el.style.removeProperty('--lamp');
       const showSlider = c.dim && view !== 'toggle' && (sz.big || view === 'slider');
-      inner.innerHTML = head(t, t.opts.mdi || D.devIcon(d), esc(zone), on) + `<div class="state">${esc(state)}</div>` +
+      inner.innerHTML = head(t, D.pic(t, on, D.devIcon(d)), esc(zone), on) + `<div class="state">${esc(state)}</div>` +
         (showSlider ? D.slider('', c.dim.value ?? 0, 0, 1, 0.01, v => D.setCap(d.id, 'dim', v)) : '');
       D.pressable(el, { tap: async () => { if (await guard(t)) D.setCap(d.id, 'onoff', !on); }, long: () => tiles.device.sheet(d.id) });
     },
@@ -239,7 +241,10 @@
       }
       const dimOn = kind === 'dim' && d && d.caps.onoff ? !!d.caps.onoff.value : on;
       const active = o._preview !== undefined ? o._preview : kind === 'dim' ? dimOn : on; // _preview: voorbeeld in het menu
-      const ic = o.mdi || D.BUTTON_KINDS.find(k => k[0] === kind)?.[3] || 'power';
+      const ic = D.pic(t, active, D.BUTTON_KINDS.find(k => k[0] === kind)?.[3] || 'power');
+      el.classList.toggle('nolink', !r.target || r.target === 'none'); el.classList.toggle('keepcolor', !!o.keepColor);
+      for (const st of ['verloop', 'cirkel', 'duo']) el.classList.toggle('icst-' + st, o.icStyle === st);
+      if (o.icColor2) el.style.setProperty('--ic2', o.icColor2); else el.style.removeProperty('--ic2');
       el.classList.toggle('offline', !!d && !d.available); el.classList.remove('on'); el.style.removeProperty('--lamp');
       el.classList.toggle('is-on', !!active); el.classList.toggle('alarm-on', !!(isAlarm && active));
       el.style.setProperty('--kon', o.colorOn || (isAlarm ? '#ff8a5c' : 'var(--on)'));
@@ -247,7 +252,7 @@
       const showLabel = o.label !== false, showState = o.state !== false && !!state;
       const label = showLabel ? `<div class="kb-label">${esc(titleOf(t))}</div>` : '';
       const st = showState ? `<div class="kb-state">${esc(state)}</div>` : '';
-      const svg = anyIcon(ic);
+      const svg = anyIcon(ic, '', { brand: o.brand !== false, grad: o.icStyle === 'verloop' });
       let face;
       if (kind === 'rocker' || kind === 'rockerled') face = `<div class="face"><div class="paddle">${svg}${kind === 'rockerled' ? '<i class="led"></i>' : ''}</div></div>`;
       else if (kind === 'panic') face = `<div class="face"><div class="cap">${svg}</div></div>`;

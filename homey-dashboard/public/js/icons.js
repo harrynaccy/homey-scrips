@@ -57,11 +57,24 @@ window.icon = function (name, cls) {
   return `<svg class="ic ${cls || ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${d}"/></svg>`;
 };
 
-// Pictogram uit de grote bibliotheek ({ n: naam, p: pad }) of een eigen lijn-icoon (naam)
-window.anyIcon = function (x, cls) {
+// Pictogram uit de bibliotheek of een eigen lijn-icoon (naam).
+// { s: set, n: naam, p: pad } = eenkleurig pad (mdi, hue, merk); { u: adres } = gekleurd plaatje (plat of 3D);
+// c = merkkleur. opt: { brand: false } = merkkleur niet gebruiken, { grad: true } = kleurverloop.
+let gradN = 0;
+window.anyIcon = function (x, cls, opt) {
+  opt = opt || {};
+  if (x && typeof x === 'object' && x.u) {
+    const u = String(x.u).replace(/[^a-zA-Z0-9/._-]/g, '');
+    return `<img class="ic img ${cls || ''}" src="${u}" alt="" draggable="false" loading="lazy">`;
+  }
   if (x && typeof x === 'object' && x.p) {
     const d = String(x.p).replace(/[^MmLlHhVvCcSsQqTtAaZz0-9.,\s-]/g, '');
-    return `<svg class="ic mdi ${cls || ''}" viewBox="0 0 24 24" fill="currentColor"><path d="${d}"/></svg>`;
+    const brand = x.c && opt.brand !== false && /^#[0-9a-fA-F]{3,8}$/.test(x.c);
+    if (opt.grad) {
+      const id = 'ig' + (++gradN);
+      return `<svg class="ic mdi grad ${cls || ''}" viewBox="0 0 24 24"><defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--ic1, currentColor)"/><stop offset="1" style="stop-color:var(--ic2, #ffffff)"/></linearGradient></defs><path fill="url(#${id})" d="${d}"/></svg>`;
+    }
+    return `<svg class="ic mdi${brand ? ' brand' : ''} ${cls || ''}" viewBox="0 0 24 24" fill="currentColor"${brand ? ` style="color:${x.c}"` : ''}><path d="${d}"/></svg>`;
   }
   return window.icon(x, cls);
 };

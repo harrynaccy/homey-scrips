@@ -60,6 +60,8 @@ bridge.on('event', e => broadcast('appevent', e));
 // ---------- app ----------
 const app = express();
 app.use(express.json({ limit: '25mb' }));
+// gekleurde pictogrammen: lang bewaren in de browser (ze veranderen niet)
+app.use('/iconsets', express.static(path.join(__dirname, '..', 'public', 'iconsets'), { maxAge: '30d', immutable: true }));
 app.use((req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
 app.use('/bg', express.static(BG_DIR, { maxAge: '30d' }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
@@ -78,7 +80,9 @@ app.get('/api/notifications', wrap(() => homey.notifications()));
 app.get('/api/insights', wrap(req => homey.insightEntries(req.query.uri, req.query.id, req.query.resolution || 'last24Hours')));
 
 // pictogrammen (Material Design Icons)
-app.get('/api/icons', wrap(req => ({ ...icons.search(req.query.q, req.query.cat, Number(req.query.offset) || 0, Math.min(400, Number(req.query.limit) || 200)), cats: icons.categories() })));
+app.get('/api/icons', wrap(req => icons.search(req.query.q, req.query.cat, Number(req.query.offset) || 0, Math.min(400, Number(req.query.limit) || 200), req.query.set || 'mdi')));
+app.get('/api/icons/pair/:set/:name', wrap(req => icons.pair(req.params.set, req.params.name) || {}));
+app.get('/api/icons/:set/:name', wrap(req => icons.get(req.params.name, req.params.set) || {}));
 app.get('/api/icons/:name', wrap(req => icons.get(req.params.name) || {}));
 
 app.post('/api/device/:id/:cap', wrap(req => homey.setCapability(req.params.id, req.params.cap, req.body.value)));

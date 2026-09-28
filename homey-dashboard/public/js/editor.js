@@ -174,7 +174,7 @@
         <div class="url-in"><input type="text" inputmode="url" autocapitalize="off" autocomplete="off" spellcheck="false" data-urlk="${k}" data-fx="${fx}" value="${esc(val)}" list="urlrecent" placeholder="http://…"><button class="ib sm" data-urlclear title="Leegmaken">${icon('x')}</button></div>
         <datalist id="urlrecent">${recent.map(u => `<option value="${esc(u)}">`).join('')}</datalist>${v ? '' : '<small class="urlhint">Het begin is al ingevuld. Typ de rest erachter, of tik op ✕ voor een heel ander adres.</small>'}</div>`;
     },
-    icon: (cur, custom) => `<span class="icctl"><span class="icprev">${anyIcon(cur)}</span><button class="btn sm" data-pickicon>${icon('shapes')}Kiezen</button>${custom ? `<button class="ib sm" data-clearicon title="Standaard pictogram">${icon('refresh')}</button>` : ''}</span>`,
+    icon: (cur, custom, which = 'on') => `<span class="icctl"><span class="icprev${which === 'off' ? ' off' : ''}">${anyIcon(cur)}</span><button class="btn sm" data-pickicon="${which}">${icon('shapes')}Kiezen</button>${custom ? `<button class="ib sm" data-clearicon="${which}" title="${which === 'off' ? 'Zelfde als aan' : 'Standaard pictogram'}">${icon('refresh')}</button>` : ''}</span>`,
     seg: (k, v, opts, fx) => `<div class="seg">${opts.map(([val, l]) => `<button data-segk="${k}" data-fx="${fx}" data-v="${esc(val)}" class="${String(val) === String(v) ? 'act' : ''}">${l}</button>`).join('')}</div>`,
   };
   E.fmtOut = (v, f) => f === '%' ? Math.round(v * 100) + '%' : f === 'p' ? v + '%' : f === 'px' ? v + 'px' : f === 'x' ? Number(v).toFixed(2) + '×' : f === 'b' ? Math.round(v / 255 * 100) + '%' : f === 'min' ? v + ' min' : f === 's' ? v + ' s' : f === 'deg' ? v + '°' : v;
@@ -329,43 +329,72 @@
 
   // ---------- pictogrammen (grote bibliotheek op de server) ----------
   E._iconCache = new Map();
-  E.getIcon = async name => {
-    if (!name) return null;
-    if (E._iconCache.has(name)) return E._iconCache.get(name);
-    const ic = await D.api('GET', '/api/icons/' + encodeURIComponent(name)).catch(() => null);
-    if (ic && ic.p) { E._iconCache.set(name, ic); return ic; }
+  E.getIcon = async (name, set = 'mdi') => {
+    if (!name) return null; const key = set + ':' + name;
+    if (E._iconCache.has(key)) return E._iconCache.get(key);
+    const ic = await D.api('GET', `/api/icons/${encodeURIComponent(set)}/${encodeURIComponent(name)}`).catch(() => null);
+    if (ic && (ic.p || ic.u)) { E._iconCache.set(key, ic); if (set === 'mdi') E._iconCache.set(name, ic); return ic; }
     return null;
   };
+  // tegenhanger voor aan/uit (alleen eenkleurig en Hue)
+  E.pairFor = async ic => {
+    if (!ic || !ic.n || !['mdi', 'hue'].includes(ic.s || 'mdi')) return null;
+    const r = await D.api('GET', `/api/icons/pair/${ic.s || 'mdi'}/${encodeURIComponent(ic.n)}`).catch(() => null);
+    return r && r.other ? r : null;
+  };
   const niceName = n => String(n || '').replace(/-/g, ' ');
-  // Zoekveld + categorieën + raster; onPick(icoon) bij tikken
+  const icName = ic => ic ? (ic.s === 'paar' ? niceName(ic.on.n) + ' / ' + niceName(ic.off.n) : ic.t || niceName(ic.n)) : '';
+  // Zoekveld + sets + categorieën + raster; onPick(icoon of paar) bij tikken
   E.iconBrowser = (root, onPick) => {
-    const st = E._icb || (E._icb = { q: '', cat: '' });
-    root.innerHTML = `<div class="icb-top"><input type="search" class="icb-q" placeholder="Zoek: lamp, raam, wasmachine, sensor…" value="${esc(st.q)}"><div class="chips-row icb-cats"></div></div>
+    const st = E._icb || (E._icb = { q: '', cat: '', set: 'mdi' }); st.set = st.set || 'mdi';
+    root.innerHTML = `<div class="icb-top"><input type="search" class="icb-q" placeholder="Zoek: lamp, raam, spotify, hue go, hond…" value="${esc(st.q)}"><div class="seg icb-sets"></div><div class="chips-row icb-cats"></div></div>
       <div class="note icb-info"></div><div class="icb-grid"></div><div class="acts"><button class="btn sm icb-more" hidden>Meer laden</button></div>`;
-    const q = root.querySelector('.icb-q'), grid = root.querySelector('.icb-grid'), more = root.querySelector('.icb-more'), info = root.querySelector('.icb-info'), cats = root.querySelector('.icb-cats');
-    let offset = 0, token = 0;
+    const q = root.querySelector('.icb-q'), grid = root.querySelector('.icb-grid'), more = root.querySelector('.icb-more'), info = root.querySelector('.icb-info'), cats = root.querySelector('.icb-cats'), sets = root.querySelector('.icb-sets');
+    let offset = 0, token = 0, items = [], meta = { sets: E._iconSets || [['mdi', 'Eenkleurig'], ['flat', 'Gekleurd plat'], ['3d', 'Gekleurd 3D'], ['merk', 'Merken'], ['hue', 'Hue'], ['paar', 'Aan/uit-paren']], cats: [], counts: null };
+    const drawSets = () => {
+      sets.innerHTML = meta.sets.map(([k, l]) => `<button data-set="${k}" class="${k === st.set ? 'act' : ''}">${esc(l)}${meta.counts ? ` <i>${meta.counts[k]}</i>` : ''}</button>`).join('');
+      sets.querySelectorAll('[data-set]').forEach(b => b.onclick = () => { st.set = b.dataset.set; st.cat = ''; drawSets(); load(false); });
+    };
     const drawCats = () => {
-      cats.innerHTML = [['', 'Alle'], ...(E._iconCats || [])].map(([k, l]) => `<button data-c="${esc(k)}" class="${k === st.cat ? 'act' : ''}">${esc(l)}</button>`).join('');
+      cats.innerHTML = [['', 'Alle'], ...(meta.cats || [])].filter((c, i, a) => a.findIndex(x => x[1] === c[1]) === i).map(([k, l]) => `<button data-c="${esc(k)}" class="${k === st.cat ? 'act' : ''}">${esc(l)}</button>`).join('');
       cats.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { st.cat = b.dataset.c; drawCats(); load(false); });
     };
+    const cell = (i, n) => i.s === 'paar'
+      ? `<button class="icb-it pair" data-i="${n}" title="${esc(icName(i))}">${anyIcon(i.on)}<em></em>${anyIcon(i.off)}</button>`
+      : `<button class="icb-it${i.s === 'merk' ? ' merk' : ''}" data-i="${n}" title="${esc(icName(i))}">${anyIcon(i)}</button>`;
     const load = async append => {
       const my = ++token;
-      if (!append) { offset = 0; grid.innerHTML = '<div class="muted pad">Laden…</div>'; }
-      const r = await D.api('GET', `/api/icons?q=${encodeURIComponent(st.q)}&cat=${encodeURIComponent(st.cat)}&offset=${offset}&limit=160`).catch(e => ({ error: e.message, items: [], total: 0 }));
+      if (!append) { offset = 0; items = []; grid.innerHTML = '<div class="muted pad">Laden…</div>'; }
+      const r = await D.api('GET', `/api/icons?set=${encodeURIComponent(st.set)}&q=${encodeURIComponent(st.q)}&cat=${encodeURIComponent(st.cat)}&offset=${offset}&limit=160`).catch(e => ({ error: e.message, items: [], total: 0 }));
       if (my !== token || !root.isConnected) return;
-      if (!E._iconCats && r.cats) { E._iconCats = r.cats; drawCats(); }
+      if (r.sets) { meta.sets = E._iconSets = r.sets; }
+      meta.cats = r.cats || []; meta.counts = r.counts; drawSets(); drawCats();
       if (!append) grid.innerHTML = '';
-      r.items.forEach(i => E._iconCache.set(i.n, i));
-      grid.insertAdjacentHTML('beforeend', r.items.map(i => `<button class="icb-it" data-n="${esc(i.n)}" title="${esc(niceName(i.n))}">${anyIcon(i)}</button>`).join(''));
+      grid.classList.toggle('pairs', st.set === 'paar'); grid.classList.toggle('colored', st.set === 'flat' || st.set === '3d');
+      grid.insertAdjacentHTML('beforeend', r.items.map((i, k) => cell(i, items.length + k)).join(''));
+      items.push(...r.items); r.items.forEach(i => { if (i.s === 'mdi') E._iconCache.set(i.n, i); });
       offset += r.items.length;
-      info.textContent = r.error ? 'Laden mislukt: ' + r.error : r.total ? `${r.total} pictogrammen${st.q ? ` voor "${st.q}"` : ''}` : 'Niets gevonden. Probeer een ander woord, in het Nederlands of Engels.';
+      info.textContent = r.error ? 'Laden mislukt: ' + r.error : r.total ? `${r.total} ${st.set === 'paar' ? 'paren' : 'pictogrammen'}${st.q ? ` voor "${st.q}"` : ''}${st.set === 'merk' ? ' · in de echte merkkleur' : st.set === 'paar' ? ' · links = aan, rechts = uit' : ''}` : 'Niets gevonden in deze set. Kijk bij de andere tabbladen (het getal = aantal gevonden).';
       more.hidden = offset >= r.total;
     };
-    drawCats();
+    drawSets(); drawCats();
     let qt; q.oninput = () => { st.q = q.value; clearTimeout(qt); qt = setTimeout(() => load(false), 250); };
     more.onclick = () => load(true);
-    grid.onclick = e => { const b = e.target.closest('[data-n]'); if (b) onPick(E._iconCache.get(b.dataset.n)); };
+    grid.onclick = e => { const b = e.target.closest('[data-i]'); if (b) onPick(items[Number(b.dataset.i)]); };
     load(false);
+  };
+  // pictogram (of paar) toepassen op een tegel; bij één pictogram wordt de uit-versie automatisch gezocht
+  E.applyIcon = async (t, ic, which = 'on') => {
+    if (!ic) return;
+    if (ic.s === 'paar') { E.commit(null, () => { t.opts.mdi = ic.on; t.opts.mdiOff = ic.off; delete t.opts.mdiAuto; delete t.opts.mdiOffAuto; }, () => { D.renderGrid(); E.refreshPanel(); D.toast('Pictogram voor aan en uit ingesteld'); }); return; }
+    if (which === 'off') { E.commit(null, () => { t.opts.mdiOff = ic; delete t.opts.mdiOffAuto; }, () => { D.renderGrid(); E.refreshPanel(); }); return; }
+    const pr = (!t.opts.mdiOff || t.opts.mdiOffAuto) ? await E.pairFor(ic) : null;
+    E.commit(null, () => {
+      t.opts.mdi = ic; delete t.opts.mdiAuto;
+      if (pr && pr.role === 'on') { t.opts.mdiOff = pr.other; t.opts.mdiOffAuto = true; }
+      else if (pr && pr.role === 'off') { t.opts.mdi = pr.other; t.opts.mdiOff = ic; t.opts.mdiOffAuto = true; }
+      else if (t.opts.mdiOffAuto) { delete t.opts.mdiOff; delete t.opts.mdiOffAuto; }
+    }, () => { D.renderGrid(); E.refreshPanel(); if (pr) D.toast(`Uit-pictogram automatisch gekozen: ${niceName((pr.role === 'on' ? pr.other : ic).n)}`); });
   };
   // Venster: pictogram kiezen
   E.pickIcon = () => new Promise(resolve => {
@@ -430,13 +459,15 @@
   });
 
   // ---------- knop of pictogram-tegel toevoegen ----------
-  E.addButton = async (kind, ref, mdi) => {
+  E.addButton = async (kind, ref, mdi, mdiOff) => {
     const tab = D.currentTab(); let auto = false;
+    if (mdi && mdi.s === 'paar') { mdiOff = mdi.off; mdi = mdi.on; }
     if (!mdi) { mdi = await E.getIcon(D.defaultMdiName(kind, ref)); auto = true; }
+    if (mdi && !mdiOff && !auto) { const pr = await E.pairFor(mdi); if (pr && pr.role === 'on') mdiOff = pr.other; else if (pr && pr.role === 'off') { mdiOff = mdi; mdi = pr.other; } }
     const [w, h] = { cover: [2, 3], dim: [3, 2], toggle: [3, 2] }[kind] || [2, 2];
     const spot = E.firstFree(tab, w, h);
     if (!spot) { D.toast('Geen ruimte meer op dit tabblad. Maak ruimte of vergroot het raster.', true); return; }
-    const opts = { kind }; if (mdi) opts.mdi = mdi; if (auto) opts.mdiAuto = true;
+    const opts = { kind }; if (mdi) opts.mdi = mdi; if (auto) opts.mdiAuto = true; if (mdiOff) { opts.mdiOff = mdiOff; opts.mdiOffAuto = true; }
     const nt = { id: D.uid('w'), type: 'button', ref, opts, style: kind === 'icon' ? { frameless: true } : {}, ...spot };
     E.commit(null, () => tab.tiles.push(nt), () => { E.sel = nt.id; D.renderGrid(); const el = D.tileEls.get(nt.id); if (el) el.classList.add('flash-ok'); E.refreshPanel(); D.toast(`${D.titleOf(nt)} toegevoegd. Tik erop om kleuren en pictogram aan te passen.`); });
   };
@@ -458,7 +489,7 @@
       E.addButton(kind, ref);
     });
     const missing = [...new Set(D.BUTTON_KINDS.map(k => k[3]))].filter(n => !E._iconCache.has(n));
-    if (missing.length) { await Promise.all(missing.map(E.getIcon)); if (root.isConnected) draw(); }
+    if (missing.length) { await Promise.all(missing.map(n => E.getIcon(n))); if (root.isConnected) draw(); }
   };
 
   // Pictogrammen
@@ -467,7 +498,8 @@
   E.useIcon = ic => {
     if (!ic) return;
     const f = E.sel && D.findTile(E.sel); const canSel = f && ['device', 'button', 'flow', 'mood'].includes(f.tile.type);
-    D.openSheet(`<div class="sheet-hd"><span class="badge big">${anyIcon(ic)}</span><div><h2>${esc(niceName(ic.n))}</h2><div class="sub">Wat wil je met dit pictogram?</div></div><button class="xbtn" data-close>${icon('x')}</button></div>
+    const prev = ic.s === 'paar' ? anyIcon(ic.on) + anyIcon(ic.off) : anyIcon(ic);
+    D.openSheet(`<div class="sheet-hd"><span class="badge big${ic.s === 'paar' ? ' pair' : ''}">${prev}</span><div><h2>${esc(icName(ic))}</h2><div class="sub">Wat wil je met ${ic.s === 'paar' ? 'dit paar (aan / uit)' : 'dit pictogram'}?</div></div><button class="xbtn" data-close>${icon('x')}</button></div>
       <div class="choice">
         <button data-a="device"><span class="lib-ic">${icon('bulb')}</span><span class="lib-t"><b>Op het dashboard, gekoppeld</b><small>Kleurt mee: lamp aan = verlicht, raam open = oranje. Tik = aan/uit.</small></span></button>
         <button data-a="kind"><span class="lib-ic">${icon('knob')}</span><span class="lib-t"><b>Als knop</b><small>Kies een knopstijl (3D, verlicht, wandschakelaar…) met dit pictogram</small></span></button>
@@ -477,11 +509,11 @@
     $('#sheet').onclick = async e => {
       if (e.target.closest('[data-close]')) return D.closeSheet();
       const a = e.target.closest('[data-a]'); if (!a) return; const act = a.dataset.a;
-      if (act === 'sel') { D.closeSheet(); E.commit(null, () => { f.tile.opts = f.tile.opts || {}; f.tile.opts.mdi = ic; delete f.tile.opts.mdiAuto; }, () => { D.renderGrid(); E.refreshPanel(); D.toast('Pictogram aangepast'); }); return; }
+      if (act === 'sel') { D.closeSheet(); f.tile.opts = f.tile.opts || {}; E.applyIcon(f.tile, ic); return; }
       if (act === 'plain') { D.closeSheet(); E.addButton('icon', { target: 'none' }, ic); return; }
       if (act === 'device') { const ref = await E.pickTarget(E.targetOpts('icon')); if (ref) E.addButton('icon', ref, ic); return; }
       if (act === 'kind') {
-        $('#sheet').innerHTML = `<div class="sheet-hd"><span class="badge big">${anyIcon(ic)}</span><div><h2>Knopstijl kiezen</h2><div class="sub">Met het pictogram ${esc(niceName(ic.n))}</div></div><button class="xbtn" data-close>${icon('x')}</button></div>
+        $('#sheet').innerHTML = `<div class="sheet-hd"><span class="badge big${ic.s === 'paar' ? ' pair' : ''}">${prev}</span><div><h2>Knopstijl kiezen</h2><div class="sub">Met ${esc(icName(ic))}</div></div><button class="xbtn" data-close>${icon('x')}</button></div>
           <div class="choice">${D.BUTTON_KINDS.filter(k => k[0] !== 'icon').map(([k, n, sub]) => `<button data-k2="${k}"><span class="lib-t"><b>${esc(n)}</b><small>${esc(sub)}</small></span></button>`).join('')}</div>`;
         $('#sheet').onclick = async e2 => {
           if (e2.target.closest('[data-close]')) return D.closeSheet();
@@ -546,6 +578,21 @@
     const st = root.querySelector('[data-sndtest]'); if (st) st.onclick = () => { const v = getV(); D.sound(v.snd === 'none' ? 'klik' : v.snd, v.vol); };
   };
 
+  // Pictogram-regels bij een tegel: aan, uit, merkkleur, kleur bij uit, kleurstijl
+  E.iconRows = (t, dflt) => {
+    const o = t.opts, P = selPath(), on = o.mdi || dflt; const kindOf = x => x && typeof x === 'object' ? (x.u ? 'img' : x.c ? 'merk' : 'mono') : 'mono';
+    let h = F.row('Pictogram (aan)', F.icon(on, !!o.mdi && !o.mdiAuto, 'on'), 'Tip: kies een paar bij "Aan/uit-paren"');
+    h += F.row('Pictogram (uit)', F.icon(o.mdiOff || on, !!o.mdiOff, 'off'), o.mdiOff ? (o.mdiOffAuto ? 'Automatisch gekozen' : 'Eigen keuze') : 'Nu: zelfde als aan');
+    const k = kindOf(o.mdiOff && !o.mdi ? o.mdiOff : on), k2 = kindOf(o.mdiOff);
+    if (k === 'merk' || k2 === 'merk') h += F.row('Merkkleur', F.toggle(`${P}.opts.brand`, o.brand !== false, 'tilepanel'), 'Logo in de echte kleur van het merk');
+    if (t.type === 'button' && (k === 'img' || k === 'merk' || k2 === 'img')) h += F.row('Kleur behouden bij uit', F.toggle(`${P}.opts.keepColor`, !!o.keepColor, 'tile'), 'Uit = anders grijs');
+    if (t.type === 'button' && k === 'mono') {
+      h += F.row('Kleurstijl', F.select(`${P}.opts.icStyle`, o.icStyle || 'mono', [['mono', 'Eén kleur'], ['verloop', 'Kleurverloop'], ['cirkel', 'Met gekleurde cirkel'], ['duo', 'Tweekleurig']], 'tilepanel'));
+      if (o.icStyle && o.icStyle !== 'mono') h += F.row({ verloop: 'Tweede kleur (verloop)', cirkel: 'Kleur pictogram', duo: 'Kleur cirkel' }[o.icStyle] || 'Tweede kleur', F.colorOpt(`${P}.opts.icColor2`, o.icColor2, o.icStyle === 'duo' ? D.cfg.settings.theme.onColor : '#ffffff', 'tilepanel'));
+    }
+    return h;
+  };
+
   // Keuzelijst knopstijl: bij een apparaat ook "Gewone tegel"
   E.kindSelect = (t, d) => {
     const cur = t.type === 'button' ? (t.opts.kind || 'glow') : '_tile';
@@ -565,7 +612,7 @@
       const ref = { target: 'device', deviceId: t.ref.deviceId }; const custom = t.opts.mdi;
       const ic = custom || await E.getIcon(D.defaultMdiName(kind, ref));
       const { title, ...prev } = t.opts;
-      E.commit(null, () => { t.type = 'button'; t.ref = ref; t.opts = { kind, _prev: prev }; if (title) t.opts.title = title; if (ic) t.opts.mdi = ic; if (!custom && ic) t.opts.mdiAuto = true; }, () => { D.renderGrid(); E.refreshPanel(); });
+      E.commit(null, () => { t.type = 'button'; t.ref = ref; t.opts = { kind, _prev: prev }; if (title) t.opts.title = title; if (ic) t.opts.mdi = ic; if (!custom && ic) t.opts.mdiAuto = true; if (prev.mdiOff) t.opts.mdiOff = prev.mdiOff; if (prev.brand === false) t.opts.brand = false; }, () => { D.renderGrid(); E.refreshPanel(); });
       return;
     }
     const ic = t.opts.mdiAuto || !t.opts.mdi ? await E.getIcon(D.defaultMdiName(kind, t.ref)) : null;
@@ -584,7 +631,7 @@
       spec += F.row('Knopstijl', E.kindSelect(t, d), 'Maak van deze tegel een knop');
       spec += F.row('Weergave', F.select(`${P}.opts.view`, t.opts.view || 'auto', [['auto', 'Automatisch'], ['toggle', 'Alleen knop'], ['slider', 'Knop + schuif'], ['value', 'Eén waarde groot']], 'tilepanel'));
       if (d && (t.opts.view === 'value' || D.devKind(d) === 'sensor')) spec += F.row('Waarde', F.select(`${P}.opts.cap`, t.opts.cap || D.measures(d)[0] || '', Object.keys(d.caps).map(k => [k, d.caps[k].title || k]), 'tile'));
-      spec += F.row('Pictogram', F.icon(t.opts.mdi || (d ? D.devIcon(d) : 'chip'), !!t.opts.mdi));
+      spec += E.iconRows(t, d ? D.devIcon(d) : 'chip');
       spec += F.row('Zone tonen', F.toggle(`${P}.opts.showZone`, t.opts.showZone !== false, 'tile'));
       spec += `<p class="note">Op het dashboard: tik = aan/uit, lang drukken = alle bediening.</p>`;
     } else if (t.type === 'flow') {
@@ -596,7 +643,7 @@
       spec += F.row('Knopstijl', E.kindSelect(t, d));
       spec += F.row('Gekoppeld aan', `<span class="tgt">${esc(D.btnTargetName(t.ref) || 'Niets')}</span><button class="btn sm" data-retarget>Wijzigen</button>`);
       if (d) spec += F.row('Toestand van', F.select(`${P}.opts.cap`, o.cap || '', [['', 'Automatisch'], ...Object.keys(d.caps).map(k => [k, d.caps[k].title || k])], 'tilepanel'), 'Welke waarde de knop laat zien');
-      spec += F.row('Pictogram', F.icon(o.mdi || 'chip', !!o.mdi && !o.mdiAuto));
+      spec += E.iconRows(t, 'chip');
       spec += F.row('Kleur als aan', F.colorOpt(`${P}.opts.colorOn`, o.colorOn, th.onColor, 'tilepanel')) + F.row('Kleur als uit', F.colorOpt(`${P}.opts.colorOff`, o.colorOff, '#9aa3b2', 'tilepanel'));
       spec += F.row('Naam tonen', F.toggle(`${P}.opts.label`, o.label !== false, 'tile')) + F.row('Toestand tonen', F.toggle(`${P}.opts.state`, o.state !== false, 'tile'), 'Bijv. "Aan · 70%" of "Open"');
       spec += `<p class="note">${o.kind === 'panic' ? 'Deze knop vraagt altijd eerst om bevestiging.' : 'Op het dashboard: tik = bedienen, lang drukken = alle bediening van het apparaat.'}</p>`;
@@ -637,13 +684,12 @@
       if (!(await D.confirm(`Stijl van deze knop (kleuren, vorm, rand, schaduw, gloed, tekst, diepte en geluid) op ${others.length} andere ${others.length === 1 ? 'knop' : 'knoppen'} van "${f.tab.name}" zetten?`, 'Kopiëren'))) return;
       E.commit(null, () => others.forEach(x => { x.style = D.clone(t.style || {}); for (const o of ['colorOn', 'colorOff', 'label', 'state']) { if (t.opts[o] === undefined) delete x.opts[o]; else x.opts[o] = t.opts[o]; } }), () => { D.renderGrid(); D.toast(`Stijl gekopieerd naar ${others.length} ${others.length === 1 ? 'knop' : 'knoppen'}`); });
     };
-    const pi = root.querySelector('[data-pickicon]');
-    if (pi) pi.onclick = async () => { const ic = await E.pickIcon(); if (ic) E.commit(null, () => { t.opts.mdi = ic; delete t.opts.mdiAuto; }, () => { D.renderGrid(); E.refreshPanel(); }); };
-    const ci = root.querySelector('[data-clearicon]');
-    if (ci) ci.onclick = async () => {
+    root.querySelectorAll('[data-pickicon]').forEach(b => b.onclick = async () => { const ic = await E.pickIcon(); if (ic) E.applyIcon(t, ic, b.dataset.pickicon); });
+    root.querySelectorAll('[data-clearicon]').forEach(b => b.onclick = async () => {
+      if (b.dataset.clearicon === 'off') { E.commit(null, () => { delete t.opts.mdiOff; delete t.opts.mdiOffAuto; }, () => { D.renderGrid(); E.refreshPanel(); }); return; }
       const ic = t.type === 'button' ? await E.getIcon(D.defaultMdiName(t.opts.kind, t.ref)) : null;
-      E.commit(null, () => { if (ic) { t.opts.mdi = ic; t.opts.mdiAuto = true; } else delete t.opts.mdi; }, () => { D.renderGrid(); E.refreshPanel(); });
-    };
+      E.commit(null, () => { if (ic) { t.opts.mdi = ic; t.opts.mdiAuto = true; } else delete t.opts.mdi; if (t.opts.mdiOffAuto) { delete t.opts.mdiOff; delete t.opts.mdiOffAuto; } }, () => { D.renderGrid(); E.refreshPanel(); });
+    });
     const rt = root.querySelector('[data-retarget]');
     if (rt) rt.onclick = async () => {
       const kind = t.opts.kind || 'glow'; const ref = await E.pickTarget(E.targetOpts(kind)); if (!ref) return;

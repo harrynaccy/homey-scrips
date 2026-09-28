@@ -237,3 +237,25 @@ body.editing .tile .inner { pointer-events: none; }
 .f > .c > .rg input[type=range] { flex: 1; width: auto; min-width: 60px; }
 .f > .c > .seg { flex: 1; }
 .f:has(> .c > .rg) > label small, .f:has(> .c > .seg) > label small { display: inline; margin-left: 6px; }
+
+/* pictogramkiezer: sets, gekleurd, merken, paren */
+.icb-sets { margin: 8px 0 6px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.icb-sets::-webkit-scrollbar { display: none; }
+.icb-sets button { flex: none; font-size: 12px; padding: 7px 9px; }
+.icb-sets button i { font-style: normal; opacity: .65; font-size: 11px; margin-left: 2px; }
+.icb-grid.colored { grid-template-columns: repeat(auto-fill, minmax(54px, 1fr)); }
+.icb-grid.colored .icb-it .ic { width: 36px; height: 36px; }
+.icb-it .ic.img { width: 30px; height: 30px; }
+.icb-grid.pairs { grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); }
+.icb-it.pair { aspect-ratio: auto; height: 50px; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.icb-it.pair em { width: 1px; height: 22px; background: rgba(255,255,255,.2); }
+.icb-it.pair .ic + em + .ic { opacity: .5; }
+.icb-it.merk { background: #e9edf3; }
+#sheet .icb-it.merk { background: #e9edf3; }
+.icprev.off .ic { opacity: .55; }
+.icprev .ic.img { width: 26px; height: 26px; }
+.badge.pair { width: auto; padding: 0 10px; gap: 6px; display: flex; border-radius: 16px; }
+.badge.pair .ic + .ic { opacity: .5; }
+.badge .ic.img { width: 30px; height: 30px; }
+.icb-sets { flex-wrap: wrap; overflow: visible; }
+.icb-sets button { flex: 1 1 30%; }
