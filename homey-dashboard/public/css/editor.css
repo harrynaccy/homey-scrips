@@ -207,3 +207,33 @@ body.editing .tile .inner { pointer-events: none; }
 .kb-prevtile .kb-dim.is-on::after { background: linear-gradient(to right, var(--kon) 0 55%, var(--soft2) 55%); }
 #panel .switch:not(.on) { background: rgba(255,255,255,.18); }
 .kb-prevtile .kb-cover .face { display: none; }
+
+/* schuifregelaars met – en + */
+.rg { gap: 4px; }
+.rg input[type=range] { width: 92px; }
+.rg output { min-width: 40px; }
+.f .c { max-width: 68%; }
+.ib.xs { width: 26px; height: 26px; border-radius: 8px; }
+.ib.xs .ic { width: 14px; height: 14px; }
+.ib.xs:active { background: var(--accent); color: #0b0f16; }
+.rg + .ib.xs, .c > .ib.xs { margin-left: 4px; }
+
+/* inklapbare groepjes */
+.fold { border-radius: 12px; background: #131820; margin: 0 0 6px; }
+.fold > summary { list-style: none; cursor: pointer; padding: 11px 12px; font-weight: 600; font-size: 13.5px; color: #dfe4ec; display: flex; align-items: center; justify-content: space-between; }
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary::after { content: '▸'; color: #7d8697; transition: transform .2s; }
+.fold[open] > summary::after { transform: rotate(90deg); }
+.fold-b { padding: 0 12px 8px; }
+.fxpresets { display: flex; flex-wrap: wrap; gap: 5px; margin: 2px 0 8px; }
+.fxpresets button { padding: 6px 10px; border-radius: 99px; background: #1f2631; color: #cfd5de; font-size: 12px; }
+.fxpresets button:active { background: var(--accent); color: #0b0f16; }
+.fold .seg button { padding: 7px 7px; font-size: 12px; }
+/* regels met schuifregelaar of keuzeknoppen: naam boven, regelaar over de volle breedte */
+.f:has(> .c > .rg), .f:has(> .c > .seg) { flex-wrap: wrap; gap: 4px 10px; padding: 6px 0; }
+.f:has(> .c > .rg) > label, .f:has(> .c > .seg) > label { flex-basis: 100%; }
+.f:has(> .c > .rg) > .c, .f:has(> .c > .seg) > .c { max-width: 100%; width: 100%; justify-content: stretch; }
+.f > .c > .rg { flex: 1; }
+.f > .c > .rg input[type=range] { flex: 1; width: auto; min-width: 60px; }
+.f > .c > .seg { flex: 1; }
+.f:has(> .c > .rg) > label small, .f:has(> .c > .seg) > label small { display: inline; margin-left: 6px; }

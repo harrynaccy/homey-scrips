@@ -47,7 +47,7 @@
       if (long) timer = setTimeout(() => { longed = true; el.classList.remove('pressing'); if (navigator.vibrate) navigator.vibrate(15); long(e); }, 550);
     };
     el.onpointermove = e => { if (start && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 12) { moved = true; clearTimeout(timer); el.classList.remove('pressing'); } };
-    el.onpointerup = e => { clearTimeout(timer); el.classList.remove('pressing'); if (start && !moved && !longed && tap && !D.editing && !e.target.closest('.nopress')) tap(e); start = null; };
+    el.onpointerup = e => { clearTimeout(timer); el.classList.remove('pressing'); if (start && !moved && !longed && tap && !D.editing && !e.target.closest('.nopress')) { D.playFor(el); tap(e); } start = null; };
     el.onpointercancel = el.onpointerleave = () => { clearTimeout(timer); el.classList.remove('pressing'); start = null; };
   };
   const guard = async (t, text) => !(t.style && t.style.confirm) || D.confirm(text || `${titleOf(t)}: weet je het zeker?`);
@@ -77,7 +77,7 @@
       if (!d) { inner.innerHTML = `<div class="empty">${icon('chip')}<span>Apparaat niet gevonden</span></div>`; return; }
       const view = (t.opts && t.opts.view) || 'auto'; const kind = D.devKind(d); const c = d.caps; const sz = size(t);
       const on = c.onoff ? !!c.onoff.value : (c.locked ? !!c.locked.value : false);
-      el.classList.toggle('on', kind === 'switch' && on);
+      el.classList.toggle('on', kind === 'switch' && on); el.classList.remove('alarm-on', 'is-on');
       el.classList.toggle('offline', !d.available);
       const zone = t.opts && t.opts.showZone === false ? '' : D.zoneName(d.zone);
 
@@ -85,6 +85,7 @@
         const capId = (t.opts && t.opts.cap) || D.measures(d)[0];
         const main = c[capId]; const rest = D.measures(d).filter(k => k !== capId).slice(0, sz.big ? 4 : 0);
         const alarm = main && typeof main.value === 'boolean' && main.value;
+        el.classList.toggle('alarm-on', !!(alarm && capId.startsWith('alarm_'))); el.classList.toggle('is-on', !!alarm);
         inner.innerHTML = head(t, t.opts.mdi || D.devIcon(d), esc(zone), alarm) +
           `<div class="big${alarm ? ' alarm' : ''}">${esc(D.fmt(main, capId))}</div>` +
           (rest.length ? `<div class="chips">${rest.map(k => `<span class="chip${typeof c[k].value === 'boolean' && c[k].value ? ' alert' : ''}">${esc(D.fmt(c[k], k))}</span>`).join('')}</div>` : '');
@@ -240,6 +241,7 @@
       const active = o._preview !== undefined ? o._preview : kind === 'dim' ? dimOn : on; // _preview: voorbeeld in het menu
       const ic = o.mdi || D.BUTTON_KINDS.find(k => k[0] === kind)?.[3] || 'power';
       el.classList.toggle('offline', !!d && !d.available); el.classList.remove('on'); el.style.removeProperty('--lamp');
+      el.classList.toggle('is-on', !!active); el.classList.toggle('alarm-on', !!(isAlarm && active));
       el.style.setProperty('--kon', o.colorOn || (isAlarm ? '#ff8a5c' : 'var(--on)'));
       if (o.colorOff) el.style.setProperty('--koff', o.colorOff); else el.style.removeProperty('--koff');
       const showLabel = o.label !== false, showState = o.state !== false && !!state;
@@ -262,7 +264,7 @@
 
       if (kind === 'cover') {
         inner.querySelectorAll('[data-p]').forEach(b => b.onclick = async () => {
-          if (!d || !(await guard(t))) return; const p = b.dataset.p;
+          if (!d || !(await guard(t))) return; const p = b.dataset.p; D.playFor(el);
           if (p === 'idle') { if (d.caps.windowcoverings_state) D.setCap(d.id, 'windowcoverings_state', 'idle'); return; }
           if (d.caps.windowcoverings_set) D.setCap(d.id, 'windowcoverings_set', p === 'up' ? 1 : 0);
           else if (d.caps.windowcoverings_state) D.setCap(d.id, 'windowcoverings_state', p);

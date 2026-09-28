@@ -103,6 +103,24 @@ De tegel wordt dan een knop. Met **Gewone tegel** zet je hem weer terug.
 Tik daarna op de knop en ga naar **Tegel**. Daar stel je in: de knopstijl, waaraan hij gekoppeld is, welke waarde hij laat zien,
 het pictogram, de kleur als hij aan of uit is, en of de naam en de toestand eronder staan.
 
+## Stijl: schaduw, gloed, rand, vorm, tekst, diepte en geluid
+
+Tik op een tegel en kies **Tegel → Stijl**. De instellingen staan in inklapbare groepjes:
+
+- **Kleuren**: achtergrond, doorzichtigheid, tekstkleur en aan-kleur.
+- **Vorm en rand**: hoeken van de tegel, **knopvorm** (0% = vierkant, 50% = rond), **binnenmarge** (ruimte tussen de knop en de rand),
+  **randdikte**, randkleur, rand doorzichtigheid, "rand kleurt mee als aan", en de dikte van de rand van de knop zelf.
+- **Schaduw en gloed**: kant-en-klare keuzes (*Zacht zwevend*, *Neon*, *Warm lampje*, *Diepe schaduw*, *Knipperen bij alarm*, *Geen effecten*).
+  Schaduw op de tegel, de knop of de tekst, met sterkte, grootte, richting en kleur.
+  Gloed *nooit*, *als aan*, *altijd* of *bij alarm* (knipperen), op de tegel, de knop of de tekst.
+- **Tekst**: tekstgrootte, en de doorzichtigheid van de naam en van de toestand, elk met een eigen schuifregelaar.
+- **Bediening**: **indrukdiepte** (3D-knop, paniekknop en wandschakelaars), **tikeffect**, **klikgeluid** (klik, tik, schakelaar, zachte plop) met volume en een knop om het geluid te proberen.
+
+Elke schuifregelaar heeft **–** en **+**. Houd ze ingedrukt, dan loopt de waarde steeds sneller door. Met het pijltje-rondje ernaast zet je een waarde terug naar de standaard.
+Bij knoppen zet **Stijl naar alle knoppen op dit tabblad** dezelfde stijl op alle andere knoppen van het tabblad.
+Onder **Uiterlijk → Standaard voor alle tegels en knoppen** stel je hetzelfde in voor alle tegels tegelijk. Per tegel kun je daarvan afwijken.
+Het klikgeluid komt uit de tablet, dus zet het mediavolume van de tablet aan.
+
 ## Pictogrammen
 
 Onder **Pictogrammen** staan ruim 7000 pictogrammen (Material Design Icons), ingedeeld in categorieën zoals Lampen, Sensoren,

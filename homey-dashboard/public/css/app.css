@@ -34,11 +34,11 @@ input, select, textarea { font: inherit; }
 .tab.hid { opacity: .45; outline: 1px dashed rgba(255,255,255,.4); outline-offset: -3px; }
 
 /* tegels */
-.tile { --soft: color-mix(in srgb, var(--text) 10%, transparent); --soft2: color-mix(in srgb, var(--text) 14%, transparent); --soft3: color-mix(in srgb, var(--text) 22%, transparent); position: relative; min-width: 0; min-height: 0; border-radius: var(--radius); background: var(--tile); border: 1px solid var(--border); box-shadow: var(--shadow);
+.tile { --soft: color-mix(in srgb, var(--text) 10%, transparent); --soft2: color-mix(in srgb, var(--text) 14%, transparent); --soft3: color-mix(in srgb, var(--text) 22%, transparent); position: relative; min-width: 0; min-height: 0; border-radius: var(--radius); background: var(--tile); border: var(--bw, 1px) solid var(--border); box-shadow: var(--shadow);
   backdrop-filter: blur(var(--blur)); -webkit-backdrop-filter: blur(var(--blur)); color: var(--text); overflow: hidden; container-type: size; transition: transform .12s ease, background .3s; }
 .tile .inner { position: absolute; inset: 0; display: flex; flex-direction: column; padding: clamp(10px, 7cqmin, 22px);
   font-size: clamp(11px, calc((4.6cqmin + 4px) * var(--fs) * var(--tfs, 1)), 46px); line-height: 1.25; }
-.tile.pressing { transform: scale(.97); }
+.tile.pressing { transform: scale(calc(1 - .03 * var(--tap, 1))); }
 .tile.offline { opacity: .5; }
 .tile.on { background: linear-gradient(140deg, color-mix(in srgb, var(--lamp, var(--on)) 26%, transparent), transparent 75%), var(--tile); }
 .tile.frameless { background: none; border: 0; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
@@ -184,8 +184,8 @@ input, select, textarea { font: inherit; }
 
 /* ---------- knoppen en pictogrammen ---------- */
 .ic.mdi { stroke: none; }
-.kb { --kon: var(--on); --koff: var(--muted); --face: min(56cqh, 72cqw); height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .5em; text-align: center; min-height: 0; }
-.kb.nolabel { --face: min(80cqh, 80cqw); }
+.kb { --kon: var(--on); --koff: var(--muted); --face: min(64cqh, 88cqw); height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .5em; text-align: center; min-height: 0; }
+.kb.nolabel { --face: min(94cqh, 94cqw); }
 .kb-txt { min-width: 0; max-width: 100%; display: flex; flex-direction: column; gap: .1em; }
 .kb-label { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kb-state { color: var(--muted); font-size: .8em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -211,21 +211,21 @@ input, select, textarea { font: inherit; }
 
 /* 1. drukknop 3D: hoog = uit, laag = aan */
 .kb-3d .face { border-radius: 24%; background: linear-gradient(180deg, color-mix(in srgb, var(--text) 18%, var(--tile-solid)), color-mix(in srgb, var(--text) 7%, var(--tile-solid)));
-  box-shadow: 0 .5em 0 color-mix(in srgb, #000 60%, var(--tile-solid)), 0 .9em 1.4em rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.22); transform: translateY(-.25em); }
-.kb-3d.is-on .face, .tile.pressing .kb-3d .face { transform: translateY(.25em); background: linear-gradient(180deg, color-mix(in srgb, var(--kon) 16%, var(--tile-solid)), color-mix(in srgb, var(--kon) 26%, var(--tile-solid)));
-  box-shadow: 0 .06em 0 color-mix(in srgb, #000 60%, var(--tile-solid)), 0 .2em .5em rgba(0,0,0,.4), inset 0 .3em .7em rgba(0,0,0,.45); }
+  box-shadow: 0 calc(.5em * var(--depth, 1)) 0 color-mix(in srgb, #000 60%, var(--tile-solid)), 0 calc(.9em * var(--depth, 1)) 1.4em rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.22); transform: translateY(calc(-.25em * var(--depth, 1))); }
+.kb-3d.is-on .face, .tile.pressing .kb-3d .face { transform: translateY(calc(.25em * var(--depth, 1))); background: linear-gradient(180deg, color-mix(in srgb, var(--kon) 16%, var(--tile-solid)), color-mix(in srgb, var(--kon) 26%, var(--tile-solid)));
+  box-shadow: 0 calc(.06em * var(--depth, 1)) 0 color-mix(in srgb, #000 60%, var(--tile-solid)), 0 .2em .5em rgba(0,0,0,.4), inset 0 calc(.3em * var(--depth, 1)) .7em rgba(0,0,0,.45); }
 .tile.pressing .kb-3d:not(.is-on) .face { background: linear-gradient(180deg, color-mix(in srgb, var(--text) 10%, var(--tile-solid)), color-mix(in srgb, var(--text) 16%, var(--tile-solid))); }
 
 /* 2. verlichte knop */
-.kb-glow .face { border-radius: 26%; background: color-mix(in srgb, var(--text) 7%, transparent); border: .12em solid color-mix(in srgb, var(--text) 14%, transparent); }
+.kb-glow .face { border-radius: 26%; background: color-mix(in srgb, var(--text) 7%, transparent); border: var(--fbw, .12em) solid color-mix(in srgb, var(--text) 14%, transparent); }
 .kb-glow.is-on .face { background: color-mix(in srgb, var(--kon) 16%, transparent); border-color: var(--kon);
   box-shadow: 0 0 1.3em color-mix(in srgb, var(--kon) 55%, transparent), inset 0 0 1.1em color-mix(in srgb, var(--kon) 35%, transparent); }
 
 /* 3 + 4. wandschakelaar (met led) */
 .kb-rocker .face, .kb-rockerled .face { width: calc(var(--face) * .8); border-radius: 12%; background: linear-gradient(160deg, #f4f4f1, #d6d6d1); box-shadow: 0 .3em .9em rgba(0,0,0,.45), inset 0 1px 0 #fff; perspective: 10em; }
-.kb .paddle { position: absolute; inset: 13%; border-radius: 9%; display: grid; place-items: center; transform: rotateX(16deg); transition: transform .22s ease, background .22s;
+.kb .paddle { position: absolute; inset: 13%; border-radius: 9%; display: grid; place-items: center; transform: rotateX(calc(16deg * var(--depth, 1))); transition: transform .22s ease, background .22s;
   background: linear-gradient(180deg, #dcdcd6, #fbfbf8 60%); box-shadow: 0 .12em .25em rgba(0,0,0,.28), inset 0 -.1em .2em rgba(0,0,0,.06); }
-.kb.is-on .paddle { transform: rotateX(-16deg); background: linear-gradient(180deg, #fbfbf8 40%, #dcdcd6); }
+.kb.is-on .paddle { transform: rotateX(calc(-16deg * var(--depth, 1))); background: linear-gradient(180deg, #fbfbf8 40%, #dcdcd6); }
 .kb .paddle > .ic { width: 50%; height: 50%; color: var(--koff, #8a8a86); }
 .kb-rocker .paddle > .ic, .kb-rockerled .paddle > .ic { color: #8b8b86; }
 .kb-rocker.is-on .paddle > .ic, .kb-rockerled.is-on .paddle > .ic { color: var(--kon); filter: none; }
@@ -233,19 +233,19 @@ input, select, textarea { font: inherit; }
 .kb.is-on .led { background: var(--kon); box-shadow: 0 0 .5em var(--kon), 0 0 1em var(--kon); }
 
 /* 5. ronde knop met ring */
-.kb-ring .face { border-radius: 50%; background: color-mix(in srgb, var(--text) 7%, transparent); box-shadow: inset 0 0 0 .2em color-mix(in srgb, var(--text) 16%, transparent); }
-.kb-ring.is-on .face { background: color-mix(in srgb, var(--kon) 12%, transparent); box-shadow: inset 0 0 0 .2em var(--kon), 0 0 1.4em color-mix(in srgb, var(--kon) 50%, transparent); }
+.kb-ring .face { border-radius: 50%; background: color-mix(in srgb, var(--text) 7%, transparent); box-shadow: inset 0 0 0 var(--fbw, .2em) color-mix(in srgb, var(--text) 16%, transparent); }
+.kb-ring.is-on .face { background: color-mix(in srgb, var(--kon) 12%, transparent); box-shadow: inset 0 0 0 var(--fbw, .2em) var(--kon), 0 0 1.4em color-mix(in srgb, var(--kon) 50%, transparent); }
 
 /* 8. scène */
-.kb-scene .face { border-radius: 28%; background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 38%, transparent), color-mix(in srgb, var(--accent) 12%, transparent)); border: .1em solid color-mix(in srgb, var(--accent) 45%, transparent); }
+.kb-scene .face { border-radius: 28%; background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 38%, transparent), color-mix(in srgb, var(--accent) 12%, transparent)); border: var(--fbw, .1em) solid color-mix(in srgb, var(--accent) 45%, transparent); }
 .kb-scene .face > .ic { color: var(--text); }
 .kb-scene.is-on .face { box-shadow: 0 0 1.3em color-mix(in srgb, var(--kon) 50%, transparent); }
 
 /* 9. paniek */
 .kb-panic .face { border-radius: 50%; background: radial-gradient(circle at 50% 35%, #555a63, #2a2d33); box-shadow: 0 .3em .8em rgba(0,0,0,.5), inset 0 0 0 .18em #ffcc33; }
-.kb-panic .cap { position: absolute; inset: 14%; border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle at 40% 30%, #ff6b6b, #c41d1d 70%); box-shadow: 0 .25em 0 #7d0f0f, 0 .4em .7em rgba(0,0,0,.45), inset 0 .1em .15em rgba(255,255,255,.35); transform: translateY(-.15em); transition: transform .15s, box-shadow .15s; }
+.kb-panic .cap { position: absolute; inset: 14%; border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle at 40% 30%, #ff6b6b, #c41d1d 70%); box-shadow: 0 calc(.25em * var(--depth, 1)) 0 #7d0f0f, 0 .4em .7em rgba(0,0,0,.45), inset 0 .1em .15em rgba(255,255,255,.35); transform: translateY(calc(-.15em * var(--depth, 1))); transition: transform .15s, box-shadow .15s; }
 .kb-panic .cap > .ic { color: #fff; width: 52%; height: 52%; }
-.tile.pressing .kb-panic .cap { transform: translateY(.15em); box-shadow: 0 .05em 0 #7d0f0f, inset 0 .2em .5em rgba(0,0,0,.4); }
+.tile.pressing .kb-panic .cap { transform: translateY(calc(.15em * var(--depth, 1))); box-shadow: 0 .05em 0 #7d0f0f, inset 0 .2em .5em rgba(0,0,0,.4); }
 .kb-panic.is-on .cap { animation: panicpulse 1.2s ease-in-out infinite; }
 @keyframes panicpulse { 50% { box-shadow: 0 .25em 0 #7d0f0f, 0 0 1.6em #ff3b3b; } }
 
@@ -253,6 +253,30 @@ input, select, textarea { font: inherit; }
 .kb-icon .face > .ic { width: 82%; height: 82%; }
 .kb-icon.is-on.is-alarm .face > .ic { animation: iconblink 1.4s ease-in-out infinite; }
 @keyframes iconblink { 50% { opacity: .55; } }
-.kb-cover .face { --face: min(30cqh, 60cqw); align-self: center; }
+.kb-cover .face { --face: min(34cqh, 70cqw); align-self: center; }
 .kb-cover .face > .ic { width: 80%; height: 80%; }
 .kb-cover .btnrow { margin-top: 0; }
+
+/* ---------- stijl-effecten per tegel ---------- */
+.tile .inner { container-type: size; text-shadow: var(--tsh, none); }
+.tile.has-pad .inner, .tile.frameless.has-pad .inner { padding: var(--pad); }
+/* tekst: naam en toestand apart doorzichtig */
+.tile .name, .tile .kb-label, .tile .clock b, .tile .txt, .tile .cstat b { opacity: var(--txn, 1); }
+.tile .sub, .tile .state, .tile .kb-state, .tile .big, .tile .chips, .tile .hint, .tile .clock span, .tile .cstat span { opacity: var(--txs, 1); }
+/* schaduw op knop of pictogram */
+.tile .kb .face, .tile .kb-mini, .tile .badge { filter: var(--fsh, none); }
+/* gloed: op tegel, knop of tekst; nooit, altijd, alleen als aan, of knipperend bij alarm */
+.tile.gt-tile.gw-always, .tile.gt-tile.gw-on:is(.on, .is-on), .tile.gt-tile.gw-alarm.alarm-on { box-shadow: var(--glow-box), var(--shadow); }
+.tile.gt-face.gw-always :is(.kb .face, .kb-mini, .badge), .tile.gt-face.gw-on:is(.on, .is-on) :is(.kb .face, .kb-mini, .badge), .tile.gt-face.gw-alarm.alarm-on :is(.kb .face, .kb-mini, .badge) { filter: var(--glow-drop) var(--fsh,); }
+.tile.gt-text.gw-always .inner, .tile.gt-text.gw-on:is(.on, .is-on) .inner, .tile.gt-text.gw-alarm.alarm-on .inner { text-shadow: var(--glow-text), var(--tsh, 0 0 0 transparent); }
+.tile.gt-tile.gw-alarm.alarm-on { animation: blinkbox 1.2s ease-in-out infinite; }
+.tile.gt-face.gw-alarm.alarm-on :is(.kb .face, .kb-mini, .badge) { animation: blinkdrop 1.2s ease-in-out infinite; }
+.tile.gt-text.gw-alarm.alarm-on .inner { animation: blinktext 1.2s ease-in-out infinite; }
+@keyframes blinkbox { 50% { box-shadow: var(--shadow); } }
+@keyframes blinkdrop { 50% { filter: var(--fsh, none); } }
+@keyframes blinktext { 50% { text-shadow: var(--tsh, none); } }
+/* rand kleurt mee als het apparaat aan staat */
+.tile.bd-on:is(.on, .is-on) { border-color: var(--kon, var(--on)); }
+/* eigen knopvorm (0% = vierkant, 50% = rond) */
+.tile.has-fr .kb .face, .tile.has-fr .kb .face.sm, .tile.has-fr .kb-mini, .tile.has-fr .badge, .tile.has-fr .kb-panic .cap { border-radius: var(--fr); }
+.tile.has-fr .kb .paddle { border-radius: calc(var(--fr) * .8); }

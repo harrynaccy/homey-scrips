@@ -206,6 +206,73 @@
     return el;
   };
   D.placeTile = (el, t) => { el.style.gridColumn = `${t.x + 1} / span ${t.w}`; el.style.gridRow = `${t.y + 1} / span ${t.h}`; };
+  // ---------- stijl-effecten: schaduw, gloed, rand, tekst, vorm, marge, diepte, geluid ----------
+  // Standaardwaarden; per tegel te overschrijven in t.style, voor alle tegels in settings.theme.fx
+  D.FX_DEFAULT = { shT: 'tile', shS: 30, shD: 'down', shC: '#000000', glW: 'never', glT: 'face', glC: '', glA: 0.7, glS: 24,
+    bdW: 1, bdC: '#ffffff', bdOn: false, txN: 1, txS: 1, fr: null, pad: null, fbw: null, depth: 1, tap: 1, snd: 'none', vol: 0.6 };
+  D.FX_KEYS = [...Object.keys(D.FX_DEFAULT), 'shA', 'bdA'];
+  D.fxBase = () => { const th = D.cfg.settings.theme; return { ...D.FX_DEFAULT, shA: th.shadow ?? 0.35, bdA: th.border ?? 0.1, ...(th.fx || {}) }; };
+  D.fxOf = t => { const out = D.fxBase(); const s = (t && t.style) || {}; for (const k of D.FX_KEYS) if (s[k] !== undefined && s[k] !== null && s[k] !== '') out[k] = s[k]; return out; };
+  const mix = (c, a) => /^#/.test(c) ? D.hexA(c, a) : `color-mix(in srgb, ${c} ${Math.round(a * 100)}%, transparent)`;
+  D.applyFx = (el, t) => {
+    const fx = D.fxOf(t); const st = el.style;
+    // rand
+    st.setProperty('--bw', fx.bdW + 'px'); st.setProperty('--border', D.hexA(fx.bdC, fx.bdA));
+    el.classList.toggle('bd-on', !!fx.bdOn);
+    // schaduw
+    const S = Number(fx.shS) || 0; const off = { down: [0, 0.35], diag: [0.3, 0.35], around: [0, 0] }[fx.shD] || [0, 0.35];
+    const x = Math.round(off[0] * S), y = Math.round(off[1] * S); const sc = D.hexA(fx.shC, fx.shA); const has = fx.shA > 0 && S >= 0;
+    st.setProperty('--shadow', has && fx.shT === 'tile' ? `${x}px ${y}px ${S}px ${sc}` : '0 0 0 transparent');
+    if (has && fx.shT === 'face') st.setProperty('--fsh', `drop-shadow(${Math.round(x / 2)}px ${Math.round(y / 2)}px ${Math.round(S / 3)}px ${sc})`); else st.removeProperty('--fsh');
+    st.setProperty('--tsh', has && fx.shT === 'text' ? `${Math.round(x / 3)}px ${Math.max(1, Math.round(y / 3))}px ${Math.max(1, Math.round(S / 4))}px ${sc}` : '0 0 0 transparent');
+    // gloed
+    const gc = mix(fx.glC || 'var(--kon, var(--on))', fx.glA); const G = Number(fx.glS) || 0;
+    st.setProperty('--glow-box', `0 0 ${G}px ${Math.round(G / 5)}px ${gc}`);
+    st.setProperty('--glow-drop', `drop-shadow(0 0 ${Math.round(G / 2)}px ${gc})`);
+    st.setProperty('--glow-text', `0 0 ${Math.round(G / 2)}px ${gc}`);
+    for (const w of ['never', 'on', 'always', 'alarm']) el.classList.toggle('gw-' + w, fx.glW === w);
+    for (const g of ['tile', 'face', 'text']) el.classList.toggle('gt-' + g, fx.glT === g);
+    // tekst
+    st.setProperty('--txn', fx.txN); st.setProperty('--txs', fx.txS);
+    // vorm, marge, knoprand, diepte, tikeffect
+    if (fx.fr !== null && fx.fr !== undefined) { st.setProperty('--fr', fx.fr + '%'); el.classList.add('has-fr'); } else { st.removeProperty('--fr'); el.classList.remove('has-fr'); }
+    if (fx.pad !== null && fx.pad !== undefined) { st.setProperty('--pad', fx.pad + 'px'); el.classList.add('has-pad'); } else { st.removeProperty('--pad'); el.classList.remove('has-pad'); }
+    if (fx.fbw !== null && fx.fbw !== undefined) st.setProperty('--fbw', fx.fbw + 'px'); else st.removeProperty('--fbw');
+    st.setProperty('--depth', fx.depth); st.setProperty('--tap', fx.tap);
+  };
+
+  // ---------- klikgeluid (gemaakt in de browser, geen bestanden nodig) ----------
+  let actx = null;
+  D.SOUNDS = [['none', 'Geen'], ['klik', 'Klik'], ['tik', 'Tik'], ['schakelaar', 'Schakelaar'], ['plop', 'Zachte plop']];
+  D.sound = (type, vol = 0.6, on = true) => {
+    if (!type || type === 'none' || !(vol > 0)) return;
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === 'suspended') actx.resume();
+      const t0 = actx.currentTime + 0.005;
+      const tone = (f1, f2, dur, at, wave, v) => {
+        const o = actx.createOscillator(); const g = actx.createGain(); o.type = wave;
+        o.frequency.setValueAtTime(f1, t0 + at); o.frequency.exponentialRampToValueAtTime(f2, t0 + at + dur);
+        g.gain.setValueAtTime(0.0001, t0 + at); g.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol * v), t0 + at + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, t0 + at + dur);
+        o.connect(g).connect(actx.destination); o.start(t0 + at); o.stop(t0 + at + dur + 0.02);
+      };
+      const noise = (dur, at, freq, v) => {
+        const n = Math.floor(actx.sampleRate * dur); const buf = actx.createBuffer(1, n, actx.sampleRate); const d = buf.getChannelData(0);
+        for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 4);
+        const src = actx.createBufferSource(); src.buffer = buf; const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = freq; bp.Q.value = 1.2;
+        const g = actx.createGain(); g.gain.value = vol * v * 1.8; src.connect(bp).connect(g).connect(actx.destination); src.start(t0 + at);
+      };
+      if (type === 'klik') { noise(0.012, 0, 3200, 1); tone(2400, 1200, 0.02, 0, 'square', 0.12); }
+      else if (type === 'tik') tone(1900, 1500, 0.035, 0, 'sine', 0.7);
+      else if (type === 'schakelaar') { noise(0.01, 0, on ? 2600 : 1800, 1); noise(0.012, 0.045, on ? 3400 : 2200, 0.8); }
+      else if (type === 'plop') tone(700, 140, 0.11, 0, 'sine', 0.9);
+    } catch (e) { /* geen geluid mogelijk */ }
+  };
+  D.playFor = el => {
+    const f = el && el.dataset && el.dataset.id && D.findTile(el.dataset.id); if (!f) return;
+    const fx = D.fxOf(f.tile); D.sound(fx.snd, fx.vol, !(el.classList.contains('on') || el.classList.contains('is-on')));
+  };
+
   D.styleTile = (el, t) => {
     const s = t.style || {}; const th = D.cfg.settings.theme;
     el.style.removeProperty('--tile'); el.style.removeProperty('--text'); el.style.removeProperty('--accent'); el.style.removeProperty('--radius'); el.style.removeProperty('--tfs'); el.style.removeProperty('--on');
@@ -216,6 +283,7 @@
     el.style.setProperty('--tfs', s.fontScale || 1);
     el.classList.toggle('frameless', !!s.frameless);
     el.classList.toggle('notitle', !!s.hideTitle);
+    D.applyFx(el, t);
   };
   D.renderTileContent = (t, el) => {
     const inner = el.querySelector('.inner'); const T = D.tiles[t.type];
