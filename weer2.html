@@ -90,9 +90,10 @@
       font-weight: 300;
       line-height: 0.9;
       letter-spacing: -0.04em;
+      white-space: nowrap;   /* 4 cijfers + hPa op één regel houden */
     }
     .plaats { font-size: calc(20 * var(--u)); font-weight: 500; }
-    /* km/u op de plek van het °-teken uit weer: een onzichtbaar ° houdt exact dezelfde breedte vast,
+    /* hPa op de plek van het °-teken uit weer: een onzichtbaar ° houdt exact dezelfde breedte vast,
        zodat Enschede op dezelfde plek staat als in weer */
     .graad { position: relative; color: transparent; }
     .basis { display: inline-block; width: 0; height: 0; }   /* meetpunt: onderkant = basislijn van de tekst */
@@ -108,7 +109,7 @@
 
     /* ---------- weekoverzicht ---------- */
     .sectie-titel { font-size: calc(21 * var(--u)); font-weight: 500; margin-bottom: calc(10 * var(--u));
-                    display: flex; justify-content: space-between; align-items: baseline; }
+                    display: flex; justify-content: space-between; align-items: baseline; gap: calc(8 * var(--u)); white-space: nowrap; }
     .sectie-titel .legenda { font-size: calc(13 * var(--u)); font-weight: 400; color: var(--dim); }
     .week { display: grid; grid-template-columns: repeat(7, 1fr); gap: calc(4 * var(--u)); text-align: center; }
     .dag { display: flex; flex-direction: column; align-items: center; gap: calc(5 * var(--u)); }
@@ -119,9 +120,9 @@
       border-radius: 50%;
       border: calc(1 * var(--u)) solid var(--rand);
       display: grid; place-items: center;
-      font-size: calc(19.5 * var(--u)); font-weight: 500;
+      font-size: calc(13.5 * var(--u)); font-weight: 500;   /* kleiner: luchtdruk heeft 4 cijfers */
     }
-    .dag .min { font-size: calc(16.5 * var(--u)); color: var(--dim); }
+    .dag .min { font-size: calc(14 * var(--u)); color: var(--dim); }
     .dag.vandaag .max { background: #fff; color: #121316; border-color: #fff; font-weight: 600; }
     .dag.vandaag .naam { color: var(--tekst); }
 
@@ -139,16 +140,9 @@
       color: #f2f5f9; min-height: 0; overflow: hidden;
     }
     .tegel h2 { margin: 0; font-size: calc(14 * var(--u)); font-weight: 400; color: rgba(242, 245, 249, 0.62); white-space: nowrap; }
+    .tegel h2.lang { font-size: calc(12.5 * var(--u)); }   /* "Luchtvochtigheid" past zo in de smalle tegel */
     .tegel .big { font-size: calc(30 * var(--u)); font-weight: 300; line-height: 1; }
     .tegel .big small { font-size: calc(15 * var(--u)); color: rgba(242, 245, 249, 0.62); margin-left: calc(3 * var(--u)); }
-    #bft { line-height: 1.15; }
-    #bft small.naam { margin-left: calc(4 * var(--u)); }
-    /* lange omschrijving (windkracht 10 en hoger) op een eigen regel, iets kleiner */
-    #bft small.naam.lang { display: block; margin: calc(4 * var(--u)) 0 0; font-size: calc(13 * var(--u)); white-space: nowrap; }
-    .tegel .sub { font-size: calc(13 * var(--u)); color: rgba(242, 245, 249, 0.62); white-space: nowrap; }
-    .tegel .sub b { color: #f2f5f9; font-weight: 600; }
-    #windRichting { white-space: nowrap; }
-    #windRichting b { font-size: calc(16 * var(--u)); color: #ffffff; }
 
     .balken { display: flex; align-items: flex-end; gap: calc(4 * var(--u)); flex: 1; min-height: 0; }
     .balken span {
@@ -171,31 +165,30 @@
   <div id="widget">
     <div>
       <div class="kop">
-        <span class="temp"><span id="windGroot">16</span><span class="basis" id="basisGetal"></span><span class="graad">°<span class="eenheid" id="eenheid">km/u<span class="basis" id="basisEenheid"></span></span></span></span>
+        <span class="temp"><span id="drukGroot">1013</span><span class="basis" id="basisGetal"></span><span class="graad">°<span class="eenheid" id="eenheid">hPa<span class="basis" id="basisEenheid"></span></span></span></span>
         <span class="plaats" id="plaats">Enschede</span>
       </div>
       <ul class="details">
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h11a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h7"/></svg><b id="windOmschrijving">Matig</b></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 6v1M7.8 7.8l.7.7M16.2 7.8l-.7.7M6 12h1M17 12h1"/><path d="M12 12l3.5-3.5"/><circle cx="12" cy="12" r="1"/></svg><b id="baroOmschrijving">Veranderlijk · gelijk</b></li>
       </ul>
     </div>
     <div class="ruimte"></div>
 
     <div>
-      <div class="sectie-titel">Wind deze week<span class="legenda">min · max km/u</span></div>
+      <div class="sectie-titel">Barometer deze week<span class="legenda">min · max hPa</span></div>
       <div class="week" id="week"></div>
     </div>
 
     <div class="tegels">
       <div class="tegel">
-        <h2>Wind 6 uur</h2>
-        <div class="big" id="windNu">16<small>km/u</small></div>
-        <div class="balken" id="windBalken"></div>
+        <h2>Luchtdruk 6 uur</h2>
+        <div class="big" id="drukNu">1013<small>hPa</small></div>
+        <div class="balken" id="drukBalken"></div>
         <div class="uren" id="uren"></div>
       </div>
       <div class="tegel">
-        <h2>Windkracht</h2>
-        <div class="big" id="bft">3<small>Bft</small> <small class="naam" id="bftNaam">Matig</small></div>
-        <div class="sub" style="margin-top:auto" id="windRichting">Uit het <b>westen</b></div>
+        <h2 class="lang">Luchtvochtigheid</h2>
+        <div class="big" id="vocht">78<small>%</small></div>
       </div>
     </div>
   </div>
@@ -218,7 +211,7 @@
       const datum = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
       const vandaag = datum(nu);
       const uren = [], dagen = [];
-      for (let h = 0; h < 48; h++) {
+      for (let h = -24; h < 7 * 24; h++) {   // vanaf gisteren, net als past_days=1
         const t = new Date(nu); t.setHours(h, 0, 0, 0);
         uren.push(`${datum(t)}T${pad(t.getHours())}:00`);
       }
@@ -226,16 +219,17 @@
         const t = new Date(nu); t.setDate(nu.getDate() + n);
         dagen.push(datum(t));
       }
-      const regen = new Array(48).fill(0);
-      [0, 0, 0.1, 0.2, 0].forEach((mm, k) => regen[nu.getHours() + 1 + k] = mm);
+      const regen = new Array(uren.length).fill(0);
+      [0, 0, 0.1, 0.2, 0].forEach((mm, k) => regen[24 + nu.getHours() + 1 + k] = mm);
       return {
         current: {
           time: `${vandaag}T${pad(nu.getHours())}:${pad(nu.getMinutes())}`,
           temperature_2m: 14.2, apparent_temperature: 12.6, relative_humidity_2m: 78,
           weather_code: 3, cloud_cover: 95, wind_speed_10m: 16, wind_direction_10m: 250, wind_gusts_10m: 30,
-          is_day: 1
+          pressure_msl: 1012 + 8 * Math.sin((24 + nu.getHours()) / 20), is_day: 1
         },
-        hourly: { time: uren, precipitation: regen, uv_index: new Array(48).fill(2), wind_speed_10m: uren.map((_, h) => 12 + Math.round(6 * Math.sin(h / 3))) },
+        hourly: { time: uren, precipitation: regen, uv_index: new Array(uren.length).fill(2), wind_speed_10m: uren.map((_, h) => 12 + Math.round(6 * Math.sin(h / 3))),
+                  pressure_msl: uren.map((_, h) => 1012 + 8 * Math.sin(h / 20)) },
         daily: {
           time: dagen,
           weather_code:       [3, 3, 61, 2, 3, 0, 2],
@@ -249,14 +243,16 @@
     }
 
     const DAGEN = ["zo", "ma", "di", "wo", "do", "vr", "za"];
-    const WINDRICHTING = ["N", "NO", "O", "ZO", "Z", "ZW", "W", "NW"];
-    /* Beaufort: bovengrens per windkracht in km/u (KNMI-indeling) */
-    const BEAUFORT = [1, 6, 12, 20, 29, 39, 50, 62, 75, 89, 103, 118];
-    const BFT_NAAM = ["Windstil", "Zwak", "Zwak", "Matig", "Matig", "Vrij krachtig", "Krachtig",
-                      "Hard", "Stormachtig", "Storm", "Zware storm", "Zeer zware storm", "Orkaan"];
-    const bftVan = kmh => { const b = BEAUFORT.findIndex(grens => kmh < grens); return b < 0 ? 12 : b; };
-    /* 2. windrichting voluit */
-    const RICHTING_VOLUIT = ["noorden", "noordoosten", "oosten", "zuidoosten", "zuiden", "zuidwesten", "westen", "noordwesten"];
+    /* Barometerschaal: term per luchtdruk in hPa, zoals op een klassieke barometer */
+    function baroTerm(hpa) {
+      if (hpa < 980) return "Storm";
+      if (hpa < 1000) return "Regen";
+      if (hpa < 1020) return "Veranderlijk";
+      if (hpa < 1040) return "Mooi weer";
+      return "Zeer droog";
+    }
+    /* Trend: luchtdruk nu vergeleken met 3 uur geleden; minstens 1 hPa verschil telt */
+    const trendVan = verschil => verschil >= 1 ? "stijgend" : verschil <= -1 ? "dalend" : "gelijk";
 
     /* Open-Meteo weercode → omschrijving + icoonsoort */
     function weerInfo(code, isDag = 1) {
@@ -282,6 +278,7 @@
       half:   '<path d="M8 3v1.5M3 8h1.5M4.5 4.5l1 1M11.5 4.5l-1 1"/><path d="M5.3 10.5A3.5 3.5 0 0 1 11 6.2"/>' + '<path d="M9 20h8.5a3.5 3.5 0 0 0 .5-6.96A5 5 0 0 0 8.4 14 3 3 0 0 0 9 20z"/>',
       wolk:   WOLK,
       wind:   '<path d="M3 8h11a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h7"/>',
+      baro:   '<circle cx="12" cy="12" r="9"/><path d="M12 6v1M7.8 7.8l.7.7M16.2 7.8l-.7.7M6 12h1M17 12h1"/><path d="M12 12l3.5-3.5"/><circle cx="12" cy="12" r="1"/>',
       mist:   '<path d="M4 9h16M3 13h18M5 17h14"/>',
       regen:  '<path d="M7 15h10a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.1 8 3.5 3.5 0 0 0 7 15z"/><path d="M8 18l-1 3M12 18l-1 3M16 18l-1 3"/>',
       sneeuw: '<path d="M7 15h10a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.1 8 3.5 3.5 0 0 0 7 15z"/><path d="M8 19h.01M12 20h.01M16 19h.01M10 22h.01M14 22h.01"/>',
@@ -389,15 +386,7 @@
       }
     }
 
-    /* Windrichting: erachter als het op één regel past, anders eronder */
-    let windVan = "westen";
-    function zetRichting() {
-      const el = $("windRichting");
-      el.innerHTML = `Uit het <b>${windVan}</b>`;
-      if (el.scrollWidth > el.clientWidth + 0.5) el.innerHTML = `Uit het<br><b>${windVan}</b>`;
-    }
-
-    /* km/u: bovenkant van de letters precies gelijk met de bovenkant van de cijfers,
+    /* hPa: bovenkant van de letters precies gelijk met de bovenkant van de cijfers,
        gemeten met het lettertype dat echt geladen is */
     const meetDoek = document.createElement("canvas").getContext("2d");
     function hoogteBovenBasis(el, tekst) {
@@ -406,13 +395,13 @@
       return meetDoek.measureText(tekst).actualBoundingBoxAscent;
     }
     function lijnKmUit() {
-      const getal = $("windGroot"), eenheid = $("eenheid");
+      const getal = $("drukGroot"), eenheid = $("eenheid");
       const bovenGetal = $("basisGetal").getBoundingClientRect().bottom - hoogteBovenBasis(getal, getal.textContent || "0");
-      const bovenKm = $("basisEenheid").getBoundingClientRect().bottom - hoogteBovenBasis(eenheid, "km/u");
+      const bovenKm = $("basisEenheid").getBoundingClientRect().bottom - hoogteBovenBasis(eenheid, "hPa");
       const nuTop = parseFloat(getComputedStyle(eenheid).top) || 0;
       eenheid.style.top = (nuTop + bovenGetal - bovenKm) + "px";
     }
-    function herschik() { eenheidReset(); lijnKmUit(); zetRichting(); }
+    function herschik() { eenheidReset(); lijnKmUit(); }
     function eenheidReset() { $("eenheid").style.top = ""; }
     document.fonts.ready.then(herschik);
     window.addEventListener("resize", herschik);
@@ -420,10 +409,10 @@
     async function laadWeer() {
       const url = "https://api.open-meteo.com/v1/forecast"
         + `?latitude=${CONFIG.lat}&longitude=${CONFIG.lon}`
-        + "&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,wind_gusts_10m,is_day"
-        + "&hourly=precipitation,uv_index,wind_speed_10m"
+        + "&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,wind_gusts_10m,pressure_msl,is_day"
+        + "&hourly=precipitation,uv_index,wind_speed_10m,pressure_msl"
         + "&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,wind_speed_10m_max"
-        + "&timezone=auto&forecast_days=7&wind_speed_unit=kmh";
+        + "&timezone=auto&past_days=1&forecast_days=7&wind_speed_unit=kmh";   // past_days: nodig voor de trend van 3 uur
 
       try {
         let d;
@@ -462,34 +451,39 @@
         let i = d.hourly.time.findIndex(t => t.startsWith(uurNu));
         if (i < 0) i = 0;
 
-        // wind: nu (KNMI als die er is) + verwachting komende 6 uur
-        const windNu = Math.round(nu.wind_speed_10m);
-        $("windNu").innerHTML = `${windNu}<small>km/u</small>`;
-        $("windGroot").textContent = windNu;
+        // luchtdruk: nu + verwachting komende 6 uur
+        const druk = d.hourly.pressure_msl || [];
+        const drukNu = Math.round(nu.pressure_msl ?? druk[i]);
+        $("drukNu").innerHTML = `${drukNu}<small>hPa</small>`;
+        $("drukGroot").textContent = drukNu;
         $("plaats").textContent = CONFIG.plaats;
-        const wind = (d.hourly.wind_speed_10m || []).slice(i, i + 6);
-        const windPiek = Math.max(20, ...wind);   // schaal: minstens 20 km/u = volle balk
-        $("windBalken").innerHTML = wind.map(w => `<span style="height:${Math.max(4, (w / windPiek) * 100)}%;opacity:0.95"></span>`).join("");
+        const komend = druk.slice(i, i + 6);
+        // alleen het verschil tonen, zodat stijgen en dalen goed zichtbaar is (minstens 2 hPa schaal)
+        const laag = Math.min(...komend), hoog = Math.max(...komend);
+        const midden = (laag + hoog) / 2, spanne = Math.max(2, hoog - laag);
+        $("drukBalken").innerHTML = komend.map(w => `<span style="height:${50 + ((w - midden) / spanne) * 80}%;opacity:0.95"></span>`).join("");
         $("uren").innerHTML = d.hourly.time.slice(i, i + 6).map(t => `<span>${t.slice(11, 13)}</span>`).join("");
 
-        // windkracht (Beaufort) en windrichting
-        const kracht = bftVan(windNu);
-        $("windOmschrijving").textContent = BFT_NAAM[kracht];
-        $("bft").innerHTML = `${kracht}<small>Bft</small> <small class="naam${BFT_NAAM[kracht].length > 13 ? " lang" : ""}">${BFT_NAAM[kracht]}</small>`;
-        windVan = RICHTING_VOLUIT[Math.round(nu.wind_direction_10m / 45) % 8];
-        zetRichting();
+        // barometerterm + trend
+        const drie = druk[i - 3];
+        const trend = drie != null ? trendVan((nu.pressure_msl ?? druk[i]) - drie) : "gelijk";
+        $("baroOmschrijving").textContent = `${baroTerm(drukNu)} · ${trend}`;
         lijnKmUit();
 
-        // week
-        $("week").innerHTML = d.daily.time.map((dag, n) => {
+        // luchtvochtigheid (KNMI als die er is)
+        $("vocht").innerHTML = `${Math.round(nu.relative_humidity_2m)}<small>%</small>`;
+
+        // week: laagste en hoogste luchtdruk per dag, vanaf vandaag
+        const vandaag = nu.time.slice(0, 10);
+        const dagen = d.daily.time.filter(dag => dag >= vandaag).slice(0, 7);
+        $("week").innerHTML = dagen.map((dag, n) => {
           const datum = new Date(dag + "T12:00");
-          const max = Math.round(d.daily.wind_speed_10m_max[n]);
-          // laagste uurwaarde van die dag (geen uurwaarden: maximum)
-          const perUur = d.hourly.time.map((t, k) => t.startsWith(dag) ? d.hourly.wind_speed_10m?.[k] : null).filter(w => w != null);
-          const min = perUur.length ? Math.round(Math.min(...perUur)) : max;
+          const perUur = d.hourly.time.map((t, k) => t.startsWith(dag) ? druk[k] : null).filter(w => w != null);
+          const min = perUur.length ? Math.round(Math.min(...perUur)) : "–";
+          const max = perUur.length ? Math.round(Math.max(...perUur)) : "–";
           return `<div class="dag${n === 0 ? " vandaag" : ""}">
               <span class="naam">${n === 0 ? "vand." : DAGEN[datum.getDay()]}</span>
-              ${svg("wind")}
+              ${svg("baro")}
               <span class="max">${min}</span>
               <span class="min">${max}</span>
             </div>`;
