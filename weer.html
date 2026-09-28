@@ -145,6 +145,7 @@
       opacity: 0.9;
     }
     .uren { display: flex; gap: calc(4 * var(--u)); }
+    #uvWaarden span { color: #f2f5f9; font-weight: 600; }
     .uren span { flex: 1; text-align: center; font-size: calc(11 * var(--u)); color: rgba(242, 245, 249, 0.62); }
 
     .fout { font-size: calc(13 * var(--u)); color: var(--zacht); }
@@ -162,9 +163,6 @@
       </div>
       <ul class="details">
         <li><span id="icoonNu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18h10a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.1 11 3.5 3.5 0 0 0 7 18z"></path></svg></span><b id="omschrijving">Bewolkt</b></li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M14 14.76V4a2 2 0 0 0-4 0v10.76a4 4 0 1 0 4 0z"></path></svg>Gevoelstemperatuur: <b id="gevoel">13°</b></li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 8h11a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h7"></path></svg>Wind: <b id="wind">W 16 km/u</b></li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M2 12h2M20 12h2"></path></svg>UV-index: <b id="uv">2</b></li>
       </ul>
     </div>
 
@@ -212,14 +210,15 @@
 
     <div class="tegels">
       <div class="tegel">
-        <h2>Neerslag 6 uur</h2>
-        <div class="big" id="regenTotaal">0,3<small>mm</small></div>
-        <div class="balken" id="balken"><span style="height:4%;opacity:0.25"></span><span style="height:4%;opacity:0.25"></span><span style="height:4%;opacity:0.25"></span><span style="height:10%;opacity:0.95"></span><span style="height:20%;opacity:0.95"></span><span style="height:4%;opacity:0.25"></span></div>
+        <h2>UV-index 6 uur</h2>
+        <div class="big" id="uvNu">2<small>nu</small></div>
+        <div class="uren" id="uvWaarden"></div>
+        <div class="balken" id="balken"></div>
         <div class="uren" id="uren"><span>18</span><span>19</span><span>20</span><span>21</span><span>22</span><span>23</span></div>
       </div>
       <div class="tegel">
-        <h2>Vochtigheid</h2>
-        <div class="big" id="vocht">78<small>%</small></div>
+        <h2>Gevoelstemp.</h2>
+        <div class="big" id="gevoel">13°</div>
         <div class="sub" style="margin-top:auto">Zon op <b id="zonOp">07:22</b></div>
         <div class="sub">Zon onder <b id="zonOnder">19:24</b></div>
       </div>
@@ -276,7 +275,6 @@
     }
 
     const DAGEN = ["zo", "ma", "di", "wo", "do", "vr", "za"];
-    const WINDRICHTING = ["N", "NO", "O", "ZO", "Z", "ZW", "W", "NW"];
 
     /* Open-Meteo weercode → omschrijving + icoonsoort */
     function weerInfo(code, isDag = 1) {
@@ -411,7 +409,7 @@
       const url = "https://api.open-meteo.com/v1/forecast"
         + `?latitude=${CONFIG.lat}&longitude=${CONFIG.lon}`
         + "&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,wind_gusts_10m,is_day"
-        + "&hourly=precipitation,uv_index"
+        + "&hourly=uv_index"
         + "&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset"
         + "&timezone=auto&forecast_days=7&wind_speed_unit=kmh";
 
@@ -455,24 +453,20 @@
         $("omschrijving").textContent = tekst;
         $("icoonNu").innerHTML = svg(soort);
         $("gevoel").textContent = Math.round(nu.apparent_temperature) + "°";
-        const richting = WINDRICHTING[Math.round(nu.wind_direction_10m / 45) % 8];
-        $("wind").textContent = `${richting} ${Math.round(nu.wind_speed_10m)} km/u`;
 
         // huidig uur in de uurlijst zoeken
         const uurNu = nu.time.slice(0, 13);
         let i = d.hourly.time.findIndex(t => t.startsWith(uurNu));
         if (i < 0) i = 0;
-        $("uv").textContent = Math.round(d.hourly.uv_index[i] ?? 0);
 
-        // neerslag komende 6 uur
-        const regen = d.hourly.precipitation.slice(i, i + 6);
-        const totaal = regen.reduce((a, b) => a + b, 0);
-        $("regenTotaal").innerHTML = `${totaal.toFixed(1).replace(".", ",")}<small>mm</small>`;
-        const piek = Math.max(1, ...regen);   // schaal: minstens 1 mm = volle balk
-        $("balken").innerHTML = regen.map(r => `<span style="height:${Math.max(4, (r / piek) * 100)}%;opacity:${r > 0 ? 0.95 : 0.25}"></span>`).join("");
+        // UV-index komende 6 uur
+        const uv = d.hourly.uv_index.slice(i, i + 6).map(u => Math.round(u ?? 0));
+        $("uvNu").innerHTML = `${uv[0] ?? 0}<small>nu</small>`;
+        $("uvWaarden").innerHTML = uv.map(u => `<span>${u}</span>`).join("");
+        const piek = Math.max(3, ...uv);   // schaal: minstens UV 3 = volle balk
+        $("balken").innerHTML = uv.map(u => `<span style="height:${Math.max(4, (u / piek) * 100)}%;opacity:${u > 0 ? 0.95 : 0.25}"></span>`).join("");
         $("uren").innerHTML = d.hourly.time.slice(i, i + 6).map(t => `<span>${t.slice(11, 13)}</span>`).join("");
 
-        $("vocht").innerHTML = `${nu.relative_humidity_2m}<small>%</small>`;
         $("zonOp").textContent = tijd(d.daily.sunrise[0]);
         $("zonOnder").textContent = tijd(d.daily.sunset[0]);
 
