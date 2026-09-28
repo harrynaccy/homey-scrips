@@ -269,3 +269,18 @@ body.editing .tile .inner { pointer-events: none; }
 .scopebar.wide .seg button.act { background: #ff9f43; }
 .scopebar.wide p { color: #ffc98f; }
 i.ovr { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-right: 6px; vertical-align: 1px; box-shadow: 0 0 0 2px rgba(90,169,255,.25); }
+
+/* bolletje = eigen instelling, tikken zet terug */
+button.ovr, i.ovr { display: inline-block; width: 12px; height: 12px; padding: 0; border-radius: 50%; background: var(--accent); margin-right: 7px; vertical-align: 0; box-shadow: 0 0 0 3px rgba(90,169,255,.25); cursor: pointer; flex: none; }
+button.ovr:hover, button.ovr:active { background: #ff9f43; box-shadow: 0 0 0 3px rgba(255,159,67,.35); }
+/* uitleg */
+button.info { display: inline-grid; place-items: center; width: 17px; height: 17px; margin-left: 6px; border-radius: 50%; border: 1px solid #5c6678; color: #9aa4b3; font: italic 600 11px/1 Georgia, serif; vertical-align: 1px; cursor: pointer; }
+button.info:hover { border-color: var(--accent); color: var(--accent); }
+.helptext { margin: -2px 0 8px; padding: 8px 10px; background: rgba(90,169,255,.1); border-left: 3px solid var(--accent); border-radius: 8px; color: #cfd5de; font-size: 12.5px; line-height: 1.45; }
+/* laatste wijzigingen */
+.hist { display: flex; flex-direction: column; gap: 6px; }
+.hist-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: rgba(255,255,255,.04); border-radius: 12px; }
+.hist-row .ht { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.hist-row .ht span { color: #cfd5de; font-size: 14px; }
+.hist-row .ht small { color: #7d8697; font-size: 12px; }
+.hist-row.rev { opacity: .5; }
