@@ -837,7 +837,7 @@
     const stat = st.mode === 'demo' ? `<span class="stat warn">Demo-modus</span><p class="note">Er is nog geen Homey gekoppeld. Je ziet voorbeeldapparaten. Vul HOMEY_ADDRESS en HOMEY_TOKEN in (zie de handleiding).</p>`
       : st.connected ? `<span class="stat ok">Verbonden met Homey</span>` : `<span class="stat bad">Geen verbinding</span><p class="note">${esc(st.error || '')}</p>`;
     return F.group('Homey', stat + `<div class="counts">${[['Apparaten', L.devices.length], ['Zones', L.zones.length], ['Flows', L.flows.length + L.advancedFlows.length], ['Moods', L.moods.length], ['Variabelen', L.variables.length], ['Insights', L.insights.length], ['Apps', L.apps.length], ['Gebruikers', L.users.length]].map(([l, n]) => `<div><b>${n}</b><small>${l}</small></div>`).join('')}</div>
-        <div class="acts"><button class="btn sm" data-relib>${icon('refresh')}Bibliotheek vernieuwen</button><button class="btn sm" data-reload>${icon('refresh')}Dashboard herladen</button></div>`) +
+        <div class="acts"><button class="btn sm primary" data-manual>${icon('book')}Gebruiksaanwijzing</button><button class="btn sm" data-relib>${icon('refresh')}Bibliotheek vernieuwen</button><button class="btn sm" data-reload>${icon('refresh')}Dashboard herladen</button></div>`) +
       F.group('Eigen apps', '<div id="awstat"><div class="muted">Laden…</div></div>') +
       F.group('Back-ups', `<p class="note">Elke dag wordt automatisch een back-up gemaakt (14 dagen bewaard).</p><div class="acts"><button class="btn sm" data-bk>${icon('download')}Back-up maken</button><button class="btn sm" data-export>${icon('download')}Exporteren</button><label class="btn sm">${icon('upload')}Importeren<input type="file" accept=".json" id="impfile" hidden></label></div><div id="bklist" class="bklist"><div class="muted">Laden…</div></div>`) +
       F.group('Adressen invullen', F.row('Standaardbegin', F.text('settings.urls.prefix', E.urls().prefix, 'none', 'http://192.168.178.79:'), 'Staat al ingevuld bij een nieuw adres') +
@@ -848,6 +848,7 @@
       `<p class="note center">Homey Dashboard · ${D.hasFully() ? 'Fully Kiosk' : 'browser'} · ${window.innerWidth}×${window.innerHeight}</p>`;
   };
   E.wire.systeem = async root => {
+    root.querySelector('[data-manual]').onclick = () => D.openManual();
     root.querySelector('[data-addurl]').onclick = () => E.commit(null, () => E.urls().quick.push(['', E.urls().prefix || 'http://']), () => E.refreshPanel());
     root.querySelector('[data-reseturl]').onclick = async () => { if (!(await D.confirm('Standaardbegin en snelknoppen terugzetten?', 'Terugzetten'))) return; E.commit(null, () => { D.cfg.settings.urls = URL_DEFAULTS(); }, () => E.refreshPanel()); };
     root.querySelectorAll('[data-delurl]').forEach(b => b.onclick = () => E.commit(null, () => E.urls().quick.splice(Number(b.dataset.delurl), 1), () => E.refreshPanel()));

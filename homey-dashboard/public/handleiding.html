@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Homey Dashboard – Gebruiksaanwijzing</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Crect x='8' y='8' width='240' height='240' rx='56' fill='%23182538'/%3E%3Cpath d='M46 118 128 50l82 68' fill='none' stroke='%235aa9ff' stroke-width='18' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M68 112v82a12 12 0 0 0 12 12h96a12 12 0 0 0 12-12v-82' fill='none' stroke='%23e9f1fb' stroke-width='16' stroke-linecap='round'/%3E%3Ccircle cx='128' cy='138' r='26' fill='%23ffc34d'/%3E%3C/svg%3E">
+<style>
+  :root { --bg: #0b1018; --panel: #121925; --card: #161e2b; --line: rgba(255,255,255,.08); --text: #e9edf3; --muted: #9aa4b3; --accent: #5aa9ff; --on: #ffc34d; --mark: #ffd766; }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 90px; }
+  body { margin: 0; overflow-x: hidden; background: var(--bg); color: var(--text); font: 16px/1.6 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  header.top { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 16px; padding: 14px 24px; background: rgba(11,16,24,.92); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+  header.top svg { width: 44px; height: 44px; flex: none; }
+  header.top h1 { margin: 0; font-size: 19px; font-weight: 650; line-height: 1.2; }
+  header.top h1 small { display: block; font-size: 12.5px; font-weight: 400; color: var(--muted); }
+  .search { flex: 1; max-width: 560px; margin-left: auto; position: relative; }
+  .search input { width: 100%; height: 44px; border-radius: 12px; border: 1px solid var(--line); background: #1a2231; color: var(--text); font: inherit; padding: 0 40px 0 42px; outline: none; }
+  .search input:focus { border-color: var(--accent); }
+  .search input::-webkit-search-cancel-button { -webkit-appearance: none; display: none; }
+  .search .loupe { position: absolute; left: 14px; top: 12px; width: 20px; height: 20px; color: var(--muted); }
+  .search button { position: absolute; right: 6px; top: 6px; width: 32px; height: 32px; border: 0; border-radius: 8px; background: none; color: var(--muted); font-size: 18px; cursor: pointer; }
+  .search button:hover { background: rgba(255,255,255,.08); }
+  .layout { display: grid; grid-template-columns: 270px minmax(0, 1fr); max-width: 1180px; margin: 0 auto; }
+  nav.toc { position: sticky; top: 73px; align-self: start; max-height: calc(100vh - 73px); overflow-y: auto; padding: 22px 12px 40px 24px; }
+  nav.toc h2 { font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 8px 10px; }
+  nav.toc a { display: block; padding: 6px 10px; border-radius: 9px; color: #c9d1dc; font-size: 14.5px; }
+  nav.toc a:hover { background: rgba(255,255,255,.06); text-decoration: none; }
+  nav.toc a.hidden { display: none; }
+  nav.toc a .n { display: inline-block; width: 24px; color: var(--muted); }
+  main { padding: 22px 28px 120px; min-width: 0; }
+  .status { color: var(--muted); font-size: 14px; margin: 0 0 14px; min-height: 22px; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 8px 26px 18px; margin: 0 0 18px; }
+  section.hidden { display: none; }
+  section h2 { font-size: 22px; margin: 18px 0 8px; }
+  section h2 .n { color: var(--accent); margin-right: 8px; }
+  section h3 { font-size: 17px; margin: 20px 0 6px; color: #f3f6fa; }
+  p { margin: 8px 0; }
+  ol, ul { padding-left: 22px; margin: 8px 0; }
+  li { margin: 4px 0; }
+  kbd { display: inline-block; padding: 1px 7px; border-radius: 6px; background: #232c3b; border: 1px solid #334055; border-bottom-width: 2px; font: 13px/1.5 Consolas, monospace; color: #fff; }
+  code { background: #1f2836; padding: 1px 6px; border-radius: 6px; font: 14px Consolas, monospace; }
+  b.m { color: #fff; background: rgba(90,169,255,.14); padding: 0 5px; border-radius: 5px; font-weight: 600; white-space: nowrap; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 15px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: .05em; }
+  .tip, .let { border-radius: 12px; padding: 10px 14px; margin: 12px 0; font-size: 15px; }
+  .tip { background: rgba(76,217,138,.1); border-left: 4px solid #4cd98a; }
+  .let { background: rgba(255,195,77,.1); border-left: 4px solid var(--on); }
+  mark { background: var(--mark); color: #111; border-radius: 3px; padding: 0 1px; }
+  .empty { display: none; text-align: center; color: var(--muted); padding: 50px 10px; }
+  .empty.show { display: block; }
+  footer { color: var(--muted); font-size: 13px; text-align: center; padding: 20px; }
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: 1fr; }
+    nav.toc { position: static; max-height: none; padding: 14px 16px 0; display: flex; flex-wrap: wrap; gap: 4px; }
+    nav.toc h2 { width: 100%; }
+    nav.toc a { background: rgba(255,255,255,.05); font-size: 13.5px; }
+    main { padding: 16px 14px 80px; }
+    section { padding: 6px 16px 14px; }
+    header.top { flex-wrap: wrap; padding: 12px 14px; }
+    .search { max-width: none; flex-basis: 100%; }
+  }
+  @media print {
+    body { background: #fff; color: #000; }
+    header.top, nav.toc, .status { display: none; }
+    .layout { display: block; }
+    section { border: 1px solid #ccc; background: #fff; break-inside: avoid-page; }
+    section.hidden { display: block; }
+    b.m { color: #000; background: #eef3fb; }
+    kbd, code { background: #f1f1f1; color: #000; border-color: #ccc; }
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <svg viewBox="0 0 256 256" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2=".4" y2="1"><stop offset="0" stop-color="#24374f"/><stop offset="1" stop-color="#0a0e15"/></linearGradient><radialGradient id="gl" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffc34d" stop-opacity=".75"/><stop offset="1" stop-color="#ffc34d" stop-opacity="0"/></radialGradient></defs><rect x="8" y="8" width="240" height="240" rx="56" fill="url(#g)"/><path d="M46 118 128 50l82 68" fill="none" stroke="#5aa9ff" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/><path d="M68 112v82a12 12 0 0 0 12 12h96a12 12 0 0 0 12-12v-82" fill="none" stroke="#e9f1fb" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/><circle cx="128" cy="140" r="58" fill="url(#gl)"/><path d="M128 106a30 30 0 0 0-17 54.7c2.6 1.9 4 4.7 4 7.8V172h26v-3.5c0-3.1 1.4-5.9 4-7.8A30 30 0 0 0 128 106z" fill="#ffc34d"/><rect x="115" y="176" width="26" height="8" rx="4" fill="#e9f1fb"/><rect x="119" y="187" width="18" height="7" rx="3.5" fill="#e9f1fb"/></svg>
+  <h1>Homey Dashboard<small>Gebruiksaanwijzing</small></h1>
+  <div class="search">
+    <svg class="loupe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="q" type="search" placeholder="Zoeken, bijv. achtergrond, gloed, raster…  (toets /)" autocomplete="off" spellcheck="false">
+    <button id="clear" title="Zoeken wissen" hidden>✕</button>
+  </div>
+</header>
+
+<div class="layout">
+  <nav class="toc" id="toc"><h2>Inhoud</h2></nav>
+  <main>
+    <p class="status" id="status"></p>
+    <div class="empty" id="empty">Niets gevonden. Probeer een ander woord, bijvoorbeeld <b>knop</b>, <b>kleur</b> of <b>tabblad</b>.</div>
+
+<section id="beginnen" data-title="Beginnen">
+  <h2>Beginnen</h2>
+  <p>Het dashboard heeft een <b>voorkant</b> (wat je normaal ziet en bedient) en een <b>achterkant</b> (waar je alles instelt). Alles wat je instelt wordt automatisch opgeslagen op de NAS en is meteen zichtbaar op de tablet, op de laptop en in het Windows-programma.</p>
+  <h3>De achterkant openen</h3>
+  <ul>
+    <li><b>Tablet:</b> tik <b>4× snel</b> op een lege plek of op de tabbalk onderaan.</li>
+    <li><b>Laptop of pc:</b> klik 4× snel op een lege plek, of druk in het Windows-programma op <kbd>Ctrl</kbd>+<kbd>E</kbd>.</li>
+  </ul>
+  <p>Het dashboard wordt dan kleiner getoond, met rechts het menu. Links in het menu staan de onderdelen: <b class="m">Toevoegen</b>, <b class="m">Knoppen</b>, <b class="m">Pictogrammen</b>, <b class="m">Tegel</b>, <b class="m">Tabbladen</b>, <b class="m">Scherm</b>, <b class="m">Uiterlijk</b>, <b class="m">Raster</b> en <b class="m">Systeem</b>.</p>
+  <h3>Opslaan, ongedaan maken, klaar</h3>
+  <ul>
+    <li>Je hoeft nooit zelf op te slaan. Bovenin zie je <i>Opslaan…</i> en daarna <i>Opgeslagen</i>.</li>
+    <li>Met de <b>pijltjes linksboven</b> in het menu maak je iets <b>ongedaan</b> of doe je het <b>opnieuw</b>.</li>
+    <li>Met <b class="m">Klaar</b> ga je terug naar de voorkant.</li>
+  </ul>
+  <h3>Schuifregelaars</h3>
+  <p>Elke schuifregelaar heeft <kbd>–</kbd> en <kbd>+</kbd> ernaast. Tik één keer voor één stap. <b>Houd ingedrukt</b> om steeds sneller door te lopen. Het rondje-pijltje ernaast zet de waarde terug naar de standaard.</p>
+  <div class="tip">De achterkant openen kan ook met een ander aantal tikken: zie <a href="#systeem">Systeem → Achterkant openen</a>.</div>
+</section>
+
+<section id="tegels" data-title="Tegels toevoegen en indelen">
+  <h2>Tegels toevoegen en indelen</h2>
+  <h3>Iets toevoegen</h3>
+  <ol>
+    <li>Open de achterkant en kies <b class="m">Toevoegen</b>.</li>
+    <li>Kies een categorie: <i>Apparaten, Zones, Flows, Moods, Variabelen, Grafieken, Eigen apps</i> of <i>Overig</i> (klok, tekst, webpagina, energie, wie is thuis, wekkers, meldingen, apps).</li>
+    <li>Zoek eventueel met het zoekveld en tik op <b>+</b>. De tegel komt op het tabblad dat openstaat.</li>
+  </ol>
+  <p>Een vinkje ✓ achter een naam betekent dat het al op dit tabblad staat.</p>
+  <h3>Verplaatsen en groter of kleiner maken</h3>
+  <ul>
+    <li><b>Verplaatsen:</b> sleep de tegel naar een andere plek. Wordt hij rood, dan ligt daar al een tegel.</li>
+    <li><b>Grootte:</b> sleep het witte <b>rondje rechtsonder</b> op de tegel.</li>
+    <li>Precies instellen kan ook onder <b class="m">Tegel</b> → <i>Plaats en grootte</i> (breedte, hoogte, kolom, rij).</li>
+    <li><b>Vastzetten</b> (onder Tegel) voorkomt dat je hem per ongeluk verschuift.</li>
+  </ul>
+  <h3>Een tegel bewerken</h3>
+  <p>Tik op een tegel op de achterkant. Het menu springt naar <b class="m">Tegel</b> met alle instellingen: titel, inhoud, plaats, <a href="#stijl">stijl</a> en acties.</p>
+  <h3>Dupliceren, kopiëren, verplaatsen, verwijderen</h3>
+  <p>Onder <b class="m">Tegel</b> → <i>Acties</i>: <b>Dupliceren</b> (kopie op hetzelfde tabblad), <b>Kopiëren</b> of <b>Verplaatsen</b> naar een ander tabblad, en <b>Verwijderen</b>.</p>
+  <h3>Bediening op de voorkant</h3>
+  <ul>
+    <li><b>Tik</b> op een lamp of schakelaar: aan/uit.</li>
+    <li><b>Lang drukken</b>: alle bediening (dimmen, kleur, wittint, temperatuur, positie, volume…).</li>
+    <li>Een thermostaat heeft <kbd>–</kbd> en <kbd>+</kbd>, een rolluik pijltjes omhoog, stop en omlaag.</li>
+  </ul>
+</section>
+
+<section id="knoppen" data-title="Knoppen">
+  <h2>Knoppen</h2>
+  <p>Knoppen zijn tegels die er uitzien als een echte knop en de toestand van een apparaat laten zien.</p>
+  <h3>Een knop maken</h3>
+  <ol>
+    <li>Kies <b class="m">Knoppen</b>. Links zie je elke stijl <b>uit</b>, rechts <b>aan</b>.</li>
+    <li>Tik op <b>+</b> bij de stijl die je wilt.</li>
+    <li>Kies waaraan de knop gekoppeld wordt: een <b>apparaat</b>, een <b>flow</b> of een <b>mood</b>. <i>Nog niet koppelen</i> kan ook.</li>
+  </ol>
+  <h3>De 11 knopstijlen</h3>
+  <table>
+    <tr><th>Stijl</th><th>Wat het doet</th></tr>
+    <tr><td>Drukknop 3D</td><td>Steekt uit als het uit is, zit ingedrukt als het aan is</td></tr>
+    <tr><td>Verlichte knop</td><td>Neutraal als het uit is, licht op als het aan is</td></tr>
+    <tr><td>Wandschakelaar</td><td>Klassieke tuimelschakelaar die omklapt</td></tr>
+    <tr><td>Schakelaar met led</td><td>Wandschakelaar met een ledje dat brandt als het aan is</td></tr>
+    <tr><td>Ronde knop met ring</td><td>De ring licht op als het aan is</td></tr>
+    <tr><td>Schuifschakelaar</td><td>Schuifje zoals op je telefoon</td></tr>
+    <tr><td>Dimknop</td><td>Tik = aan/uit, schuif = helderheid (alleen dimbare lampen)</td></tr>
+    <tr><td>Scène- of flowknop</td><td>Start een flow of mood en licht kort op</td></tr>
+    <tr><td>Paniek- of alarmknop</td><td>Rode knop, vraagt altijd eerst om bevestiging</td></tr>
+    <tr><td>Rolluikknoppen</td><td>Omhoog, stop en omlaag</td></tr>
+    <tr><td>Pictogram</td><td>Alleen het pictogram, kleurt mee met de toestand</td></tr>
+  </table>
+  <h3>Een knop aanpassen</h3>
+  <p>Tik op de knop en kies <b class="m">Tegel</b>. Daar stel je in: <b>Knopstijl</b>, <b>Gekoppeld aan</b> (met <i>Wijzigen</i>), <b>Toestand van</b> (welke waarde de knop laat zien), <b>Pictogram</b>, <b>Kleur als aan</b>, <b>Kleur als uit</b>, <b>Naam tonen</b> en <b>Toestand tonen</b>.</p>
+  <h3>Een gewone apparaat-tegel omzetten in een knop</h3>
+  <ol>
+    <li>Tik op de apparaat-tegel en kies <b class="m">Tegel</b>.</li>
+    <li>Kies bij <b>Knopstijl</b> een stijl. Er staan alleen stijlen die bij het apparaat passen.</li>
+    <li>Terug? Kies <b>Gewone tegel</b>. Je oude instellingen komen dan terug.</li>
+  </ol>
+  <h3>Stijl op alle knoppen zetten</h3>
+  <p>Onder <b class="m">Tegel</b> → <i>Stijl</i> zet <b>Stijl naar alle knoppen op dit tabblad</b> dezelfde kleuren, vorm, rand, schaduw, gloed, tekst, diepte en geluid op alle andere knoppen van het tabblad.</p>
+</section>
+
+<section id="pictogrammen" data-title="Pictogrammen">
+  <h2>Pictogrammen</h2>
+  <p>Onder <b class="m">Pictogrammen</b> staan ruim 7000 pictogrammen, met bovenaan de meest gebruikte voor in huis. Ze staan op de NAS en werken ook zonder internet.</p>
+  <h3>Zoeken</h3>
+  <p>Typ in het Nederlands of Engels, bijvoorbeeld <i>lamp, raam, rolluik, wasmachine, rookmelder, bewegingssensor, zonnepaneel</i>. Of kies een categorie: Lampen, Schakelaars en stopcontacten, Sensoren, Deuren/ramen/zonwering, Klimaat, Media, Energie, Huishoudelijke apparaten, Veiligheid, Kamers, Buiten, Weer, Mensen en dieren, Tijd, Pijlen. Schuif de categorieën opzij voor meer.</p>
+  <h3>Een pictogram gebruiken</h3>
+  <p>Tik op een pictogram en kies:</p>
+  <ul>
+    <li><b>Op het dashboard, gekoppeld</b>: kleurt mee met het apparaat (lamp aan = verlicht, raam open = oranje). Tik = aan/uit.</li>
+    <li><b>Als knop</b>: kies daarna een knopstijl met dit pictogram.</li>
+    <li><b>Alleen het pictogram</b>: als versiering of label.</li>
+    <li><b>Voor de geselecteerde tegel</b>: geeft de tegel die je hebt aangetikt dit pictogram.</li>
+  </ul>
+  <h3>Pictogram van een tegel wijzigen</h3>
+  <p>Bij apparaat-, flow-, mood- en knop-tegels: <b class="m">Tegel</b> → <b>Pictogram</b> → <b>Kiezen</b>. Het rondje-pijltje zet het standaard pictogram terug.</p>
+</section>
+
+<section id="stijl" data-title="Stijl: kleuren, vorm, schaduw, gloed, tekst, geluid">
+  <h2>Stijl: kleuren, vorm, schaduw, gloed, tekst en geluid</h2>
+  <p>Tik op een tegel en kies <b class="m">Tegel</b> → <i>Stijl</i>. De instellingen staan in inklapbare groepjes. Wat je hier instelt geldt alleen voor deze tegel. Voor alle tegels tegelijk: zie <a href="#uiterlijk">Uiterlijk</a>.</p>
+  <h3>Kleuren</h3>
+  <p>Achtergrond van de tegel, doorzichtigheid, tekstkleur en de <b>accent/aan-kleur</b>. <i>standaard</i> betekent dat de kleur van het thema wordt gebruikt.</p>
+  <h3>Vorm en rand</h3>
+  <ul>
+    <li><b>Hoeken tegel</b>: 0 = scherp, 48 px = heel rond.</li>
+    <li><b>Knopvorm / hoeken</b>: van 0% (vierkant) tot 50% (rond) voor de knop of het pictogram-rondje.</li>
+    <li><b>Binnenmarge</b>: ruimte tussen de inhoud en de rand. Meer marge = kleinere knop.</li>
+    <li><b>Randdikte</b> (0–12 px), <b>Randkleur</b>, <b>Rand doorzichtigheid</b>.</li>
+    <li><b>Rand kleurt mee als aan</b>: de rand krijgt de aan-kleur zodra het apparaat aan staat.</li>
+    <li><b>Knoprand dikte</b>: de rand van de knop zelf (verlichte knop, ring, scène). Bij de ring is dit de dikte van de ring.</li>
+    <li><b>Zonder kader</b>: geen achtergrond en rand, alleen de inhoud.</li>
+  </ul>
+  <h3>Schaduw en gloed</h3>
+  <p>Kant-en-klare keuzes: <i>Zacht zwevend, Neon, Warm lampje, Diepe schaduw, Knipperen bij alarm, Geen effecten</i>. Daarna kun je alles zelf bijstellen.</p>
+  <ul>
+    <li><b>Schaduw op</b>: de tegel, de knop of de tekst. Met sterkte, grootte, richting (onder, schuin, rondom) en kleur.</li>
+    <li><b>Gloed</b>: <i>Nooit</i>, <i>Als aan</i>, <i>Altijd</i> of <i>Bij alarm</i> (knippert, bijvoorbeeld bij een open raam of beweging).</li>
+    <li><b>Gloed op</b>: de tegel, de knop of de tekst. Met kleur (standaard de aan-kleur), sterkte en grootte.</li>
+  </ul>
+  <h3>Tekst</h3>
+  <p><b>Tekstgrootte</b>, <b>Naam doorzichtigheid</b> en <b>Toestand doorzichtigheid</b> (bijv. "Aan · 70%", waarden, datum) apart instelbaar, en <b>Titel verbergen</b>.</p>
+  <h3>Bediening: diepte en geluid</h3>
+  <ul>
+    <li><b>Indrukdiepte</b> (3D-knop, paniekknop, wandschakelaars): 0 = plat, 1 = normaal, 3 = diep.</li>
+    <li><b>Tikeffect</b>: hoeveel de tegel krimpt als je erop tikt (0 = niet).</li>
+    <li><b>Klikgeluid</b>: Geen, Klik, Tik, Schakelaar, Zachte plop. Met <b>Volume</b> en een knop ▶ om het te proberen.</li>
+    <li><b>Eerst bevestigen</b>: vraagt "Weet je het zeker?" voor het schakelen.</li>
+  </ul>
+  <div class="let">Het klikgeluid komt uit de tablet of pc: zet het mediavolume aan.</div>
+  <p><b>Stijl terugzetten</b> haalt alle eigen stijl van deze tegel weg.</p>
+</section>
+
+<section id="tabbladen" data-title="Tabbladen">
+  <h2>Tabbladen</h2>
+  <p>Onder <b class="m">Tabbladen</b>:</p>
+  <ul>
+    <li><b>Toevoegen</b>: maximaal 10 tabbladen.</li>
+    <li><b>Naam en icoon</b>: typ een naam; het icoon is een emoji (bijv. 🏠 🛋️ 🎵). Op Windows open je de emoji-kiezer met <kbd>Win</kbd>+<kbd>.</kbd></li>
+    <li>🏠 = <b>starttabblad</b>, 👁 = zichtbaar of verborgen (verborgen tabbladen zie je alleen op de achterkant).</li>
+    <li>Pijltjes = volgorde, prullenbak = verwijderen.</li>
+    <li><b>Tabbalk onderaan</b>: hoogte, iconen tonen, namen tonen, donkerte van de balk.</li>
+  </ul>
+  <p>De kleur van het actieve tabblad in de tabbalk is de <b>accentkleur</b> (zie <a href="#uiterlijk">Uiterlijk</a>).</p>
+</section>
+
+<section id="scherm" data-title="Scherm: achtergrond, helderheid, nacht, screensaver">
+  <h2>Scherm: achtergrond, helderheid, nachtmodus, screensaver</h2>
+  <h3>Achtergrond voor alle tabbladen</h3>
+  <ol>
+    <li>Kies <b class="m">Scherm</b> en bij Achtergrond <b>Alle tabbladen</b>.</li>
+    <li>Kies <b>Soort</b>: Kleur, Verloop (twee kleuren en richting) of Foto (uploaden of kiezen uit je galerij).</li>
+    <li><b>Vervagen</b> en <b>Donkerder maken</b> helpen om tegels beter leesbaar te maken.</li>
+  </ol>
+  <p><b>Panorama</b> (bij een foto): één brede foto die per tabblad doorschuift.</p>
+  <h3>Eigen achtergrond voor één tabblad</h3>
+  <ol>
+    <li>Tik onderaan op het tabblad dat je wilt veranderen.</li>
+    <li>Kies bij Achtergrond <b>Alleen "naam van het tabblad"</b> en tik op <b>Eigen achtergrond voor dit tabblad</b>.</li>
+    <li>Stel kleur, verloop of foto in. Terug naar de algemene: <b>Terug naar algemene achtergrond</b>.</li>
+  </ol>
+  <h3>Eén achtergrond voor alle tabbladen</h3>
+  <p><b>Deze achtergrond op alle tabbladen</b> zet de achtergrond die je bekijkt op alle tabbladen en haalt eigen achtergronden weg. Eronder staat hoeveel tabbladen nog een eigen achtergrond hebben.</p>
+  <h3>Helderheid</h3>
+  <p><b>Schermhelderheid</b>: in Fully Kiosk wordt de echte helderheid van de tablet geregeld; elders een donkere laag.</p>
+  <h3>Nachtmodus</h3>
+  <p>Aan/uit, <b>Vaste tijden</b> of <b>Zon onder → op</b>, met helderheid 's nachts en extra dimmen.</p>
+  <h3>Screensaver</h3>
+  <p>Na een aantal minuten: <b>Grote klok</b>, <b>Foto's</b> (je achtergronden), <b>Zwart</b> of <b>Scherm uit</b> (alleen in Fully Kiosk). Met <b>Voorbeeld</b> zie je hoe het eruitziet.</p>
+  <h3>Terug naar start</h3>
+  <p>Gaat na een aantal minuten zonder aanraking automatisch terug naar het starttabblad.</p>
+</section>
+
+<section id="uiterlijk" data-title="Uiterlijk en standaardstijl">
+  <h2>Uiterlijk en standaardstijl</h2>
+  <ul>
+    <li><b>Thema's</b>: Glas, Donker, Licht, OLED zwart, Warm, Oceaan. Je eigen instellingen bewaar je met <b>Opslaan</b> als eigen thema.</li>
+    <li><b>Kleuren</b>: accentkleur (ook de kleur van het actieve tabblad), kleur als iets aan staat, tekstkleur, tegelkleur.</li>
+    <li><b>Tekst</b>: lettertype en tekstgrootte voor alles.</li>
+    <li><b>Tegels</b>: doorzichtigheid, glas-vervaging en hoeken.</li>
+    <li><b>Standaard voor alle tegels en knoppen</b>: dezelfde groepjes als bij <a href="#stijl">Stijl</a> (vorm en rand, schaduw en gloed, tekst, diepte en klikgeluid). Wat je per tegel instelt gaat voor.</li>
+  </ul>
+</section>
+
+<section id="raster" data-title="Raster">
+  <h2>Raster</h2>
+  <p>Elk tabblad is verdeeld in vakjes. Onder <b class="m">Raster</b> stel je in: <b>kolommen</b> (max. 24), <b>rijen</b> (max. 16), <b>ruimte tussen tegels</b> en <b>rand van scherm</b>. <b>Dit raster op alle tabbladen</b> kopieert deze instellingen.</p>
+  <h3>Raster verdubbelen of halveren</h3>
+  <ul>
+    <li><b>Raster verdubbelen</b>: van 12×8 naar 24×16. Alle tegels groeien mee, de indeling blijft precies gelijk, maar je kunt fijner schuiven en kleinere tegels maken.</li>
+    <li><b>Raster halveren</b>: terug. Kan alleen als alle tegels op even vakjes staan met een even breedte en hoogte.</li>
+    <li>Bij <b>Voor</b> kies je dit tabblad of alle tabbladen.</li>
+  </ul>
+  <div class="let">Kolommen en rijen gewoon verhogen (zonder verdubbelen) maakt alle tegels kleiner; dan moet je ze zelf weer groter maken.</div>
+</section>
+
+<section id="webpaginas" data-title="Webpagina's en adressen">
+  <h2>Webpagina's en adressen</h2>
+  <p>Met <b class="m">Toevoegen</b> → <i>Overig</i> → <b>Webpagina</b> zet je een andere pagina op je dashboard, bijvoorbeeld je Spotify-widgets of Buienradar.</p>
+  <h3>Het adresveld</h3>
+  <ul>
+    <li>Het begin staat al ingevuld (<code>http://192.168.178.79:</code>, je NAS). Tik in het veld en typ de rest erachter, zoals <code>8090/playlist.html</code>.</li>
+    <li><b>Snelknoppen</b> boven het veld: NAS, Spotify, Homey, GitHub, https://, http://.</li>
+    <li><b>✕</b> maakt het veld leeg voor een heel ander adres. Eerder gebruikte adressen verschijnen als suggestie.</li>
+    <li>Druk op <b>Laden</b> om de pagina te (her)laden.</li>
+  </ul>
+  <p>Verder: <b>Bedienbaar</b> (uit = alleen kijken), <b>Zoom</b> en <b>Verversen</b> (elke zoveel minuten).</p>
+  <p>Standaardbegin en snelknoppen wijzig je onder <b class="m">Systeem</b> → <i>Adressen invullen</i>.</p>
+</section>
+
+<section id="systeem" data-title="Systeem en back-ups">
+  <h2>Systeem en back-ups</h2>
+  <ul>
+    <li><b>Homey</b>: verbonden of niet, aantallen apparaten/zones/flows. <b>Bibliotheek vernieuwen</b> na nieuwe apparaten in Homey; <b>Dashboard herladen</b>.</li>
+    <li><b>Eigen apps</b>: of de verbinding met je Spotify Dashboard-app werkt.</li>
+    <li><b>Adressen invullen</b>: standaardbegin en snelknoppen van het adresveld.</li>
+    <li><b>Back-ups</b>: elke dag automatisch (14 dagen bewaard). Ook <b>Back-up maken</b>, <b>Exporteren</b> (bestand naar je pc) en <b>Importeren</b>. Bij elke back-up: terugzetten, downloaden, verwijderen.</li>
+    <li><b>Achterkant openen</b>: aantal tikken en binnen hoeveel tijd.</li>
+    <li><b>Opnieuw beginnen</b>: alles terug naar het begin (back-ups blijven bewaard).</li>
+  </ul>
+  <div class="tip">Maak een back-up voordat je grote dingen verandert. Terugzetten kan altijd.</div>
+</section>
+
+<section id="tablet" data-title="Tablet met Fully Kiosk">
+  <h2>Tablet met Fully Kiosk</h2>
+  <table>
+    <tr><th>Instelling in Fully Kiosk</th><th>Waarde</th></tr>
+    <tr><td>Web Content Settings → Start URL</td><td><code>http://192.168.178.79:8095</code></td></tr>
+    <tr><td>Advanced Web Settings → Enable JavaScript Interface</td><td>aan (voor helderheid en scherm uit)</td></tr>
+    <tr><td>Web Browsing Settings → Enable Pull to Refresh</td><td>uit</td></tr>
+    <tr><td>Device Management → Keep Screen On</td><td>aan</td></tr>
+    <tr><td>Fullscreen Mode / Hide Status Bar + Navigation Bar</td><td>aan</td></tr>
+    <tr><td>Device Management → Launch on Boot</td><td>aan</td></tr>
+    <tr><td>Motion Detection → Turn Screen On on Motion</td><td>aan, als je screensaver "Scherm uit" gebruikt</td></tr>
+  </table>
+</section>
+
+<section id="windows" data-title="Windows-programma">
+  <h2>Windows-programma</h2>
+  <p>Het programma <b>Homey Dashboard</b> opent je dashboard van de NAS in een eigen venster. Browser, snelkoppeling en tablet blijven gewoon werken.</p>
+  <h3>Installeren</h3>
+  <ol>
+    <li>Start <code>Homey-Dashboard-Setup-1.0.0.exe</code> (of eerst <code>samenvoegen.bat</code> als je de delen hebt).</li>
+    <li>Zegt Windows <i>"Windows heeft uw pc beschermd"</i>? Klik <b>Meer informatie</b> → <b>Toch uitvoeren</b>.</li>
+    <li>Volg de stappen. Er komen snelkoppelingen op het bureaublad en in het startmenu.</li>
+  </ol>
+  <p>Verwijderen: <b>Instellingen → Apps → Homey Dashboard</b>.</p>
+  <h3>Sneltoetsen</h3>
+  <p>Druk op <kbd>Alt</kbd> om het menu te tonen.</p>
+  <table>
+    <tr><th>Toets</th><th>Wat</th></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>E</kbd></td><td>Achterkant (bewerken) openen of sluiten</td></tr>
+    <tr><td><kbd>F1</kbd></td><td>Deze gebruiksaanwijzing</td></tr>
+    <tr><td><kbd>F5</kbd></td><td>Herladen</td></tr>
+    <tr><td><kbd>F11</kbd></td><td>Volledig scherm</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>+</kbd> / <kbd>Ctrl</kbd>+<kbd>-</kbd> / <kbd>Ctrl</kbd>+<kbd>0</kbd></td><td>Groter / kleiner / normaal</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>,</kbd></td><td>Adres van het dashboard wijzigen (met <b>Testen</b>)</td></tr>
+  </table>
+  <p>Is de NAS niet bereikbaar, dan zie je een melding en probeert het programma het elke 15 seconden opnieuw.</p>
+</section>
+
+<section id="nas" data-title="Bijwerken op de NAS">
+  <h2>Bijwerken op de NAS</h2>
+  <ol>
+    <li>Pak de nieuwe zip uit en kopieer alles <b>over de oude bestanden heen</b> in <code>docker/homey-dashboard</code>.</li>
+    <li>Start de container opnieuw: <b>Container Manager → Container → homey-dashboard → Opnieuw starten</b>.</li>
+    <li>Op de tablet: achterkant → <b class="m">Systeem</b> → <b>Dashboard herladen</b>.</li>
+  </ol>
+  <div class="let">Gooi de map nooit eerst leeg: <code>docker-compose.yml</code> (met je Homey-sleutel) en de map <code>data/</code> (indeling, back-ups, foto's) moeten blijven staan.</div>
+</section>
+
+<section id="problemen" data-title="Problemen oplossen en vragen">
+  <h2>Problemen oplossen en veelgestelde vragen</h2>
+  <h3>Het dashboard laadt niet</h3>
+  <ul>
+    <li>Staat de NAS aan? Draait de container? Kijk in Container Manager → Container → homey-dashboard → <b>Logboek</b>.</li>
+    <li>Ben je thuis op je eigen netwerk (of via Tailscale verbonden)?</li>
+  </ul>
+  <h3>Er staat "Demo-modus" of "Geen verbinding" bij Systeem</h3>
+  <p>Controleer <code>HOMEY_ADDRESS</code> en <code>HOMEY_TOKEN</code> in <code>docker-compose.yml</code> en start de container opnieuw. Geef de Homey in je router een vast IP-adres.</p>
+  <h3>Een nieuw apparaat uit Homey staat er niet tussen</h3>
+  <p><b class="m">Systeem</b> → <b>Bibliotheek vernieuwen</b>.</p>
+  <h3>Ik zie een nieuwe functie niet</h3>
+  <p>Dan draait op de NAS nog de oude versie. Zie <a href="#nas">Bijwerken op de NAS</a>.</p>
+  <h3>Een tegel zegt "Apparaat niet gevonden"</h3>
+  <p>Het apparaat is in Homey verwijderd of opnieuw toegevoegd. Kies onder <b class="m">Tegel</b> het juiste apparaat, of verwijder de tegel.</p>
+  <h3>Ik hoor geen klikgeluid</h3>
+  <p>Zet het mediavolume van de tablet of pc aan en controleer of het geluid onder Stijl → Bediening niet op <i>Geen</i> staat. Het eerste geluid klinkt pas na je eerste tik.</p>
+  <h3>Iets per ongeluk verwijderd of verpest</h3>
+  <p>Direct: pijltje <b>ongedaan maken</b> linksboven. Later: <b class="m">Systeem</b> → <b>Back-ups</b> → terugzetten.</p>
+  <h3>Kan ik veilig terug naar de browser?</h3>
+  <p>Ja. Browser, snelkoppeling, tablet en Windows-programma tonen allemaal hetzelfde dashboard van de NAS.</p>
+</section>
+
+  </main>
+</div>
+<footer>Homey Dashboard · Gebruiksaanwijzing · Tip: druk op <kbd>/</kbd> om te zoeken, <kbd>Esc</kbd> om te wissen</footer>
+
+<script>
+(function () {
+  const sections = [...document.querySelectorAll('main section')];
+  const toc = document.getElementById('toc'); const q = document.getElementById('q');
+  const status = document.getElementById('status'); const empty = document.getElementById('empty'); const clear = document.getElementById('clear');
+  // nummering + inhoudsopgave
+  sections.forEach((s, i) => {
+    const h = s.querySelector('h2'); h.insertAdjacentHTML('afterbegin', `<span class="n">${i + 1}.</span>`);
+    const a = document.createElement('a'); a.href = '#' + s.id; a.innerHTML = `<span class="n">${i + 1}.</span>${s.dataset.title}`; a.dataset.for = s.id; toc.appendChild(a);
+    s._html = s.innerHTML;
+  });
+  const norm = t => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const esc = t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  function highlight(root, words) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: n => n.parentNode.closest('script, .n') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+    const nodes = []; while (walker.nextNode()) nodes.push(walker.currentNode);
+    const re = new RegExp('(' + words.map(esc).join('|') + ')', 'gi');
+    for (const n of nodes) {
+      if (!re.test(n.nodeValue)) { re.lastIndex = 0; continue; } re.lastIndex = 0;
+      const span = document.createElement('span'); span.innerHTML = n.nodeValue.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])).replace(re, '<mark>$1</mark>');
+      n.parentNode.replaceChild(span, n);
+    }
+  }
+  function run() {
+    const raw = q.value.trim(); clear.hidden = !raw;
+    const words = raw.split(/\s+/).filter(w => w.length > 0);
+    let shown = 0;
+    sections.forEach(s => {
+      s.innerHTML = s._html; // zoek-markeringen weghalen
+      const text = norm(s.textContent);
+      const hit = !words.length || words.every(w => text.includes(norm(w)));
+      s.classList.toggle('hidden', !hit);
+      toc.querySelector(`[data-for="${s.id}"]`).classList.toggle('hidden', !hit);
+      if (hit) { shown++; if (words.length) highlight(s, words); }
+    });
+    empty.classList.toggle('show', shown === 0);
+    status.textContent = words.length ? (shown ? `${shown} ${shown === 1 ? 'hoofdstuk' : 'hoofdstukken'} gevonden voor "${raw}"` : '') : '';
+    if (words.length && shown) { const m = document.querySelector('main section:not(.hidden) mark'); if (m) m.scrollIntoView({ block: 'center' }); }
+  }
+  let t; q.addEventListener('input', () => { clearTimeout(t); t = setTimeout(run, 150); });
+  clear.onclick = () => { q.value = ''; run(); q.focus(); };
+  document.addEventListener('keydown', e => {
+    if (e.key === '/' && document.activeElement !== q) { e.preventDefault(); q.focus(); }
+    else if (e.key === 'Escape') { q.value = ''; run(); }
+  });
+  const hash = new URLSearchParams(location.search).get('zoek'); if (hash) { q.value = hash; run(); }
+})();
+</script>
+</body>
+</html>

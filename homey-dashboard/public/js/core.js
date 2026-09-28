@@ -303,6 +303,13 @@
     D.applyTheme(); D.applyBackground(); D.renderTabbar(); D.renderAll(); D.applyBrightness();
   };
 
+  // ---------- gebruiksaanwijzing (F1 of Systeem → Gebruiksaanwijzing) ----------
+  D.openManual = (zoek) => {
+    D.openSheet(`<div class="manual-hd"><b>Gebruiksaanwijzing</b><a class="btn sm ghost" href="handleiding.html" target="_blank" rel="noopener">Apart openen</a><button class="xbtn" data-close>${icon('x')}</button></div><iframe class="manual" src="handleiding.html${zoek ? '?zoek=' + encodeURIComponent(zoek) : ''}"></iframe>`, 'manual');
+    $('#sheet [data-close]').onclick = () => D.closeSheet();
+  };
+  document.addEventListener('keydown', e => { if (e.key === 'F1') { e.preventDefault(); if ($('#sheet').classList.contains('manual') && !$('#sheet-wrap').hidden) D.closeSheet(); else D.openManual(); } });
+
   // ---------- 4× tikken: alleen op lege plek of tabbalk ----------
   let taps = [];
   document.addEventListener('pointerdown', e => {

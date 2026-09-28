@@ -61,6 +61,13 @@ Ga in Fully Kiosk naar *Instellingen* en stel in:
 | Device Management → **Launch on Boot** | aan |
 | Motion Detection (optioneel) → **Turn Screen On on Motion** | aan, als je de screensaver "Scherm uit" gebruikt |
 
+## Gebruiksaanwijzing
+
+Een doorzoekbare gebruiksaanwijzing staat in `public/handleiding.html`. Openen kan op drie manieren:
+- dubbelklik op het bestand (werkt zonder internet, in elke browser);
+- in het dashboard: druk op **F1**, of kies op de achterkant **Systeem → Gebruiksaanwijzing**;
+- via `http://192.168.178.79:8095/handleiding.html`.
+
 ## Bediening
 
 - **Achterkant openen:** tik 4× snel op een lege plek of op de tabbalk onderaan.
