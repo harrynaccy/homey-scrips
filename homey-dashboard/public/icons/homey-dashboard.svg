@@ -1,50 +1,101 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
-  <!-- Duitse herder van opzij, met toetsenbord, tekenstijl -->
-  <g stroke="#241c16" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">
-    <rect x="8" y="8" width="240" height="240" rx="56" fill="#f4e7cf"/>
-    <circle cx="124" cy="110" r="92" fill="#bfe0f5" stroke="none"/>
-    <!-- lijf en borst -->
-    <path d="M40 186 C40 150 58 128 86 122 L134 132 C150 144 158 164 160 186 Z" fill="#c8924f"/>
-    <path d="M40 186 C40 150 58 128 86 122 L104 126 C92 140 84 160 82 186 Z" fill="#2e241d" stroke-width="4"/>
-    <path d="M118 140 C134 146 146 162 150 186 L112 186 C112 166 114 150 118 140 Z" fill="#ecd09f" stroke="none"/>
-    <!-- achterste oor -->
-    <path d="M112 70 L120 18 L146 64 Z" fill="#2e241d"/>
-    <!-- kop -->
-    <path d="M72 138 C64 104 74 72 104 62 C124 56 144 62 154 78 L196 100 C206 106 206 122 194 126 L158 134 C148 146 128 150 112 158 C98 158 82 152 72 138 Z" fill="#c8924f"/>
-    <!-- zwarte achterkant van de kop en nek -->
-    <path d="M72 138 C64 104 74 72 104 62 C96 78 92 100 96 124 C98 134 90 142 72 138 Z" fill="#2e241d" stroke-width="4"/>
-    <!-- voorste oor -->
-    <path d="M94 76 L96 20 L128 64 Z" fill="#2e241d"/>
-    <path d="M101 66 L102 36 L119 62 Z" fill="#ecd09f" stroke-width="3"/>
-    <!-- zwarte snuit bovenop -->
-    <path d="M148 76 L196 100 C204 104 204 112 198 114 L156 104 C152 94 150 84 148 76 Z" fill="#2e241d" stroke-width="4"/>
-    <!-- lichte wang en kaak -->
-    <path d="M118 112 C130 104 146 106 158 112 L186 122 L158 134 C146 142 130 146 118 142 C112 132 112 120 118 112 Z" fill="#ecd09f" stroke="none"/>
-    <!-- neus -->
-    <path d="M190 102 C200 100 208 106 206 114 C204 120 196 120 190 116 Z" fill="#17110d" stroke-width="3"/>
-    <!-- bek en tong -->
-    <path d="M196 124 C184 128 170 130 158 128" fill="none" stroke-width="4"/>
-    <path d="M168 128 C170 142 180 150 188 142 C190 136 186 130 182 128 Z" fill="#ef7c86" stroke-width="3.5"/>
-    <path d="M177 132 L180 142" fill="none" stroke="#c9505c" stroke-width="2.5"/>
-    <!-- oog en wenkbrauw -->
-    <path d="M132 88 Q142 80 150 88 Q141 94 132 88 Z" fill="#241c16" stroke-width="2"/>
-    <circle cx="143" cy="86.5" r="1.8" fill="#fff" stroke="none"/>
-    <path d="M132 78 Q140 74 148 78" fill="none" stroke-width="3.5"/>
-    <!-- toetsenbord -->
-    <rect x="34" y="176" width="188" height="54" rx="12" fill="#e9eef4"/>
-    <g fill="#ffffff" stroke-width="3">
-      <rect x="46" y="186" width="18" height="12" rx="3"/><rect x="70" y="186" width="18" height="12" rx="3"/>
-      <rect x="94" y="186" width="18" height="12" rx="3"/><rect x="118" y="186" width="18" height="12" rx="3"/>
-      <rect x="142" y="186" width="18" height="12" rx="3"/><rect x="166" y="186" width="18" height="12" rx="3"/>
-      <rect x="190" y="186" width="20" height="12" rx="3"/>
-      <rect x="46" y="204" width="26" height="12" rx="3"/><rect x="184" y="204" width="26" height="12" rx="3"/>
-      <rect x="78" y="204" width="100" height="12" rx="3" fill="#ffd27a"/>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#22354f"/>
+      <stop offset="1" stop-color="#0a111c"/>
+    </linearGradient>
+    <radialGradient id="light" cx="0.55" cy="0.38" r="0.55">
+      <stop offset="0" stop-color="#5aa9ff" stop-opacity=".35"/>
+      <stop offset="1" stop-color="#5aa9ff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="deck" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2c3a4e"/>
+      <stop offset="1" stop-color="#1a2331"/>
+    </linearGradient>
+    <linearGradient id="key" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f4f7fb"/>
+      <stop offset="1" stop-color="#d9e0ea"/>
+    </linearGradient>
+    <linearGradient id="keyA" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8cc4ff"/>
+      <stop offset="1" stop-color="#4a98f0"/>
+    </linearGradient>
+    <filter id="sh" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#000" flood-opacity=".45"/>
+    </filter>
+    <clipPath id="tile"><rect x="8" y="8" width="240" height="240" rx="54"/></clipPath>
+  </defs>
+
+  <rect x="8" y="8" width="240" height="240" rx="54" fill="url(#bg)"/>
+  <g clip-path="url(#tile)">
+    <circle cx="140" cy="100" r="130" fill="url(#light)"/>
+
+    <!-- herdershond, van opzij, in vlakken -->
+    <g filter="url(#sh)" stroke-linejoin="round">
+      <!-- achterste oor -->
+      <polygon points="104,72 116,24 136,74" fill="#15110e"/>
+      <polygon points="112,66 118,38 128,70" fill="#3a2c22"/>
+      <!-- nek en achterkop -->
+      <polygon points="72,86 60,196 104,196 100,124" fill="#211a15"/>
+      <polygon points="100,124 104,196 138,196 132,150" fill="#a8723b"/>
+      <polygon points="72,86 100,124 104,76" fill="#2c221b"/>
+      <!-- schedel -->
+      <polygon points="104,76 100,124 132,74" fill="#3b2d23"/>
+      <polygon points="132,74 100,124 128,112" fill="#b9813f"/>
+      <polygon points="132,74 128,112 152,88" fill="#cf9a55"/>
+      <!-- voorhoofd / stop -->
+      <polygon points="152,88 128,112 150,112" fill="#c48c4a"/>
+      <!-- zwarte bovenkant snuit -->
+      <polygon points="152,88 204,104 172,106" fill="#1b1511"/>
+      <polygon points="152,88 172,106 150,112" fill="#2a2019"/>
+      <!-- snuit zijkant -->
+      <polygon points="150,112 172,106 180,122" fill="#d8a664"/>
+      <polygon points="172,106 204,104 206,118 180,122" fill="#caa06a"/>
+      <!-- neus -->
+      <polygon points="200,100 214,110 208,122 196,118" fill="#0d0a08"/>
+      <polygon points="203,104 211,110 205,112" fill="#3a302a"/>
+      <!-- bek en kaak -->
+      <polygon points="180,122 206,118 196,128 170,132" fill="#b88852"/>
+      <polygon points="150,112 180,122 170,132 140,138" fill="#e7c38a"/>
+      <polygon points="128,112 150,112 140,138 132,150" fill="#d2a262"/>
+      <polygon points="100,124 128,112 132,150" fill="#b47b3f"/>
+      <polygon points="140,138 170,132 150,150 132,150" fill="#caa06a"/>
+      <!-- keel / borst -->
+      <polygon points="132,150 150,150 160,196 138,196" fill="#e3bd83"/>
+      <!-- voorste oor -->
+      <polygon points="76,88 84,22 120,78" fill="#1b1511"/>
+      <polygon points="86,78 89,40 110,76" fill="#caa06a"/>
+      <polygon points="89,40 110,76 98,74" fill="#e2bb80"/>
+      <!-- oog -->
+      <path d="M134 98 Q142 91 150 97 Q142 103 134 98 Z" fill="#0d0a08"/>
+      <circle cx="144.5" cy="96.5" r="1.6" fill="#ffffff"/>
+      <!-- bek-lijn -->
+      <path d="M204 124 L172 130" stroke="#3a2a1e" stroke-width="2.4" fill="none" stroke-linecap="round"/>
     </g>
-    <!-- poot op het toetsenbord -->
-    <g transform="translate(30 0)">
-    <path d="M122 164 C126 160 134 162 136 170 L140 186 C140 194 118 194 116 186 Z" fill="#c8924f"/>
-    <path d="M112 184 C112 174 146 174 146 184 C146 192 112 192 112 184 Z" fill="#ecd09f"/>
-    <path d="M123 180 V189 M135 180 V189" fill="none" stroke-width="3"/>
+
+    <!-- toetsenbord -->
+    <g filter="url(#sh)">
+      <rect x="28" y="180" width="200" height="60" rx="14" fill="url(#deck)"/>
+      <rect x="28.5" y="180.5" width="199" height="59" rx="13.5" fill="none" stroke="#ffffff" stroke-opacity=".12"/>
+    </g>
+    <g>
+      <!-- rij 1 -->
+      <g transform="translate(40 190)">
+        <rect x="0" y="2" width="20" height="16" rx="4" fill="#9aa7b8"/><rect x="0" y="0" width="20" height="14" rx="4" fill="url(#key)"/>
+        <rect x="25" y="2" width="20" height="16" rx="4" fill="#9aa7b8"/><rect x="25" y="0" width="20" height="14" rx="4" fill="url(#key)"/>
+        <rect x="50" y="2" width="20" height="16" rx="4" fill="#9aa7b8"/><rect x="50" y="0" width="20" height="14" rx="4" fill="url(#key)"/>
+        <rect x="75" y="2" width="20" height="16" rx="4" fill="#9aa7b8"/><rect x="75" y="0" width="20" height="14" rx="4" fill="url(#key)"/>
+        <rect x="100" y="2" width="20" height="16" rx="4" fill="#9aa7b8"/><rect x="100" y="0" width="20" height="14" rx="4" fill="url(#key)"/>
+        <rect x="125" y="2" width="20" height="16" rx="4" fill="#2f6fd0"/><rect x="125" y="0" width="20" height="14" rx="4" fill="url(#keyA)"/>
+        <rect x="150" y="2" width="26" height="16" rx="4" fill="#9aa7b8"/><rect x="150" y="0" width="26" height="14" rx="4" fill="url(#key)"/>
+      </g>
+      <!-- rij 2 -->
+      <g transform="translate(40 212)">
+        <rect x="0" y="2" width="30" height="16" rx="4" fill="#9aa7b8"/><rect x="0" y="0" width="30" height="14" rx="4" fill="url(#key)"/>
+        <rect x="35" y="2" width="106" height="16" rx="4" fill="#9aa7b8"/><rect x="35" y="0" width="106" height="14" rx="4" fill="url(#key)"/>
+        <rect x="146" y="2" width="30" height="16" rx="4" fill="#9aa7b8"/><rect x="146" y="0" width="30" height="14" rx="4" fill="url(#key)"/>
+      </g>
     </g>
   </g>
+  <rect x="8.75" y="8.75" width="238.5" height="238.5" rx="53.25" fill="none" stroke="#ffffff" stroke-opacity=".10" stroke-width="1.5"/>
 </svg>
