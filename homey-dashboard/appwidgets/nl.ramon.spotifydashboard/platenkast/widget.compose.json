@@ -1,0 +1,153 @@
+{
+  "name": {
+    "en": "Spotify – Record shelf",
+    "nl": "Spotify – Platenkast"
+  },
+  "settings": [
+    {
+      "id": "height_mode",
+      "type": "dropdown",
+      "value": "app",
+      "title": {
+        "en": "Height",
+        "nl": "Hoogte"
+      },
+      "values": [
+        {
+          "id": "app",
+          "title": {
+            "en": "Full (app setting)",
+            "nl": "Volledig (app-instelling)"
+          }
+        },
+        {
+          "id": "percent",
+          "title": {
+            "en": "Percentage of full height",
+            "nl": "Percentage van de volledige hoogte"
+          }
+        }
+      ]
+    },
+    {
+      "id": "height_percent",
+      "type": "number",
+      "value": 60,
+      "min": 20,
+      "max": 100,
+      "step": 1,
+      "title": {
+        "en": "Height in % (only with 'Percentage')",
+        "nl": "Hoogte in % (alleen bij 'Percentage')"
+      }
+    },
+    {
+      "id": "panorama",
+      "type": "dropdown",
+      "value": "default",
+      "title": {
+        "en": "Background",
+        "nl": "Achtergrond (stuk van de hoes)"
+      },
+      "values": [
+        {
+          "id": "default",
+          "title": {
+            "en": "Standard (quarter 3)",
+            "nl": "Standaard (kwart 3)"
+          }
+        },
+        {
+          "id": "1",
+          "title": {
+            "en": "Quarter 1",
+            "nl": "Kwart 1"
+          }
+        },
+        {
+          "id": "2",
+          "title": {
+            "en": "Quarter 2",
+            "nl": "Kwart 2"
+          }
+        },
+        {
+          "id": "3",
+          "title": {
+            "en": "Quarter 3",
+            "nl": "Kwart 3"
+          }
+        },
+        {
+          "id": "4",
+          "title": {
+            "en": "Quarter 4",
+            "nl": "Kwart 4"
+          }
+        },
+        {
+          "id": "whole",
+          "title": {
+            "en": "Whole cover",
+            "nl": "Hele hoes"
+          }
+        }
+      ]
+    },
+    {
+      "id": "more_count",
+      "type": "number",
+      "value": 3,
+      "min": 0,
+      "max": 10,
+      "step": 1,
+      "title": {
+        "en": "Rows under 'Also new'",
+        "nl": "Aantal regels bij 'Ook nieuw'"
+      }
+    },
+    {
+      "id": "recent_count",
+      "type": "number",
+      "value": 8,
+      "min": 0,
+      "max": 20,
+      "step": 1,
+      "title": {
+        "en": "Rows under 'Recently played'",
+        "nl": "Aantal regels bij 'Onlangs gedraaid'"
+      }
+    },
+    {
+      "id": "debug",
+      "type": "checkbox",
+      "value": false,
+      "title": {
+        "en": "Show diagnostics",
+        "nl": "Diagnose tonen"
+      }
+    }
+  ],
+  "api": {
+    "getState": {
+      "method": "GET",
+      "path": "/state"
+    },
+    "getPlatenkast": {
+      "method": "POST",
+      "path": "/platenkast"
+    },
+    "resolve": {
+      "method": "POST",
+      "path": "/resolve"
+    },
+    "getAlbum": {
+      "method": "POST",
+      "path": "/album"
+    },
+    "command": {
+      "method": "POST",
+      "path": "/command"
+    }
+  }
+}

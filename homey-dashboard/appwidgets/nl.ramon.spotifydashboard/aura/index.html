@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Aura</title>
+<style>
+  :root{ --panorama-width:1280px; --panorama-height:784px; --panorama-offset:-960px; --panorama-voffset:0px; }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0;
+    width:100%; height:100%;
+    overflow:hidden;
+    background:#05070a;
+    font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-user-select:none; user-select:none;
+    -webkit-touch-callout:none;
+    color:#fff;
+  }
+  .wrap{
+    position:relative;
+    width:100%; height:100%;
+    overflow:hidden;
+    display:flex; flex-direction:column;
+  }
+  /* Gedeelde panorama-achtergrond (album art), zoals in index.html/playlist.html.
+     Blijft heel licht zichtbaar onder de golven voor samenhang met de andere tegels. */
+  .bg{
+    position:absolute; inset:-20px;
+    background-repeat:no-repeat;
+    background-size:var(--panorama-width) var(--panorama-height);
+    background-position:var(--panorama-offset) calc(50% + var(--panorama-voffset));
+    filter:blur(14px) brightness(.5) saturate(1.3);
+    transform:scale(1.15);
+    transition:background-image 400ms ease, background-position 250ms ease;
+    z-index:0;
+  }
+  /* Animatiegebied: alleen het bovenste deel van de widget, zodat er onder
+     de golfanimatie nog ruimte overblijft voor de artiestfoto en albums.
+     Op % i.p.v. vh, want vh kan in een ingebedde tablet-weergave soms de
+     hoogte van het hele scherm i.p.v. alleen deze widget-tegel pakken. */
+  .animArea{
+    position:relative;
+    z-index:1;
+    flex:0 0 30%;
+    min-height:90px;
+  }
+  canvas#aura{
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    display:block;
+  }
+  .artistRow{
+    position:relative;
+    z-index:1;
+    display:flex; align-items:center; gap:.7em;
+    padding:.2em 1em .8em 1em;
+    flex-shrink:0;
+  }
+  .artistPhoto{
+    width:56px; height:56px;
+    border-radius:50%;
+    background-size:cover; background-position:center;
+    background-color:#222;
+    flex-shrink:0;
+    box-shadow:0 8px 16px rgba(0,0,0,.4);
+  }
+  .artistTextCol{
+    min-width:0; flex:1;
+    display:flex; flex-direction:column;
+    justify-content:center;
+  }
+  .artistName{
+    font-size:clamp(15px,3.6vw,20px); font-weight:700;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .currentAlbumName{
+    font-size:12px; opacity:.65; margin-top:.15em;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .headerAlbumArt{
+    width:44px; height:44px;
+    border-radius:6px;
+    background-size:cover; background-position:center;
+    background-color:#222;
+    flex-shrink:0;
+    box-shadow:0 6px 12px rgba(0,0,0,.4);
+  }
+  .albumsList{
+    position:relative;
+    z-index:1;
+    flex:1;
+    overflow-y:auto;
+    overflow-x:hidden;
+    padding:0 .8em 1em .8em;
+    -webkit-overflow-scrolling:touch;
+    touch-action:pan-y;
+    overscroll-behavior:contain;
+  }
+  .albumsList::-webkit-scrollbar{ width:4px; }
+  .albumsList::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.2); border-radius:4px; }
+  .albumRow{
+    display:flex; align-items:center; gap:.7em;
+    padding:.5em .3em;
+    border-radius:10px;
+    transition:transform 200ms ease, box-shadow 200ms ease;
+  }
+  .albumRow.active{
+    transform:scale(1.06);
+    transform-origin:left center;
+    box-shadow:0 8px 18px rgba(0,0,0,.4);
+  }
+  .albumRow.active .albumArt{
+    width:52px; height:52px;
+  }
+  .albumRow.active .albumName{ color:#1DB954; }
+  .albumRow.active .albumYear{ color:#1ed760; opacity:.85; }
+  .albumArt{
+    width:42px; height:42px;
+    border-radius:6px;
+    background-size:cover; background-position:center;
+    background-color:#222;
+    flex-shrink:0;
+    transition:width 200ms ease, height 200ms ease;
+  }
+  .albumInfo{ min-width:0; flex:1; }
+  .albumName{
+    font-size:14px; font-weight:600;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .albumYear{
+    font-size:12px; opacity:.6;
+  }
+  .albumsMessage{
+    text-align:center; padding:1.5em 1em;
+    font-size:13px; opacity:.6; line-height:1.5;
+  }
+  .albumRow{ cursor:pointer; }
+  .albumRow.tapped, .trackRow.tapped{ background:rgba(255,255,255,.1); }
+  .albumRow .addBtn{ margin-left:.2em; }
+  /* Uitgelicht album wordt 6% vergroot: iets smaller maken zodat ＋ binnen beeld blijft. */
+  .albumRow.active{ width:calc(100% / 1.06); }
+  .albumRow:active{ background:rgba(255,255,255,.06); }
+
+  /* ---------- Albumdetail (open geklikt album) — zelfde stijl als acc3 ---------- */
+  .detail{
+    position:absolute; inset:0; z-index:5;
+    display:none; flex-direction:column;
+    background:rgba(8,10,12,.82);
+    -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);
+  }
+  .detail.open{ display:flex; }
+  .detailHead{
+    display:flex; gap:.9em; align-items:flex-end;
+    padding:1em 1em .8em 1em;
+    flex-shrink:0;
+  }
+  .detailArt{
+    width:96px; height:96px; border-radius:8px;
+    background-size:cover; background-position:center; background-color:#222;
+    box-shadow:0 10px 22px rgba(0,0,0,.5);
+    flex-shrink:0;
+  }
+  .detailText{ min-width:0; flex:1; }
+  .detailType{ font-size:11px; opacity:.6; text-transform:uppercase; letter-spacing:.06em; }
+  .detailName{
+    font-size:clamp(16px,3.8vw,20px); font-weight:700; line-height:1.2;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+  }
+  .detailMeta{ font-size:12px; opacity:.65; margin-top:.25em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .detailButtons{
+    display:flex; gap:.5em; align-items:center;
+    padding:0 1em .8em 1em; flex-shrink:0;
+  }
+  .btn{
+    border:0; border-radius:999px;
+    font:inherit; font-size:13px; font-weight:600;
+    padding:.6em 1.1em;
+    color:#fff; background:rgba(255,255,255,.12);
+    cursor:pointer;
+  }
+  .btn:active{ transform:scale(.96); }
+  .btn.primary{ background:#1DB954; color:#000; }
+  .btn.back{ margin-left:auto; background:transparent; opacity:.8; }
+  .trackList{
+    flex:1; overflow-y:auto; overflow-x:hidden;
+    padding:0 .6em 1em .6em;
+    -webkit-overflow-scrolling:touch;
+    touch-action:pan-y; overscroll-behavior:contain;
+  }
+  .trackList::-webkit-scrollbar{ width:4px; }
+  .trackList::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.2); border-radius:4px; }
+  .trackRow{
+    display:flex; align-items:center; gap:.7em;
+    padding:.55em .4em; border-radius:8px;
+    cursor:pointer;
+  }
+  .trackRow:active{ background:rgba(255,255,255,.06); }
+  .trackNum{ width:1.6em; text-align:right; font-size:13px; opacity:.5; flex-shrink:0; }
+  .trackInfo{ min-width:0; flex:1; }
+  .trackName{ font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .trackArtists{ font-size:11px; opacity:.55; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .trackRow.playing .trackName{ color:#1DB954; font-weight:600; }
+  .trackRow.playing .trackNum{ color:#1DB954; opacity:1; }
+  .trackDur{ font-size:12px; opacity:.5; flex-shrink:0; }
+  .addBtn{
+    width:32px; height:32px; border-radius:50%;
+    border:1px solid rgba(255,255,255,.3); background:transparent; color:#fff;
+    font-size:18px; line-height:1; flex-shrink:0; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .addBtn:active{ background:rgba(255,255,255,.15); }
+
+  /* ---------- Playlist-kiezer ---------- */
+  .sheetBackdrop{
+    position:absolute; inset:0; z-index:10;
+    background:rgba(0,0,0,.55);
+    display:none; align-items:flex-end;
+  }
+  .sheetBackdrop.open{ display:flex; }
+  .sheet{
+    width:100%;
+    background:#16191c; border-radius:16px 16px 0 0;
+    padding:1em 1em 1.3em 1em;
+    box-shadow:0 -10px 30px rgba(0,0,0,.5);
+  }
+  .sheetTitle{ font-size:13px; opacity:.7; margin-bottom:.8em; line-height:1.4; }
+  .sheetTitle b{ opacity:1; color:#fff; }
+  .sheetGrid{ display:grid; grid-template-columns:1fr 1fr; gap:.5em; }
+  .sheetGrid .btn{ padding:.85em .5em; border-radius:10px; font-size:14px; }
+  .sheet .cancel{ width:100%; margin-top:.6em; background:transparent; opacity:.7; }
+
+  .toast{
+    position:absolute; left:50%; bottom:1.2em; z-index:20;
+    transform:translate(-50%, 20px);
+    background:rgba(20,22,25,.95); color:#fff;
+    border-radius:999px; padding:.6em 1.1em;
+    font-size:13px; max-width:90%; text-align:center;
+    box-shadow:0 8px 20px rgba(0,0,0,.5);
+    opacity:0; pointer-events:none;
+    transition:opacity 200ms ease, transform 200ms ease;
+  }
+  .toast.show{ opacity:1; transform:translate(-50%, 0); }
+  .toast.error{ background:#B3452F; }
+  .errorBox{
+    position:fixed; left:0; right:0; bottom:0;
+    background:#B3452F; color:#fff; font-size:12px;
+    padding:.6em 1em; z-index:9999; word-break:break-word;
+    display:none;
+  }
+  .diag{
+    position:absolute; left:0; right:0; top:0; z-index:9998; display:none;
+    background:rgba(0,0,0,.8); color:#9f9; font:11px monospace; padding:4px 8px;
+    pointer-events:none; white-space:pre-wrap;
+  }
+</style>
+</head>
+<body class="homey-widget-full">
+
+<div class="wrap">
+  <div class="bg" id="bg"></div>
+  <div class="animArea">
+    <canvas id="aura"></canvas>
+  </div>
+  <div class="artistRow">
+    <div class="artistPhoto" id="artistPhoto"></div>
+    <div class="artistTextCol">
+      <div class="artistName" id="artistName">&nbsp;</div>
+      <div class="currentAlbumName" id="currentAlbumName"></div>
+    </div>
+    <div class="headerAlbumArt" id="headerAlbumArt"></div>
+  </div>
+  <div class="albumsList" id="albumsList">
+    <div class="albumsMessage">Wachten op afspeeldata…</div>
+  </div>
+
+  <div class="detail" id="detail">
+    <div class="detailHead">
+      <div class="detailArt" id="detailArt"></div>
+      <div class="detailText">
+        <div class="detailType" id="detailType"></div>
+        <div class="detailName" id="detailName"></div>
+        <div class="detailMeta" id="detailMeta"></div>
+      </div>
+    </div>
+    <div class="detailButtons">
+      <button class="btn primary" id="detailPlay">▶ Afspelen</button>
+      <button class="btn" id="detailAdd">＋ Toevoegen</button>
+      <button class="btn back" id="detailBack">✕ Sluiten</button>
+    </div>
+    <div class="trackList" id="trackList"></div>
+  </div>
+
+  <div class="sheetBackdrop" id="sheetBackdrop">
+    <div class="sheet">
+      <div class="sheetTitle" id="sheetTitle"></div>
+      <div class="sheetGrid" id="sheetGrid"></div>
+      <button class="btn cancel" id="sheetCancel">Annuleren</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+<div class="diag" id="diag"></div>
+<div class="errorBox" id="errorBox"></div>
+
+<script>
+/* ==========================================================================
+   Widget "Aura" (acc4) — beeldvullend golflint waarvan kleur en beweging
+   meebewegen op het karakter van de muziek, met daaronder artiestfoto,
+   huidig album en een scrollbare lijst met albums van de artiest.
+
+   Kleur/beweging: genre-tags van de artiest (hard -> fel en snel, zacht ->
+   rustig) + een zweem van de albumhoes. Genres komen van Spotify, of — als
+   Spotify ze niet geeft — van MusicBrainz (via de app).
+
+   Alle Spotify-verkeer loopt via de app op de Homey: de afspeelstatus komt
+   live binnen (Homey.on('state')), artiestgegevens worden bij de app
+   opgevraagd (die onthoudt ze 30 dagen en bewaakt een eigen budget), en
+   afspelen / toevoegen gaat als opdracht naar de app.
+   ========================================================================== */
+(function(){
+  var HAPI = null;              // Homey-object van de widget
+  var S = null;                 // laatste status van de app
+  var receivedAt = 0;
+  var currentHeight = 0;
+  var debugOn = false;
+  var WS = {};                  // widget-instellingen
+
+  /* ---------- Panorama-achtergrond: kwart 4 ---------- */
+  var PANEL_INDEX = 3;
+  var PANEL_COUNT = 4;
+  var root = document.documentElement;
+  // Achtergrond: standaard het eigen kwart van de hoes, of (widget-instelling
+  // "Achtergrond") een ander kwart of de hele hoes.
+  function updatePanorama(){
+    var w = root.clientWidth, h = root.clientHeight;
+    if(!w || !h) return;
+    var bgEl = document.getElementById("bg");
+    if(WS.panorama === "whole"){
+      bgEl.style.backgroundSize = "cover";
+      bgEl.style.backgroundPosition = "center";
+      return;
+    }
+    bgEl.style.backgroundSize = "";
+    bgEl.style.backgroundPosition = "";
+    var idx = /^[1-4]$/.test(String(WS.panorama)) ? Number(WS.panorama) - 1 : PANEL_INDEX;
+    root.style.setProperty("--panorama-width", (w * PANEL_COUNT) + "px");
+    root.style.setProperty("--panorama-height", h + "px");
+    root.style.setProperty("--panorama-offset", (-idx * w) + "px");
+  }
+  updatePanorama();
+
+  var els = {
+    bg: document.getElementById("bg"),
+    animArea: document.querySelector(".animArea"),
+    canvas: document.getElementById("aura"),
+    artistPhoto: document.getElementById("artistPhoto"),
+    artistName: document.getElementById("artistName"),
+    currentAlbumName: document.getElementById("currentAlbumName"),
+    headerAlbumArt: document.getElementById("headerAlbumArt"),
+    albumsList: document.getElementById("albumsList"),
+    errorBox: document.getElementById("errorBox"),
+    diag: document.getElementById("diag"),
+    detail: document.getElementById("detail"),
+    detailArt: document.getElementById("detailArt"),
+    detailType: document.getElementById("detailType"),
+    detailName: document.getElementById("detailName"),
+    detailMeta: document.getElementById("detailMeta"),
+    detailPlay: document.getElementById("detailPlay"),
+    detailAdd: document.getElementById("detailAdd"),
+    detailBack: document.getElementById("detailBack"),
+    trackList: document.getElementById("trackList"),
+    sheetBackdrop: document.getElementById("sheetBackdrop"),
+    sheetTitle: document.getElementById("sheetTitle"),
+    sheetGrid: document.getElementById("sheetGrid"),
+    sheetCancel: document.getElementById("sheetCancel"),
+    toast: document.getElementById("toast")
+  };
+  var ctx = els.canvas.getContext("2d");
+
+  function escapeHtml(str){
+    var div = document.createElement("div");
+    div.textContent = str || "";
+    return div.innerHTML;
+  }
+
+  /* ---------------- hoogte (zelfde als de andere widgets) ---------------- */
+  function isLandscape(){
+    try{
+      if(screen.orientation && screen.orientation.type) return screen.orientation.type.indexOf("landscape") === 0;
+    }catch(e){}
+    if(typeof window.orientation === "number") return Math.abs(window.orientation) === 90;
+    return screen.width > screen.height;
+  }
+  function computeBaseHeight(cfg){
+    cfg = cfg || {};
+    if(cfg.heightMode === "fixed" && cfg.heightFixed > 0) return Math.round(cfg.heightFixed);
+    var sw = screen.width || 0, sh = screen.height || 0;
+    var land = isLandscape();
+    var screenH = land ? Math.min(sw, sh) : Math.max(sw, sh);
+    var margin = land ? (cfg.marginLandscape != null ? cfg.marginLandscape : 140)
+                      : (cfg.marginPortrait != null ? cfg.marginPortrait : 180);
+    return Math.max(300, Math.round(screenH - margin));
+  }
+  /* Eigen hoogte per widget (widget-instelling "Hoogte"): standaard de volledige
+     hoogte uit de app-instellingen, of een percentage daarvan. */
+  function computeHeight(cfg){
+    var h = computeBaseHeight(cfg);
+    if(WS.height_mode === "percent"){
+      var p = Number(WS.height_percent);
+      if(!(p > 0)) p = 60;
+      p = Math.max(20, Math.min(100, p));
+      h = Math.max(200, Math.round(h * p / 100));
+    }
+    return h;
+  }
+  function applyHeight(cfg){
+    var h = computeHeight(cfg);
+    if(h === currentHeight) return;
+    currentHeight = h;
+    if(HAPI) HAPI.setHeight(h).catch(function(){});
+  }
+  function onOrientation(){ setTimeout(function(){ applyHeight(S && S.config); updatePanorama(); resizeCanvas(); }, 300); }
+  window.addEventListener("orientationchange", onOrientation);
+  try{ screen.orientation.addEventListener("change", onOrientation); }catch(e){}
+
+  /* ---------- Handmatige touch-scroll voor de albumlijst en tracklijst ----------
+     Zelfde aanpak als op de NAS: het dashboard kan het veeggebaar anders zelf
+     oppakken vóór de lijst dat kan. Door de vinger zelf te volgen en scrollTop
+     te zetten wint de lijst. Na een echte veegbeweging wordt de "klik" die de
+     browser daarna soms nog afvuurt genegeerd (geen album per ongeluk open). */
+  var suppressClickUntil = 0;
+  var userScrollAt = 0;
+  document.addEventListener("click", function(e){
+    if(Date.now() < suppressClickUntil){
+      e.stopPropagation();
+      e.preventDefault();
+    }
+  }, true);
+
+  function enableManualTouchScroll(el){
+    var dragging = false, startY = 0, startScrollTop = 0, moved = false;
+    el.addEventListener("touchstart", function(e){
+      if(e.touches.length !== 1) return;
+      dragging = true; moved = false;
+      startY = e.touches[0].clientY;
+      startScrollTop = el.scrollTop;
+      e.stopPropagation();
+    }, { passive: true });
+    el.addEventListener("touchmove", function(e){
+      if(!dragging || e.touches.length !== 1) return;
+      var deltaY = startY - e.touches[0].clientY;
+      if(Math.abs(deltaY) > 8){ moved = true; userScrollAt = Date.now(); }
+      el.scrollTop = startScrollTop + deltaY;
+      e.stopPropagation();
+      e.preventDefault();
+    }, { passive: false });
+    var stopDrag = function(){
+      if(dragging && moved) suppressClickUntil = Date.now() + 350;
+      dragging = false;
+    };
+    el.addEventListener("touchend", stopDrag, { passive: true });
+    el.addEventListener("touchcancel", stopDrag, { passive: true });
+    el.addEventListener("wheel", function(){ userScrollAt = Date.now(); }, { passive: true });
+  }
+  enableManualTouchScroll(els.albumsList);
+  enableManualTouchScroll(els.trackList);
+
+  /* ---------------- status / fouten ---------------- */
+  var flashMsg = "", flashUntil = 0;
+  function renderStatus(){
+    var msg = "";
+    if(Date.now() < flashUntil) msg = flashMsg;
+    else if(S){
+      var st = S.status || {};
+      if(st.spotify === "no-login" || st.spotify === "error" || st.spotify === "blocked") msg = st.spotifyMsg;
+      else if(st.modifyScope === false) msg = "Log opnieuw in bij Spotify (app-instellingen): toevoegen aan afspeellijsten heeft nieuwe rechten nodig.";
+    }
+    els.errorBox.textContent = msg || "";
+    els.errorBox.style.display = msg ? "block" : "none";
+    if(debugOn && S){
+      var st2 = S.status || {};
+      els.diag.style.display = "block";
+      els.diag.textContent = "Modus: " + st2.mode + " | Spotify: " + st2.spotify +
+        " | verzoeken afgelopen uur: " + st2.requestsLastHour +
+        " | artiest: " + (currentArtistId ? "geladen" : "—") +
+        " | genres: " + (lastGenres.length ? lastGenres.slice(0, 3).join(", ") : "geen") + " (" + lastCategory + ")" +
+        " | hoogte: " + currentHeight + "px";
+    }
+  }
+  function flashError(msg){ flashMsg = msg; flashUntil = Date.now() + 6000; renderStatus(); setTimeout(renderStatus, 6100); }
+
+  function send(action, extra){
+    if(!HAPI) return Promise.resolve({ ok: false, error: "Nog geen verbinding met de app" });
+    var body = { action: action };
+    if(extra) for(var k in extra) body[k] = extra[k];
+    return HAPI.api("POST", "/command", body).catch(function(err){
+      return { ok: false, error: "Opdracht mislukt: " + (err && err.message || err) };
+    });
+  }
+
+  /* ---------- Canvas sizing (gebaseerd op .animArea, niet de hele widget) ---------- */
+  var W = 0, H = 0, DPR = Math.max(1, window.devicePixelRatio || 1);
+  function resizeCanvas(){
+    var rect = els.animArea.getBoundingClientRect();
+    if(!rect.width || !rect.height) return;
+    W = rect.width; H = rect.height;
+    els.canvas.width = W * DPR;
+    els.canvas.height = H * DPR;
+    els.canvas.style.width = W + "px";
+    els.canvas.style.height = H + "px";
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  window.addEventListener("resize", function(){ resizeCanvas(); updatePanorama(); });
+  if(window.ResizeObserver){
+    new ResizeObserver(resizeCanvas).observe(els.animArea);
+    new ResizeObserver(updatePanorama).observe(root);
+  }
+  resizeCanvas();
+
+  var lastBgArtUrl = null;
+  function updateBackground(artUrl){
+    if(!artUrl || artUrl === lastBgArtUrl) return;
+    lastBgArtUrl = artUrl;
+    els.bg.style.backgroundImage = 'url("' + artUrl + '")';
+    sampleArtworkColor(artUrl);
+  }
+
+  /* ---------- Genre / albumhoes -> kleurenpalet (zelfde als de NAS) ---------- */
+  var HARD_KEYWORDS = ["rock","metal","punk","hardcore","grunge","industrial","techno",
+    "dubstep","drum and bass","dnb","trap","edm","hardstyle","gabber","emo","screamo"];
+  var SOFT_KEYWORDS = ["ambient","chill","acoustic","classical","piano","jazz","lo-fi",
+    "lofi","soul","folk","singer-songwriter","new age","downtempo","instrumental","sleep"];
+
+  var PALETTES = {
+    hard:   { hues:[355, 320, 22, 200],  sat:88, light:52, speed:1.6, amplitude:1.35 },
+    soft:   { hues:[208, 262, 28, 165],  sat:42, light:72, speed:0.55, amplitude:0.6 },
+    medium: { hues:[280, 190, 338, 45],  sat:65, light:56, speed:1.0, amplitude:1.0 }
+  };
+  function clonePalette(p){ return { hues: p.hues.slice(), sat: p.sat, light: p.light, speed: p.speed, amplitude: p.amplitude }; }
+  var targetPalette = clonePalette(PALETTES.medium);
+  var currentPalette = clonePalette(PALETTES.medium);
+
+  function classifyGenres(genres){
+    var text = genres.join(" ").toLowerCase();
+    if(HARD_KEYWORDS.some(function(k){ return text.indexOf(k) >= 0; })) return "hard";
+    if(SOFT_KEYWORDS.some(function(k){ return text.indexOf(k) >= 0; })) return "soft";
+    return "medium";
+  }
+
+  var artworkHue = null;
+  function sampleArtworkColor(url){
+    try{
+      var img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = function(){
+        try{
+          var c = document.createElement("canvas");
+          c.width = 16; c.height = 16;
+          var cctx = c.getContext("2d");
+          cctx.drawImage(img, 0, 0, 16, 16);
+          var data = cctx.getImageData(0, 0, 16, 16).data;
+          var r=0,g=0,b=0,n=0;
+          for(var i=0;i<data.length;i+=4){
+            var rr=data[i], gg=data[i+1], bb=data[i+2];
+            var lum = (rr+gg+bb)/3;
+            if(lum < 15 || lum > 245) continue;
+            r+=rr; g+=gg; b+=bb; n++;
+          }
+          if(n === 0) return;
+          artworkHue = rgbToHue(r/n, g/n, b/n);
+          computeTargetPalette(true); // hoestint is nu bekend: palet bijwerken
+        }catch(err){ /* canvas "tainted" door CORS — negeren */ }
+      };
+      img.onerror = function(){};
+      img.src = url;
+    }catch(err){ /* negeren */ }
+  }
+
+  function rgbToHue(r,g,b){
+    r/=255; g/=255; b/=255;
+    var max=Math.max(r,g,b), min=Math.min(r,g,b);
+    var h=0, d=max-min;
+    if(d !== 0){
+      if(max===r) h = ((g-b)/d) % 6;
+      else if(max===g) h = (b-r)/d + 2;
+      else h = (r-g)/d + 4;
+      h *= 60;
+      if(h<0) h+=360;
+    }
+    return h;
+  }
+  function blendHue(base, toward, amount){
+    var diff = ((toward - base + 540) % 360) - 180;
+    return (base + diff * amount + 360) % 360;
+  }
+
+  var currentTrackId = null;
+  var lastGenres = [], lastCategory = "medium";
+  // force = opnieuw berekenen voor hetzelfde nummer (genres of hoestint kwamen later binnen)
+  function computeTargetPalette(force){
+    var track = S && S.track;
+    if(!track) return;
+    if(track.id === currentTrackId && !force) return;
+    currentTrackId = track.id;
+    var info = track.artistId && artistInfo[track.artistId];
+    var genres = (info && info.genres) || [];
+    var category = classifyGenres(genres);
+    lastGenres = genres; lastCategory = category;
+    var base = PALETTES[category];
+    var hues = base.hues.map(function(h){ return artworkHue !== null ? blendHue(h, artworkHue, 0.25) : h; });
+    targetPalette = { hues: hues, sat: base.sat, light: base.light, speed: base.speed, amplitude: base.amplitude };
+  }
+
+  /* ---------- Artiest + albums ---------- */
+  var artistInfo = {};          // artistId -> { id, name, photoUrl, genres, albums }
+  var currentArtistId = null;   // artiest waarvan foto + albums nu op het scherm staan
+  var asked = { id: null, at: 0 };
+  var lastArtistPhotoUrl = null;
+  var albumRows = {};           // albumId -> rij
+  var albumObjects = {};        // albumId -> album-object uit de lijst
+  var currentPlayingAlbumId = null;
+  var shownAlbumCount = -1;
+
+  function buildAlbumRow(album, isActive){
+    var row = document.createElement("div");
+    row.className = "albumRow" + (isActive ? " active" : "");
+    if(album.id){
+      row.setAttribute("data-album-id", album.id);
+      if(album.name || !albumObjects[album.id]) albumObjects[album.id] = album;
+    }
+    var year = (album.release_date || "").slice(0, 4);
+    row.innerHTML =
+      '<div class="albumArt"></div>' +
+      '<div class="albumInfo">' +
+        '<div class="albumName">' + escapeHtml(album.name) + '</div>' +
+        (year ? '<div class="albumYear">' + escapeHtml(year) + '</div>' : '') +
+      '</div>' +
+      '<button class="addBtn" data-add="1" aria-label="Album toevoegen aan playlist">＋</button>';
+    if(album.artUrl) row.querySelector(".albumArt").style.backgroundImage = 'url("' + album.artUrl + '")';
+    return row;
+  }
+
+  // activeAlbum: het album van het nummer dat nu speelt. Staat het niet in de
+  // lijst (bijv. een live-uitvoering), dan wordt het bovenaan toegevoegd.
+  function renderAlbums(albums, activeAlbum, keepScroll){
+    var prevScroll = els.albumsList.scrollTop;
+    albumRows = {};
+    var activeAlbumId = activeAlbum && activeAlbum.id;
+    currentPlayingAlbumId = activeAlbumId || null;
+    var list = albums || [];
+    if(activeAlbumId && !list.some(function(a){ return a.id === activeAlbumId; })) list = [activeAlbum].concat(list);
+    if(!list.length){
+      els.albumsList.innerHTML = '<div class="albumsMessage">Geen albums gevonden voor deze artiest.</div>';
+      return;
+    }
+    var ordered = activeAlbumId
+      ? list.slice().sort(function(a, b){ return a.id === activeAlbumId ? -1 : b.id === activeAlbumId ? 1 : 0; })
+      : list;
+    var frag = document.createDocumentFragment();
+    ordered.forEach(function(album){
+      var row = buildAlbumRow(album, album.id === activeAlbumId);
+      if(album.id) albumRows[album.id] = row;
+      frag.appendChild(row);
+    });
+    els.albumsList.innerHTML = "";
+    els.albumsList.appendChild(frag);
+    els.albumsList.scrollTop = keepScroll ? prevScroll : 0;
+  }
+
+  // Ander album van dezelfde artiest: dat album naar boven halen en uitlichten,
+  // zonder de lijst opnieuw op te halen.
+  function updateActiveAlbumHighlight(activeAlbum){
+    var albumId = activeAlbum && activeAlbum.id;
+    if(!albumId || albumId === currentPlayingAlbumId) return;
+    if(!els.albumsList.querySelector(".albumRow")) return; // nog geen lijst
+    var prevRow = currentPlayingAlbumId && albumRows[currentPlayingAlbumId];
+    if(prevRow) prevRow.classList.remove("active");
+    currentPlayingAlbumId = albumId;
+    var row = albumRows[albumId];
+    if(!row){
+      row = buildAlbumRow(activeAlbum, true);
+      albumRows[albumId] = row;
+    }
+    row.classList.add("active");
+    els.albumsList.prepend(row);
+    // Alleen de lijst zelf scrollen (geen scrollIntoView: dat kan ook het
+    // dashboard eromheen laten verschuiven), en niet als je net zelf scrolde.
+    if(Date.now() - userScrollAt > 10000){
+      try{ els.albumsList.scrollTo({ top: 0, behavior: "smooth" }); }catch(e){ els.albumsList.scrollTop = 0; }
+    }
+  }
+
+  function showArtist(a, track){
+    currentArtistId = a.id;
+    els.artistName.textContent = a.name || (track && track.artistName) || "";
+    els.artistPhoto.style.backgroundImage = a.photoUrl ? 'url("' + a.photoUrl + '")' : "none";
+    lastArtistPhotoUrl = a.photoUrl || null;
+    shownAlbumCount = (a.albums || []).length;
+    renderAlbums(a.albums, track && track.albumInfo);
+  }
+
+  // Artiest wissel zonder gegevens: oude foto en lijst weghalen, zodat er nooit
+  // albums van de vorige artiest onder de nieuwe naam staan.
+  function showArtistPlaceholder(track, html){
+    currentArtistId = null;
+    shownAlbumCount = -1;
+    els.artistName.textContent = track.artistName || "";
+    els.artistPhoto.style.backgroundImage = "none";
+    lastArtistPhotoUrl = null;
+    albumRows = {};
+    currentPlayingAlbumId = null;
+    els.albumsList.innerHTML = '<div class="albumsMessage">' + html + '</div>';
+  }
+
+  function requestArtist(id, name){
+    if(!HAPI) return;
+    asked = { id: id, at: Date.now() };
+    HAPI.api("POST", "/artist", { artistId: id, artistName: name || "" })
+      .then(function(r){ handleArtistReply(r, false); })
+      .catch(function(err){ flashError("Artiest opvragen mislukt: " + (err && err.message || err)); });
+  }
+
+  function handleArtistReply(r, fromRealtime){
+    if(!r) return;
+    var track = S && S.track;
+    var wantId = track && track.artistId;
+    if(r.status === "ok" && r.artist){
+      artistInfo[r.artist.id] = r.artist;
+      if(r.artist.id === wantId){
+        if(currentArtistId !== r.artist.id) showArtist(r.artist, track);
+        else if(fromRealtime){ // genres van MusicBrainz of de rest van de albums kwamen later binnen
+          var photo = r.artist.photoUrl;
+          if(photo && photo !== lastArtistPhotoUrl){ els.artistPhoto.style.backgroundImage = 'url("' + photo + '")'; lastArtistPhotoUrl = photo; }
+          if(shownAlbumCount !== (r.artist.albums || []).length){
+            // Aangevulde lijst: opnieuw tekenen zonder de scrollpositie te verliezen.
+            var active = currentPlayingAlbumId ? (albumObjects[currentPlayingAlbumId] || (track && track.albumInfo)) : (track && track.albumInfo);
+            shownAlbumCount = (r.artist.albums || []).length;
+            renderAlbums(r.artist.albums, active, true);
+          }
+        }
+        computeTargetPalette(true);
+      }
+      renderStatus();
+      return;
+    }
+    var id = r.artistId;
+    if(!id || id !== wantId || id === currentArtistId) return;
+    if(r.status === "loading"){
+      showArtistPlaceholder(track, "Albums laden…");
+    }else if(r.status === "deferred"){
+      // Budget van Aura even op: zeggen wanneer het komt (het gaat vanzelf).
+      var min = Math.ceil((r.waitMs || 0) / 60000);
+      var when = min <= 1 ? "binnen een minuut" : "over ± " + min + " min";
+      showArtistPlaceholder(track, "Albums van " + escapeHtml(track.artistName || "deze artiest") + " volgen " + when +
+        '<br><span style="opacity:.6;font-size:12px;">Aura spaart Spotify: max 6 verzoeken per 10 minuten.</span>');
+    }else if(r.status === "error"){
+      showArtistPlaceholder(track, 'Kon albums niet laden.<br><span style="opacity:.6;font-size:12px;">' +
+        escapeHtml(r.error || "") + '</span>');
+    }
+  }
+
+  function updateArtistSection(track){
+    var id = track.artistId;
+    if(!id || id === currentArtistId) return;
+    if(artistInfo[id]){ showArtist(artistInfo[id], track); return; }
+    // Nog niet bekend: aan de app vragen (niet vaker dan eens per 30 s voor dezelfde artiest).
+    if(asked.id === id && Date.now() - asked.at < 30000) return;
+    requestArtist(id, track.artistName);
+  }
+
+  /* ---------- Huidig album naast de artiestfoto ---------- */
+  var lastDisplayedAlbumId = null;
+  function updateCurrentAlbumDisplay(track){
+    var al = track.albumInfo;
+    var albumId = al && al.id;
+    if(albumId && albumId === lastDisplayedAlbumId) return;
+    lastDisplayedAlbumId = albumId || null;
+    var artUrl = (al && al.artUrl) || track.artUrl;
+    els.headerAlbumArt.style.backgroundImage = artUrl ? 'url("' + artUrl + '")' : "none";
+    els.currentAlbumName.textContent = (al && al.name) || track.album || "";
+  }
+
+  /* Dubbeltik-herkenning (eigen, want "dblclick" werkt niet betrouwbaar op een
+     touchscreen in het dashboard). Eerste tik: regel licht kort op. Tweede tik
+     op dezelfde regel binnen 0,4 s = dubbeltik (afspelen). Een enkele tik doet
+     na 0,4 s alleen iets als daar een actie voor is (bijv. album openen). */
+  var DOUBLE_TAP_MS = 400;
+  var lastTap = { key: null, timer: null, row: null };
+  function handleTap(key, row, onSingle, onDouble){
+    if(lastTap.key === key){
+      clearTimeout(lastTap.timer);
+      if(lastTap.row) lastTap.row.classList.remove("tapped");
+      lastTap = { key: null, timer: null, row: null };
+      if(onDouble) onDouble();
+      return;
+    }
+    clearTimeout(lastTap.timer);
+    if(lastTap.row) lastTap.row.classList.remove("tapped");
+    if(row) row.classList.add("tapped");
+    lastTap = { key: key, row: row, timer: setTimeout(function(){
+      if(row) row.classList.remove("tapped");
+      lastTap = { key: null, timer: null, row: null };
+      if(onSingle) onSingle();
+    }, DOUBLE_TAP_MS) };
+  }
+  // Tekst na toevoegen, bijv. "8 nummers toegevoegd aan Ramon, 2 stonden er al in".
+  function addResultText(r, name){
+    var a = r.added || 0, sk = r.skipped || 0;
+    var n = function(x){ return x === 1 ? "1 nummer" : x + " nummers"; };
+    if(a === 0 && sk > 0) return sk === 1 ? "Staat al in " + name : "Alle " + sk + " nummers staan al in " + name;
+    return n(a) + " toegevoegd aan " + name + (sk ? ", " + sk + (sk === 1 ? " stond" : " stonden") + " er al in" : "");
+  }
+
+  /* ---------- Album openen, afspelen en toevoegen ---------- */
+  var playingTrackId = null;
+  var toastTimer = null;
+  function toast(message, isError){
+    els.toast.textContent = message;
+    els.toast.classList.toggle("error", !!isError);
+    els.toast.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ els.toast.classList.remove("show"); }, isError ? 4500 : 2500);
+  }
+
+  function formatDuration(ms){
+    var s = Math.round((ms || 0) / 1000);
+    return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+  }
+  var MONTHS = ["jan","feb","mrt","apr","mei","jun","jul","aug","sep","okt","nov","dec"];
+  function formatReleaseDate(date, precision){
+    if(!date) return "";
+    var p = date.split("-");
+    if(precision === "day" && p[2]) return parseInt(p[2], 10) + " " + MONTHS[parseInt(p[1], 10) - 1] + " " + p[0];
+    if(precision === "month" && p[1]) return MONTHS[parseInt(p[1], 10) - 1] + " " + p[0];
+    return p[0];
+  }
+  function albumTypeLabel(type){
+    return type === "single" ? "Single" : type === "compilation" ? "Compilatie" : "Album";
+  }
+
+  var albumDetailCache = {}; // albumId -> { album, tracks }
+  function fetchAlbumDetail(albumId){
+    if(albumDetailCache[albumId]) return Promise.resolve(albumDetailCache[albumId]);
+    if(!HAPI) return Promise.reject(new Error("Nog geen verbinding met de app"));
+    return HAPI.api("POST", "/album", { albumId: albumId }).then(function(r){
+      if(!r || !r.ok) throw new Error((r && r.error) || "Album ophalen mislukt");
+      var d = { album: r.album, tracks: r.tracks || [] };
+      albumDetailCache[albumId] = d;
+      return d;
+    });
+  }
+
+  var openAlbumId = null;
+  function fillDetailHeader(album){
+    els.detailArt.style.backgroundImage = album.artUrl ? 'url("' + album.artUrl + '")' : "none";
+    els.detailType.textContent = albumTypeLabel(album.album_type);
+    els.detailName.textContent = album.name || "";
+    var artists = (album.artists || []).join(", ");
+    var date = formatReleaseDate(album.release_date, album.release_date_precision);
+    els.detailMeta.textContent = [artists, date, album.total_tracks ? album.total_tracks + " nummers" : ""]
+      .filter(Boolean).join(" · ");
+  }
+
+  function openAlbum(albumId){
+    openAlbumId = albumId;
+    fillDetailHeader(albumObjects[albumId] || { id: albumId });
+    els.trackList.innerHTML = '<div class="albumsMessage">Nummers laden…</div>';
+    els.trackList.scrollTop = 0;
+    els.detail.classList.add("open");
+    fetchAlbumDetail(albumId).then(function(d){
+      if(openAlbumId !== albumId) return;
+      fillDetailHeader(d.album);
+      renderTracks(d.album, d.tracks);
+    }).catch(function(err){
+      if(openAlbumId !== albumId) return;
+      els.trackList.innerHTML = '<div class="albumsMessage">Kon nummers niet laden.<br><span style="opacity:.6;font-size:12px;">' +
+        escapeHtml(err.message || String(err)) + '</span></div>';
+    });
+  }
+
+  function renderTracks(album, tracks){
+    if(!tracks.length){
+      els.trackList.innerHTML = '<div class="albumsMessage">Geen nummers gevonden.</div>';
+      return;
+    }
+    var albumArtists = (album.artists || []).join(", ");
+    var frag = document.createDocumentFragment();
+    tracks.forEach(function(t, i){
+      var row = document.createElement("div");
+      row.className = "trackRow";
+      row.setAttribute("data-track-id", t.id || "");
+      row.setAttribute("data-track-uri", t.uri || "");
+      var trackArtists = (t.artists || []).join(", ");
+      var showArtists = trackArtists && trackArtists !== albumArtists;
+      row.innerHTML =
+        '<div class="trackNum">' + (t.track_number || i + 1) + '</div>' +
+        '<div class="trackInfo">' +
+          '<div class="trackName">' + escapeHtml(t.name) + '</div>' +
+          (showArtists ? '<div class="trackArtists">' + escapeHtml(trackArtists) + '</div>' : '') +
+        '</div>' +
+        '<div class="trackDur">' + formatDuration(t.duration_ms) + '</div>' +
+        '<button class="addBtn" aria-label="Toevoegen aan playlist">＋</button>';
+      frag.appendChild(row);
+    });
+    els.trackList.innerHTML = "";
+    els.trackList.appendChild(frag);
+    markPlayingTrack();
+  }
+
+  function markPlayingTrack(){
+    Array.prototype.forEach.call(els.trackList.querySelectorAll(".trackRow"), function(row){
+      row.classList.toggle("playing", !!playingTrackId && row.getAttribute("data-track-id") === playingTrackId);
+    });
+  }
+
+  function closeAlbum(){
+    openAlbumId = null;
+    els.detail.classList.remove("open");
+  }
+
+  // Albumlijst: ＋ = album toevoegen; enkele tik = album openen; dubbeltik = album afspelen.
+  els.albumsList.addEventListener("click", function(e){
+    var row = e.target.closest(".albumRow");
+    var id = row && row.getAttribute("data-album-id");
+    if(!id) return;
+    if(e.target.closest("[data-add]")){
+      var al = albumObjects[id] || {};
+      openPlaylistPicker(null, "Album <b>" + escapeHtml(al.name || "") + "</b> toevoegen aan…", id);
+      return;
+    }
+    handleTap("al:" + id, row, function(){ openAlbum(id); }, function(){ playAlbum("spotify:album:" + id, null); });
+  });
+  els.detailBack.addEventListener("click", closeAlbum);
+  els.detailPlay.addEventListener("click", function(){
+    if(openAlbumId) playAlbum("spotify:album:" + openAlbumId, null);
+  });
+  els.detailAdd.addEventListener("click", function(){
+    var albumId = openAlbumId;
+    if(!albumId) return;
+    var al = albumObjects[albumId] || {};
+    openPlaylistPicker(null, "Album <b>" + escapeHtml(al.name || els.detailName.textContent || "") + "</b> toevoegen aan…", albumId);
+  });
+  els.trackList.addEventListener("click", function(e){
+    var row = e.target.closest(".trackRow");
+    if(!row || !openAlbumId) return;
+    if(e.target.closest(".addBtn")){
+      var name = row.querySelector(".trackName").textContent;
+      openPlaylistPicker([row.getAttribute("data-track-uri")], "<b>" + escapeHtml(name) + "</b> toevoegen aan…");
+      return;
+    }
+    // Nummer: dubbeltik = afspelen (vanaf dit nummer in het album).
+    var albumId = openAlbumId, uri = row.getAttribute("data-track-uri") || null;
+    handleTap("tr:" + uri, row, null, function(){ playAlbum("spotify:album:" + albumId, uri); });
+  });
+
+  /* ---------- Afspelen (via de app: Denon wordt zo nodig gewekt) ---------- */
+  var playBusy = false;
+  function playAlbum(albumUri, trackUri){
+    if(playBusy) return;
+    playBusy = true;
+    toast("▶ Starten…");
+    var extra = { albumUri: albumUri };
+    if(trackUri) extra.trackUri = trackUri;
+    send("playAlbum", extra).then(function(r){
+      if(r && r.ok === false) toast(r.error || "Afspelen mislukt", true);
+      else toast("▶ Speelt af");
+    }).then(function(){ playBusy = false; }, function(){ playBusy = false; });
+  }
+
+  /* ---------- Toevoegen aan playlist (knoppen uit de app-instellingen) ---------- */
+  var pickerUris = null, pickerAlbumId = null;
+  function targetPlaylists(){
+    return ((S && S.config && S.config.playlists) || []).filter(function(p){ return p && p.name && p.uri; });
+  }
+  // uris = losse nummers, of albumId = heel album (de app haalt de nummers zelf op).
+  function openPlaylistPicker(uris, titleHtml, albumId){
+    pickerUris = uris;
+    pickerAlbumId = albumId || null;
+    els.sheetTitle.innerHTML = titleHtml;
+    els.sheetGrid.innerHTML = "";
+    var lists = targetPlaylists();
+    if(!lists.length){
+      els.sheetGrid.innerHTML = '<div class="albumsMessage">Geen afspeellijsten ingesteld (app-instellingen, onderdeel 3).</div>';
+    }
+    lists.forEach(function(p, i){
+      var b = document.createElement("button");
+      b.className = "btn";
+      b.textContent = p.name;
+      b.setAttribute("data-index", String(i));
+      els.sheetGrid.appendChild(b);
+    });
+    els.sheetBackdrop.classList.add("open");
+  }
+  function closePlaylistPicker(){
+    pickerUris = null;
+    pickerAlbumId = null;
+    els.sheetBackdrop.classList.remove("open");
+  }
+  els.sheetCancel.addEventListener("click", closePlaylistPicker);
+  els.sheetBackdrop.addEventListener("click", function(e){
+    if(e.target === els.sheetBackdrop) closePlaylistPicker();
+  });
+  els.sheetGrid.addEventListener("click", function(e){
+    var b = e.target.closest("button");
+    if(!b || (!pickerUris && !pickerAlbumId)) return;
+    var target = targetPlaylists()[parseInt(b.getAttribute("data-index"), 10)];
+    var uris = pickerUris, albumId = pickerAlbumId;
+    closePlaylistPicker();
+    if(!target) return;
+    toast("Toevoegen…");
+    var req = albumId
+      ? send("addAlbumToPlaylist", { playlistUri: target.uri, albumId: albumId })
+      : send("addToPlaylist", { playlistUri: target.uri, uris: uris });
+    req.then(function(r){
+      if(!r || r.ok === false){ toast((r && r.error) || "Toevoegen mislukt", true); return; }
+      toast(addResultText(r, target.name));
+    });
+  });
+
+  /* ---------- Afspeelstatus van de app verwerken ---------- */
+  var targetPlayingLevel = 0;
+  function applyState(s){
+    if(!s) return;
+    S = s;
+    receivedAt = Date.now();
+    applyHeight(s.config);
+
+    // Golf beweegt alleen als er echt muziek speelt; anders vlakt hij uit.
+    targetPlayingLevel = (s.track && s.isPlaying) ? 1 : 0;
+    var newPlayingTrackId = (s.track && s.isPlaying) ? s.track.id : null;
+    if(newPlayingTrackId !== playingTrackId){
+      playingTrackId = newPlayingTrackId;
+      markPlayingTrack();
+    }
+    if(s.track){
+      updateBackground(s.track.artUrl);
+      updateCurrentAlbumDisplay(s.track);
+      computeTargetPalette(false);
+      updateArtistSection(s.track);
+      updateActiveAlbumHighlight(s.track.albumInfo);
+    }
+    renderStatus();
+  }
+
+  function fetchState(){
+    if(!HAPI) return;
+    HAPI.api("GET", "/state").then(applyState).catch(function(err){
+      flashError("Geen verbinding met de app: " + (err && err.message || err));
+    });
+  }
+
+  // Vangnet tegen een "bevroren" webview (zoals de andere widgets) — maar
+  // niet terwijl er een album of de playlist-kiezer openstaat.
+  setInterval(function(){
+    if(document.visibilityState !== "visible" || !receivedAt || Date.now() - receivedAt < 180000) return;
+    if(els.detail.classList.contains("open") || els.sheetBackdrop.classList.contains("open")) return;
+    location.reload();
+  }, 30000);
+
+  // Elke 30 s: status ophalen (lokaal, geen Spotify) = "ik ben in beeld".
+  setInterval(function(){ if(document.visibilityState === "visible") fetchState(); }, 30000);
+  document.addEventListener("visibilitychange", function(){ if(document.visibilityState === "visible") fetchState(); });
+
+  /* ---------- Golf-lint animatie (ongewijzigd van de NAS) ---------- */
+  var phase = 0;
+  var lastFrameTime = performance.now();
+  var playingLevel = 0;
+
+  function lerp(a,b,t){ return a + (b-a)*t; }
+  function lerpPalette(dt){
+    var t = Math.min(1, dt * 0.6);
+    for(var i=0;i<currentPalette.hues.length;i++){
+      var cur = currentPalette.hues[i];
+      var tgt = targetPalette.hues[i] !== undefined ? targetPalette.hues[i] : cur;
+      var diff = ((tgt - cur + 540) % 360) - 180;
+      currentPalette.hues[i] = (cur + diff * t + 360) % 360;
+    }
+    currentPalette.sat = lerp(currentPalette.sat, targetPalette.sat, t);
+    currentPalette.light = lerp(currentPalette.light, targetPalette.light, t);
+    currentPalette.speed = lerp(currentPalette.speed, targetPalette.speed, t);
+    currentPalette.amplitude = lerp(currentPalette.amplitude, targetPalette.amplitude, t);
+  }
+  function hsla(h, s, l, a){
+    return "hsla(" + h.toFixed(1) + ", " + s.toFixed(0) + "%, " + l.toFixed(0) + "%, " + a + ")";
+  }
+  function envelope(t){
+    var shaped = Math.sin(Math.PI * t);
+    return Math.max(0, Math.pow(shaped, 0.85));
+  }
+  function traceSmoothPath(c, pts){
+    if(pts.length === 0) return;
+    if(pts.length < 3){
+      c.moveTo(pts[0][0], pts[0][1]);
+      for(var i = 1; i < pts.length; i++) c.lineTo(pts[i][0], pts[i][1]);
+      return;
+    }
+    c.moveTo(pts[0][0], pts[0][1]);
+    for(var j = 1; j < pts.length - 1; j++){
+      var cx = pts[j][0], cy = pts[j][1], nx = pts[j + 1][0], ny = pts[j + 1][1];
+      c.quadraticCurveTo(cx, cy, (cx + nx) / 2, (cy + ny) / 2);
+    }
+    var last = pts[pts.length - 1];
+    c.lineTo(last[0], last[1]);
+  }
+
+  var RIBBON_MIN_WIDTH = 2.5;
+  function drawRibbon(pulse){
+    var centerY = H * 0.45;
+    var amp = H * 0.14 * currentPalette.amplitude * (1 + pulse * 0.35) * playingLevel;
+    var fullMaxWidth = H * 0.095 * (0.6 + currentPalette.amplitude * 0.5) * (1 + pulse * 0.25);
+    var maxWidth = RIBBON_MIN_WIDTH + (fullMaxWidth - RIBBON_MIN_WIDTH) * playingLevel;
+    var freq1 = 3.6 / W;
+    var freq2 = 8.2 / W;
+    var step = Math.max(2, W / 320);
+    var topPts = [], botPts = [];
+    for(var x=0; x<=W; x+=step){
+      var t = x / W;
+      var env = envelope(t);
+      var y = centerY
+        + env * amp * Math.sin(freq1 * x * Math.PI * 2 + phase)
+        + env * amp * 0.4 * Math.sin(freq2 * x * Math.PI * 2 - phase * 1.4);
+      var halfW = (RIBBON_MIN_WIDTH + (maxWidth - RIBBON_MIN_WIDTH) * env) / 2;
+      topPts.push([x, y - halfW]);
+      botPts.push([x, y + halfW]);
+    }
+    var gradStops = currentPalette.hues;
+    var grad = ctx.createLinearGradient(0, 0, W, 0);
+    gradStops.forEach(function(hue, i){
+      grad.addColorStop(i / (gradStops.length - 1), hsla(hue, currentPalette.sat, currentPalette.light, 1));
+    });
+    var outline = topPts.concat(botPts.slice().reverse());
+    ctx.beginPath();
+    traceSmoothPath(ctx, outline);
+    ctx.closePath();
+
+    ctx.save();
+    ctx.shadowBlur = Math.max(14, H * 0.05) * (1 + pulse * 0.6);
+    ctx.shadowColor = hsla(gradStops[Math.floor(gradStops.length/2)], currentPalette.sat, currentPalette.light, 0.85);
+    ctx.fillStyle = grad;
+    ctx.globalCompositeOperation = "lighten";
+    ctx.fill();
+    ctx.restore();
+
+    ctx.fillStyle = grad;
+    ctx.globalCompositeOperation = "lighten";
+    ctx.fill();
+
+    var midPts = topPts.map(function(p, i){ return [p[0], (p[1] + botPts[i][1]) / 2]; });
+    ctx.beginPath();
+    traceSmoothPath(ctx, midPts);
+    ctx.lineWidth = Math.max(1, H*0.006);
+    ctx.strokeStyle = "rgba(255,255,255,0.5)";
+    ctx.globalCompositeOperation = "lighten";
+    ctx.stroke();
+  }
+
+  // Widget-instelling "Animatie": normaal (elk beeldje), rustig (±15 per
+  // seconde) of uit (stilstaand lint, 2x per seconde bijgewerkt voor de kleur).
+  function scheduleFrame(){
+    var mode = WS.animation || "normal";
+    if(mode === "calm") setTimeout(function(){ requestAnimationFrame(drawFrame); }, 66);
+    else if(mode === "off") setTimeout(function(){ requestAnimationFrame(drawFrame); }, 500);
+    else requestAnimationFrame(drawFrame);
+  }
+  function drawFrame(now){
+    var dt = Math.min(0.1, (now - lastFrameTime) / 1000);
+    lastFrameTime = now;
+    lerpPalette(dt);
+    playingLevel = lerp(playingLevel, targetPlayingLevel, Math.min(1, dt * 1.4));
+    if(WS.animation !== "off") phase += currentPalette.speed * dt * 0.7 * (0.15 + playingLevel * 0.85);
+    // Geen beat-puls: daarvoor is Spotify's tempo (audio-features) nodig, en
+    // dat is afgesloten voor developer-apps — net als op de NAS.
+    var pulse = 0;
+    if(W && H){
+      ctx.clearRect(0, 0, W, H);
+      drawRibbon(pulse);
+    }
+    scheduleFrame();
+  }
+  requestAnimationFrame(drawFrame);
+
+  /* ---------- Verbinding met de app ---------- */
+  window.onHomeyReady = function(Homey){
+    HAPI = Homey;
+    try{ WS = Homey.getSettings() || {}; debugOn = !!WS.debug; }catch(e){}
+    updatePanorama();
+    Homey.on("state", applyState);
+    Homey.on("aura_artist", function(r){ handleArtistReply(r, true); });
+    var readyDone = false;
+    function ready(cfg){
+      if(readyDone) return;
+      readyDone = true;
+      currentHeight = computeHeight(cfg);
+      Homey.ready({ height: currentHeight });
+      setTimeout(function(){ updatePanorama(); resizeCanvas(); }, 50);
+    }
+    Homey.api("GET", "/state")
+      .then(function(s){ ready(s && s.config); applyState(s); })
+      .catch(function(err){ ready(null); flashError("Geen verbinding met de app: " + (err && err.message || err)); });
+    setTimeout(function(){ ready(null); }, 4000);
+  };
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Spotify — naadloos</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d0f; color: #fff; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  /* Eén doorlopende albumhoes achter alle widgets */
+  .bg { position: fixed; inset: -40px; z-index: 0; background: #0b0d0f center/cover no-repeat; filter: blur(18px) brightness(.5) saturate(1.15); transition: background-image .5s ease; }
+  .shade { position: fixed; inset: 0; z-index: 0; background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.18) 60%, rgba(0,0,0,.45) 100%); }
+  .row { position: relative; z-index: 1; display: flex; width: 100%; height: 100%; }
+  .panel { position: relative; flex: 1 1 0; min-width: 0; height: 100%; overflow: hidden; }
+  .panel iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: transparent; display: block; }
+  .err { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 5; font-size: 12px; padding: .5em 1em; border-radius: 999px; background: rgba(120,30,30,.85); max-width: 90%; text-align: center; }
+</style>
+</head>
+<body>
+<div class="bg" id="bg"></div>
+<div class="shade"></div>
+<div class="row" id="row"></div>
+<div class="err" id="err" hidden></div>
+<script>
+/* De widgets van je eigen Homey-app naadloos naast elkaar, met één
+   achtergrond. Adres: /aw-geheel.html?app=<app-id>&w=widget1,widget2,…
+   Alle gegevens komen van de app op je Homey; deze pagina vraagt zelf
+   niets aan Spotify. */
+(function () {
+  const q = new URLSearchParams(location.search);
+  const APP = q.get('app') || 'nl.ramon.spotifydashboard';
+  const W = (q.get('w') || 'nu-speelt,afspeellijst,platenkast,aura').split(',').map(s => s.trim()).filter(Boolean);
+  const bg = document.getElementById('bg');
+
+  // Gedeelde live-berichten: die van het dashboard als we daarin staan, anders een eigen verbinding.
+  let bus = null;
+  try { if (window.top !== window && window.top.__awBus) bus = window.top.__awBus; } catch (e) { /* */ }
+  if (!bus) {
+    const subs = new Set();
+    bus = window.__awBus = {
+      add(appId, fn) { const e = { appId, fn }; subs.add(e); return () => subs.delete(e); },
+      dispatch(d) { for (const e of [...subs]) if (e.appId === d.appId) { try { e.fn(d.event, d.data); } catch (err) { subs.delete(e); } } },
+    };
+    const es = new EventSource('/api/events');
+    es.addEventListener('appevent', ev => { try { bus.dispatch(JSON.parse(ev.data)); } catch (e) { /* */ } });
+  }
+
+  let lastArt = null;
+  function applyState(s) {
+    const t = s && s.track;
+    const art = t && ((t.albumInfo && t.albumInfo.artUrl) || t.artUrl);
+    if (art && art !== lastArt) { lastArt = art; bg.style.backgroundImage = `url("${String(art).replace(/"/g, '%22')}")`; }
+  }
+  bus.add(APP, (ev, data) => { if (ev === 'state') applyState(data); });
+
+  function first() {
+    fetch('/api/aw/call', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ app: APP, widget: W[0], method: 'GET', path: '/state' }) })
+      .then(r => r.json().then(j => { if (!r.ok) throw new Error(j.error || r.statusText); return j.result; }))
+      .then(s => { document.getElementById('err').hidden = true; applyState(s); })
+      .catch(e => { const el = document.getElementById('err'); el.textContent = 'Geen verbinding met de app: ' + e.message; el.hidden = false; setTimeout(first, 15000); });
+  }
+  first();
+  setInterval(first, 60000);
+
+  const row = document.getElementById('row');
+  for (const w of W) {
+    const p = document.createElement('div'); p.className = 'panel';
+    const f = document.createElement('iframe');
+    f.src = `/aw/${encodeURIComponent(APP)}/${encodeURIComponent(w)}/?naadloos=1`;
+    f.setAttribute('allowtransparency', 'true');
+    p.appendChild(f); row.appendChild(p);
+  }
+})();
+</script>
+</body>
+</html>
