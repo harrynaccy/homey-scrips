@@ -99,7 +99,7 @@
       }
     });
   }
-  E.select = id => { E.sel = id; E.decorate(); E.section = 'tegel'; E.refreshPanel(); };
+  E.select = id => { E.sel = id; E.fxScope = 'tile'; E.decorate(); E.section = 'tegel'; E.refreshPanel(); };
 
   E.dragify = (ov, t) => {
     ov.onpointerdown = e => {
@@ -193,7 +193,7 @@
     none: () => {},
   };
   E.bind = root => {
-    const apply = (k, v, fx, live) => E.commit(k, () => setPath(D.cfg, k, v), () => { (FX[fx] || FX.none)(); if (fx === 'panel' || (!live && fx === 'tilepanel')) {} });
+    const apply = (k, v, fx, live) => E.commit(k, () => E.setScoped(k, v), () => { (FX[fx] || FX.none)(); if (E.fxScope === 'all' && E.sel && fx.startsWith('tile')) D.renderAll(); if (fx === 'panel' || (!live && fx === 'tilepanel')) {} });
     root.querySelectorAll('[data-k]').forEach(inp => {
       const k = inp.dataset.k, fx = inp.dataset.fx || 'none';
       if (inp.hasAttribute('data-bool')) inp.onclick = () => { const v = !inp.classList.contains('on'); inp.classList.toggle('on', v); apply(k, v, fx); if (fx === 'panel' || fx === 'tilepanel') E.refreshPanel(); };
@@ -229,6 +229,22 @@
     root.querySelectorAll('[data-step]').forEach(b => b.onclick = () => { const inp = b.parentNode.querySelector('input'); inp.value = Number(inp.value) + Number(b.dataset.step); inp.onchange(); });
     root.querySelectorAll('[data-segk]').forEach(b => b.onclick = () => { const raw = b.dataset.v; const v = /^-?\d+(\.\d+)?$/.test(raw) ? Number(raw) : raw; apply(b.dataset.segk, v, b.dataset.fx); E.refreshPanel(); });
     root.querySelectorAll('[data-clear]').forEach(b => b.onclick = () => { apply(b.dataset.clear, undefined, b.dataset.fx); E.refreshPanel(); });
+  };
+
+  // ---------- bereik: alleen deze tegel, of alle knoppen/tegels van dit soort ----------
+  // Welke instellingen mee mogen naar andere tegels (alleen uiterlijk, nooit inhoud of koppeling)
+  const SCOPE_OPTS = ['colorOn', 'colorOff', 'label', 'state', 'icStyle', 'icColor2', 'keepColor', 'brand'];
+  const scopable = rel => rel.startsWith('style.') || (rel.startsWith('opts.') && SCOPE_OPTS.includes(rel.slice(5)));
+  E.scopeTargets = () => {
+    const f = E.sel && D.findTile(E.sel); if (!f || !E.fxScope || E.fxScope === 'tile') return [];
+    const same = x => x.id !== f.tile.id && x.type === f.tile.type;
+    return (E.fxScope === 'all' ? D.cfg.tabs : [f.tab]).flatMap(tab => tab.tiles.filter(same));
+  };
+  E.setScoped = (k, v) => {
+    setPath(D.cfg, k, v);
+    const P = E.sel && selPath(); if (!P || !k.startsWith(P + '.')) return;
+    const rel = k.slice(P.length + 1); if (!scopable(rel)) return;
+    for (const x of E.scopeTargets()) setPath(x, rel, v === undefined ? undefined : D.clone(v));
   };
 
   // ---------- secties ----------
@@ -573,9 +589,24 @@
   E.wireFx = (root, getV) => {
     root.querySelectorAll('[data-fxpreset]').forEach(b => b.onclick = () => {
       const [, vals] = FX_PRESETS[b.dataset.fxpreset]; const base = b.dataset.base;
-      E.commit(null, () => { const o = getPath(D.cfg, base) || {}; Object.assign(o, vals); if (vals.glC === undefined) delete o.glC; setPath(D.cfg, base, o); }, () => { (FX[b.dataset.fx] || FX.none)(); E.refreshPanel(); D.toast(FX_PRESETS[b.dataset.fxpreset][0] + ' toegepast'); });
+      E.commit(null, () => {
+        const put = o => { Object.assign(o, D.clone(vals)); if (vals.glC === undefined) delete o.glC; return o; };
+        setPath(D.cfg, base, put(getPath(D.cfg, base) || {}));
+        if (base.endsWith('.style')) for (const x of E.scopeTargets()) x.style = put(x.style || {});
+      }, () => { (FX[b.dataset.fx] || FX.none)(); E.refreshPanel(); D.toast(FX_PRESETS[b.dataset.fxpreset][0] + ' toegepast'); });
     });
     const st = root.querySelector('[data-sndtest]'); if (st) st.onclick = () => { const v = getV(); D.sound(v.snd === 'none' ? 'klik' : v.snd, v.vol); };
+  };
+
+  // Keuze bovenaan Stijl: voor wie geldt een wijziging?
+  E.scopeBar = (f, t) => {
+    const btn = t.type === 'button'; const scope = E.fxScope || 'tile';
+    const nTab = f.tab.tiles.filter(x => x.id !== t.id && x.type === t.type).length;
+    const nAll = D.cfg.tabs.reduce((n, tab) => n + tab.tiles.filter(x => x.id !== t.id && x.type === t.type).length, 0);
+    const what = btn ? 'knoppen' : 'tegels van dit soort';
+    const opts = [['tile', btn ? 'Alleen deze knop' : 'Alleen deze tegel'], ['tab', `Alle ${btn ? 'knoppen' : 'van dit soort'} op dit tabblad (${nTab + 1})`], ['all', `Overal (${nAll + 1})`]];
+    return `<div class="scopebar${scope !== 'tile' ? ' wide' : ''}"><b>Wijziging geldt voor</b><div class="seg">${opts.map(([v, l]) => `<button data-fxscope data-v="${v}" class="${v === scope ? 'act' : ''}">${esc(l)}</button>`).join('')}</div>` +
+      (scope !== 'tile' ? `<p>Let op: wat je nu verandert aan kleuren, vorm, rand, schaduw, gloed, tekst, diepte of geluid, gaat ook naar ${scope === 'tab' ? nTab : nAll} andere ${what}. Alleen die ene instelling verandert, de rest van die ${what} blijft zoals het is. Kies je een andere tegel, dan staat dit weer op "alleen deze".</p>` : `<p>Een <i class="ovr"></i> bolletje = eigen instelling van deze ${btn ? 'knop' : 'tegel'} (wijkt af van de standaard onder Uiterlijk).</p>`) + '</div>';
   };
 
   // Pictogram-regels bij een tegel: aan, uit, merkkleur, kleur bij uit, kleurstijl
@@ -661,7 +692,7 @@
     return `<div class="tile-hd">${anyIcon(t.opts.mdi || hdIcon)}<div><b>${esc(D.titleOf(t))}</b><small>${esc(T ? T.label : t.type)} · ${t.w}×${t.h}</small></div></div>` +
       F.group('Inhoud', F.row('Titel', F.text(`${P}.opts.title`, t.opts.title, 'tile', T && T.title ? T.title({ ...t, opts: {} }) : '')) + spec) +
       F.group('Plaats en grootte', F.row('Breedte', F.num(`${P}.w`, t.w, 1, f.tab.grid.cols, 'tilepos')) + F.row('Hoogte', F.num(`${P}.h`, t.h, 1, f.tab.grid.rows, 'tilepos')) + F.row('Kolom', F.num(`${P}.x`, t.x, 0, f.tab.grid.cols - 1, 'tilepos')) + F.row('Rij', F.num(`${P}.y`, t.y, 0, f.tab.grid.rows - 1, 'tilepos')) + F.row('Vastzetten', F.toggle(`${P}.locked`, t.locked, 'tilepanel'), 'Kan dan niet per ongeluk verschuiven')) +
-      F.group('Stijl', E.fxControls(`${P}.style`, s, D.fxOf(t), t) +
+      F.group('Stijl', E.scopeBar(f, t) + E.fxControls(`${P}.style`, s, D.fxOf(t), t) +
         `<div class="acts">${t.type === 'button' ? `<button class="btn sm" data-copystyle>${icon('copy')}Stijl naar alle knoppen op dit tabblad</button>` : ''}<button class="btn sm ghost" data-resetstyle>${icon('refresh')}Stijl terugzetten</button></div>`) +
       F.group('Acties', `<div class="acts"><button class="btn sm" data-dup>${icon('copy')}Dupliceren</button><button class="btn sm danger" data-del>${icon('trash')}Verwijderen</button></div>` +
         (tabsOpts.length ? F.row('Naar tabblad', `<select id="totab">${tabsOpts.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('')}</select>`) + `<div class="acts"><button class="btn sm" data-copyto>${icon('copy')}Kopiëren</button><button class="btn sm" data-moveto>${icon('right')}Verplaatsen</button></div>` : ''));
@@ -697,7 +728,19 @@
       E.commit(null, () => { t.ref = ref; delete t.opts.cap; if (ic) { t.opts.mdi = ic; t.opts.mdiAuto = true; } }, () => { D.renderGrid(); E.refreshPanel(); });
     };
     const rl = root.querySelector('[data-reload]'); if (rl) rl.onclick = () => { const el = D.tileEls.get(t.id); if (el) el.querySelector('.inner').innerHTML = ''; D.renderGrid(); };
-    root.querySelector('[data-resetstyle]').onclick = () => E.commit(null, () => { t.style = {}; }, () => { D.renderGrid(); E.refreshPanel(); });
+    root.querySelector('[data-resetstyle]').onclick = async () => {
+      const others = E.scopeTargets();
+      if (others.length && !(await D.confirm(`Stijl terugzetten voor deze tegel én ${others.length} andere?`, 'Terugzetten'))) return;
+      E.commit(null, () => { t.style = {}; others.forEach(x => { x.style = {}; }); }, () => { D.renderAll(); E.refreshPanel(); });
+    };
+    root.querySelectorAll('[data-fxscope]').forEach(b => b.onclick = () => { E.fxScope = b.dataset.v; E.refreshPanel(); });
+    // blauw bolletje bij instellingen die afwijken van de standaard
+    root.querySelectorAll('.grp [data-k], .grp [data-segk]').forEach(inp => {
+      const k = inp.dataset.k || inp.dataset.segk; const P = selPath();
+      if (!k || !k.startsWith(P + '.') || !scopable(k.slice(P.length + 1))) return;
+      if (getPath(D.cfg, k) === undefined) return;
+      const lab = inp.closest('.f') && inp.closest('.f').querySelector('label'); if (lab && !lab.querySelector('.ovr')) lab.insertAdjacentHTML('afterbegin', '<i class="ovr" title="Eigen instelling van deze tegel"></i>');
+    });
     root.querySelector('[data-dup]').onclick = () => {
       const spot = E.firstFree(f.tab, t.w, t.h); if (!spot) { D.toast('Geen ruimte om te dupliceren', true); return; }
       const n = { ...D.clone(t), id: D.uid('w'), ...spot, locked: false };
@@ -823,10 +866,26 @@
       F.group('Kleuren', F.row('Accentkleur', F.color(k + 'accent', t.accent, 'theme')) + F.row('Kleur als iets aan staat', F.color(k + 'onColor', t.onColor, 'theme')) + F.row('Tekstkleur', F.color(k + 'text', t.text, 'theme')) + F.row('Tegelkleur', F.color(k + 'tileBg', t.tileBg, 'theme'))) +
       F.group('Tekst', F.row('Lettertype', F.select(k + 'font', t.font, D.FONTS.map(f => [f, f]), 'theme')) + F.row('Tekstgrootte', F.range(k + 'fontScale', t.fontScale, 0.7, 1.6, 0.05, 'theme', 'x'))) +
       F.group('Tegels', F.row('Doorzichtigheid', F.range(k + 'tileOpacity', t.tileOpacity, 0, 1, 0.01, 'theme', '%')) + F.row('Glas-vervaging', F.range(k + 'tileBlur', t.tileBlur, 0, 40, 1, 'theme', 'px')) + F.row('Hoeken', F.range(k + 'radius', t.radius, 0, 48, 1, 'theme', 'px'))) +
-      F.group('Standaard voor alle tegels en knoppen', `<p class="note">Geldt voor elke tegel. Per tegel kun je afwijken onder <b>Tegel → Stijl</b>.</p>` + E.fxControls('settings.theme.fx', t.fx, D.fxBase(), null));
+      F.group('Standaard voor alle tegels en knoppen', `<p class="note">Geldt voor elke tegel. Per tegel kun je afwijken onder <b>Tegel → Stijl</b>.</p>` + E.fxControls('settings.theme.fx', t.fx, D.fxBase(), null)) +
+      F.group('Terugzetten', `<p class="note">Kwijt? Zet het uiterlijk terug naar de begininstellingen. Je indeling, tegels, koppelingen en pictogrammen blijven staan. Ongedaan maken kan met het pijltje linksboven.</p>
+        <div class="acts"><button class="btn sm" data-resettheme>${icon('refresh')}Uiterlijk terugzetten</button><button class="btn sm danger" data-resetlook>${icon('refresh')}Alles terugzetten, ook alle knoppen</button></div>
+        <p class="note"><b>Uiterlijk terugzetten</b>: thema, kleuren, lettertype en de standaard voor alle tegels. Eigen instellingen per knop blijven.<br><b>Alles terugzetten</b>: daarnaast ook de eigen stijl en kleuren van alle tegels en knoppen.</p>`);
   };
+  const DEFAULT_THEME = () => ({ preset: 'glas', accent: '#5aa9ff', text: '#ffffff', font: 'Inter', fontScale: 1, tileBg: '#141a24', tileOpacity: 0.5, tileBlur: 16, radius: 20, shadow: 0.35, border: 0.1, onColor: '#ffc34d' });
   E.wire.uiterlijk = root => {
     E.wireFx(root, () => D.fxBase());
+    root.querySelector('[data-resettheme]').onclick = async () => {
+      if (!(await D.confirm('Thema, kleuren, lettertype en de standaard voor alle tegels terugzetten naar de begininstellingen?', 'Terugzetten'))) return;
+      E.commit(null, () => { D.cfg.settings.theme = DEFAULT_THEME(); }, () => { FX.theme(); E.refreshPanel(); D.toast('Uiterlijk teruggezet'); });
+    };
+    root.querySelector('[data-resetlook]').onclick = async () => {
+      const n = D.cfg.tabs.reduce((a, tab) => a + tab.tiles.length, 0);
+      if (!(await D.confirm(`Alles terugzetten: thema én de eigen stijl en kleuren van alle ${n} tegels en knoppen? Indeling, koppelingen en pictogrammen blijven staan.`, 'Alles terugzetten'))) return;
+      E.commit(null, () => {
+        D.cfg.settings.theme = DEFAULT_THEME();
+        for (const tab of D.cfg.tabs) for (const x of tab.tiles) { x.style = {}; if (x.opts) for (const o of SCOPE_OPTS) delete x.opts[o]; }
+      }, () => { FX.theme(); E.refreshPanel(); D.toast('Alles teruggezet naar de begininstellingen'); });
+    };
     root.querySelectorAll('[data-preset]').forEach(b => b.onclick = e => {
       if (e.target.closest('[data-delth]')) { const i = Number(b.dataset.preset); E.commit(null, () => D.cfg.themes.splice(i, 1), () => E.refreshPanel()); return; }
       const p = b.hasAttribute('data-own') ? D.cfg.themes[Number(b.dataset.preset)] : PRESETS[b.dataset.preset];

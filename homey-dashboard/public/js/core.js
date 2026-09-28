@@ -284,6 +284,9 @@
     el.classList.toggle('frameless', !!s.frameless);
     el.classList.toggle('notitle', !!s.hideTitle);
     D.applyFx(el, t);
+    // doorzichtigheid 0% = helemaal onzichtbaar kader (geen achtergrond, rand of schaduw)
+    const clear = Number(s.opacity ?? th.tileOpacity) === 0; el.classList.toggle('clear', clear);
+    if (clear) el.style.setProperty('--shadow', '0 0 0 transparent');
   };
   D.renderTileContent = (t, el) => {
     const inner = el.querySelector('.inner'); const T = D.tiles[t.type];
