@@ -1,0 +1,20 @@
+# Homey Dashboard – project voor Synology Container Manager
+services:
+  homey-dashboard:
+    image: node:22-alpine
+    container_name: homey-dashboard
+    working_dir: /app
+    command: sh -c "npm install --omit=dev --no-audit --no-fund && node server/server.js"
+    ports:
+      - "8095:8095"
+    volumes:
+      - ./:/app
+    environment:
+      - TZ=Europe/Amsterdam
+      - PORT=8095
+      # Vul deze twee in (zie LEESMIJ.md, stap 1). Laat ze leeg voor de demo-modus.
+      - HOMEY_ADDRESS=http://192.168.178.XX
+      - HOMEY_TOKEN=plak-hier-je-sleutel
+      # Adres van je Spotify-widgets op de NAS (tabblad 3)
+      - SPOTIFY_BASE=http://192.168.178.79:8090
+    restart: unless-stopped
