@@ -97,6 +97,9 @@ Tik op **+** en kies wat de knop bedient: een apparaat, een flow of een mood.
 | Rolluikknoppen | Omhoog, stop en omlaag |
 | Pictogram | Alleen het pictogram, kleurt mee met de toestand |
 
+Heb je een apparaat al via **Toevoegen** neergezet? Tik op de tegel, ga naar **Tegel** en kies bij **Knopstijl** een stijl.
+De tegel wordt dan een knop. Met **Gewone tegel** zet je hem weer terug.
+
 Tik daarna op de knop en ga naar **Tegel**. Daar stel je in: de knopstijl, waaraan hij gekoppeld is, welke waarde hij laat zien,
 het pictogram, de kleur als hij aan of uit is, en of de naam en de toestand eronder staan.
 
@@ -112,6 +115,13 @@ Tik op een pictogram en kies:
 
 Bij apparaat-, flow- en mood-tegels kun je het pictogram ook wijzigen onder **Tegel → Pictogram → Kiezen**.
 De pictogrammen staan op de NAS, dus ze werken ook zonder internet.
+
+## Raster verdubbelen of halveren
+
+Onder **Raster → Fijner of grover raster** maakt **Raster verdubbelen** van 12×8 een raster van 24×16.
+Alle tegels groeien mee, dus je indeling blijft er precies hetzelfde uitzien. Daarna kun je tegels fijner verschuiven en kleinere tegels maken.
+Met **Raster halveren** ga je terug. Dat kan alleen als alle tegels op even vakjes staan en een even breedte en hoogte hebben.
+Kies bij **Voor** of het voor dit tabblad of voor alle tabbladen geldt. Het maximum is 24×16.
 
 ## Adressen invullen (webpagina-tegels)
 

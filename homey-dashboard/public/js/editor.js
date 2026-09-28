@@ -481,6 +481,32 @@
     };
   };
 
+  // Keuzelijst knopstijl: bij een apparaat ook "Gewone tegel"
+  E.kindSelect = (t, d) => {
+    const cur = t.type === 'button' ? (t.opts.kind || 'glow') : '_tile';
+    const kinds = D.BUTTON_KINDS.filter(([k]) => { if (!d) return true; const o = E.targetOpts(k); return (!o.filter || o.filter(d)) && o.targets.includes('device'); });
+    const opts = [...(d ? [['_tile', 'Gewone tegel']] : []), ...kinds.map(k => [k[0], k[1]])];
+    if (!opts.some(o => o[0] === cur)) opts.push([cur, (D.BUTTON_KINDS.find(k => k[0] === cur) || [cur, cur])[1]]);
+    return `<select data-kindsel>${opts.map(([v, l]) => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
+  };
+  E.setKind = async (t, kind) => {
+    if (kind === '_tile') {
+      if (t.type !== 'button' || !t.ref || t.ref.target !== 'device') return;
+      const prev = t.opts._prev || {}; const custom = t.opts.mdi && !t.opts.mdiAuto ? t.opts.mdi : prev.mdi;
+      E.commit(null, () => { t.type = 'device'; t.ref = { deviceId: t.ref.deviceId }; t.opts = { ...prev, title: t.opts.title }; if (custom) t.opts.mdi = custom; else delete t.opts.mdi; if (!t.opts.title) delete t.opts.title; }, () => { D.renderGrid(); E.refreshPanel(); });
+      return;
+    }
+    if (t.type === 'device') {
+      const ref = { target: 'device', deviceId: t.ref.deviceId }; const custom = t.opts.mdi;
+      const ic = custom || await E.getIcon(D.defaultMdiName(kind, ref));
+      const { title, ...prev } = t.opts;
+      E.commit(null, () => { t.type = 'button'; t.ref = ref; t.opts = { kind, _prev: prev }; if (title) t.opts.title = title; if (ic) t.opts.mdi = ic; if (!custom && ic) t.opts.mdiAuto = true; }, () => { D.renderGrid(); E.refreshPanel(); });
+      return;
+    }
+    const ic = t.opts.mdiAuto || !t.opts.mdi ? await E.getIcon(D.defaultMdiName(kind, t.ref)) : null;
+    E.commit(null, () => { t.opts.kind = kind; if (ic) { t.opts.mdi = ic; t.opts.mdiAuto = true; } }, () => { D.renderGrid(); E.refreshPanel(); });
+  };
+
   // Tegel
   E.render.tegel = () => {
     const f = E.sel && D.findTile(E.sel);
@@ -490,6 +516,7 @@
     if (t.type === 'device') {
       const d = D.dev(t.ref.deviceId);
       spec += F.row('Apparaat', F.select(`${P}.ref.deviceId`, t.ref.deviceId, D.lib.devices.map(x => [x.id, `${x.name} (${D.zoneName(x.zone)})`]).sort((a, b) => a[1].localeCompare(b[1])), 'tilepanel'));
+      spec += F.row('Knopstijl', E.kindSelect(t, d), 'Maak van deze tegel een knop');
       spec += F.row('Weergave', F.select(`${P}.opts.view`, t.opts.view || 'auto', [['auto', 'Automatisch'], ['toggle', 'Alleen knop'], ['slider', 'Knop + schuif'], ['value', 'Eén waarde groot']], 'tilepanel'));
       if (d && (t.opts.view === 'value' || D.devKind(d) === 'sensor')) spec += F.row('Waarde', F.select(`${P}.opts.cap`, t.opts.cap || D.measures(d)[0] || '', Object.keys(d.caps).map(k => [k, d.caps[k].title || k]), 'tile'));
       spec += F.row('Pictogram', F.icon(t.opts.mdi || (d ? D.devIcon(d) : 'chip'), !!t.opts.mdi));
@@ -501,7 +528,7 @@
     } else if (t.type === 'mood') spec += F.row('Mood', F.select(`${P}.ref.id`, t.ref.id, D.lib.moods.map(x => [x.id, x.name]), 'tile')) + F.row('Pictogram', F.icon(t.opts.mdi || 'sparkles', !!t.opts.mdi));
     else if (t.type === 'button') {
       const o = t.opts; const d = t.ref && t.ref.target === 'device' ? D.dev(t.ref.deviceId) : null;
-      spec += F.row('Knopstijl', F.select(`${P}.opts.kind`, o.kind || 'glow', D.BUTTON_KINDS.map(k => [k[0], k[1]]), 'tilepanel'));
+      spec += F.row('Knopstijl', E.kindSelect(t, d));
       spec += F.row('Gekoppeld aan', `<span class="tgt">${esc(D.btnTargetName(t.ref) || 'Niets')}</span><button class="btn sm" data-retarget>Wijzigen</button>`);
       if (d) spec += F.row('Toestand van', F.select(`${P}.opts.cap`, o.cap || '', [['', 'Automatisch'], ...Object.keys(d.caps).map(k => [k, d.caps[k].title || k])], 'tilepanel'), 'Welke waarde de knop laat zien');
       spec += F.row('Pictogram', F.icon(o.mdi || 'chip', !!o.mdi && !o.mdiAuto));
@@ -539,6 +566,7 @@
       if (!E.fits(f.tab, r, t.id)) { D.toast('Past niet: buiten het raster of op een andere tegel', true); inp.value = t[key]; return; }
       E.commit(null, () => { t[key] = v; }, () => { D.renderGrid(); E.refreshPanel(); });
     });
+    const ks = root.querySelector('[data-kindsel]'); if (ks) ks.onchange = () => E.setKind(t, ks.value);
     const pi = root.querySelector('[data-pickicon]');
     if (pi) pi.onclick = async () => { const ic = await E.pickIcon(); if (ic) E.commit(null, () => { t.opts.mdi = ic; delete t.opts.mdiAuto; }, () => { D.renderGrid(); E.refreshPanel(); }); };
     const ci = root.querySelector('[data-clearicon]');
@@ -695,12 +723,36 @@
   // Raster
   E.render.raster = () => {
     const tab = D.currentTab(); const P = tabPath() + '.grid.'; const g = tab.grid;
+    const all = (E.gridScope || 'tab') === 'all' ? D.cfg.tabs : [tab];
+    const canUp = all.every(t => t.grid.cols * 2 <= 24 && t.grid.rows * 2 <= 16), canDown = all.every(t => t.grid.cols % 2 === 0 && t.grid.rows % 2 === 0 && t.grid.cols >= 4 && t.grid.rows >= 4);
     return F.group(`Raster van "${esc(tab.name)}"`, F.row('Kolommen', F.num(P + 'cols', g.cols, 2, 24, 'grid')) + F.row('Rijen', F.num(P + 'rows', g.rows, 2, 16, 'grid')) +
       F.row('Ruimte tussen tegels', F.range(P + 'gap', g.gap, 0, 40, 1, 'grid', 'px')) + F.row('Rand van scherm', F.range(P + 'padding', g.padding, 0, 60, 1, 'grid', 'px')) +
       `<p class="note">Wordt het raster kleiner, dan schuiven tegels mee naar binnen. Controleer daarna of niets overlapt.</p><button class="btn sm" data-gridall>${icon('copy')}Dit raster op alle tabbladen</button>`) +
+      F.group('Fijner of grover raster', `<p class="note">${canUp ? `Verdubbelen maakt van ${g.cols}×${g.rows} een raster van ${g.cols * 2}×${g.rows * 2}.` : `Dit raster (${g.cols}×${g.rows}) kan niet verder verdubbeld worden: het maximum is 24×16.`} Alle tegels groeien mee, dus je indeling blijft er hetzelfde uitzien. Daarna kun je tegels fijner verschuiven en kleinere tegels maken. Halveren doet het omgekeerde.</p>` +
+        F.row('Voor', F.seg('_gscope', E.gridScope || 'tab', [['tab', `"${esc(tab.name)}"`], ['all', 'Alle tabbladen']], 'none').replace(/data-segk="_gscope"/g, 'data-gscope')) +
+        `<div class="acts"><button class="btn sm" data-gscale="2" ${canUp ? '' : 'disabled'}>${icon('plus')}Raster verdubbelen</button><button class="btn sm" data-gscale="0.5" ${canDown ? '' : 'disabled'}>${icon('minus')}Raster halveren</button></div><p class="note">Maximaal 24 kolommen en 16 rijen.</p>`) +
       F.group('Hulplijnen', `<p class="note">Op de achterkant zie je de vakjes van het raster. Op de voorkant zijn ze onzichtbaar.</p>`);
   };
+  // Raster schalen met alle tegels erbij. Geeft een foutmelding terug als het niet kan, anders null.
+  E.scaleGrid = (tab, f) => {
+    const g = tab.grid; const cols = g.cols * f, rows = g.rows * f;
+    if (cols > 24 || rows > 16) return `"${tab.name}": ${cols}×${rows} is groter dan het maximum van 24×16`;
+    if (!Number.isInteger(cols) || !Number.isInteger(rows) || cols < 2 || rows < 2) return `"${tab.name}": ${g.cols}×${g.rows} kan niet gehalveerd worden`;
+    const next = tab.tiles.map(t => f > 1 ? { x: t.x * 2, y: t.y * 2, w: t.w * 2, h: t.h * 2 }
+      : { x: Math.floor(t.x / 2), y: Math.floor(t.y / 2), w: Math.max(1, Math.round(t.w / 2)), h: Math.max(1, Math.round(t.h / 2)) });
+    const tmp = { grid: { ...g, cols, rows }, tiles: tab.tiles.map((t, i) => ({ id: t.id, ...next[i] })) };
+    const bad = tmp.tiles.find(r => !E.fits(tmp, r, r.id));
+    if (bad) return `"${tab.name}": tegels zouden over elkaar vallen. Zet de tegels eerst op even vakjes (kolom en rij 0, 2, 4…) met een even breedte en hoogte.`;
+    return () => { g.cols = cols; g.rows = rows; tab.tiles.forEach((t, i) => Object.assign(t, next[i])); };
+  };
   E.wire.raster = root => {
+    root.querySelectorAll('[data-gscope]').forEach(b => b.onclick = () => { E.gridScope = b.dataset.v; E.refreshPanel(); });
+    root.querySelectorAll('[data-gscale]').forEach(b => b.onclick = async () => {
+      const f = Number(b.dataset.gscale); const tabs = (E.gridScope || 'tab') === 'all' ? D.cfg.tabs : [D.currentTab()];
+      const res = tabs.map(t => E.scaleGrid(t, f)); const err = res.find(r => typeof r === 'string');
+      if (err) { D.toast(err, true); return; }
+      E.commit(null, () => res.forEach(fn => fn()), () => { D.renderAll(); E.refreshPanel(); D.toast(`Raster ${f > 1 ? 'verdubbeld' : 'gehalveerd'}${tabs.length > 1 ? ' op alle tabbladen' : ''}`); });
+    });
     root.querySelector('[data-gridall]').onclick = async () => {
       if (!(await D.confirm('Kolommen, rijen en ruimte van dit tabblad op alle tabbladen toepassen?'))) return;
       const g = D.currentTab().grid; E.commit(null, () => D.cfg.tabs.forEach(t => { t.grid = D.clone(g); E.clampTiles(t); }), () => { D.renderAll(); D.toast('Toegepast op alle tabbladen'); });

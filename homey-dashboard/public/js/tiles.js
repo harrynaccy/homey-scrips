@@ -239,7 +239,7 @@
       const dimOn = kind === 'dim' && d && d.caps.onoff ? !!d.caps.onoff.value : on;
       const active = o._preview !== undefined ? o._preview : kind === 'dim' ? dimOn : on; // _preview: voorbeeld in het menu
       const ic = o.mdi || D.BUTTON_KINDS.find(k => k[0] === kind)?.[3] || 'power';
-      el.classList.toggle('offline', !!d && !d.available);
+      el.classList.toggle('offline', !!d && !d.available); el.classList.remove('on'); el.style.removeProperty('--lamp');
       el.style.setProperty('--kon', o.colorOn || (isAlarm ? '#ff8a5c' : 'var(--on)'));
       if (o.colorOff) el.style.setProperty('--koff', o.colorOff); else el.style.removeProperty('--koff');
       const showLabel = o.label !== false, showState = o.state !== false && !!state;
