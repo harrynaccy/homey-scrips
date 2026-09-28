@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="nl"><head><meta charset="utf-8"><title>Homey Dashboard</title><link rel="stylesheet" href="style.css"></head>
+<body>
+  <div class="card center">
+    <img class="logo" src="../build/icon.png" alt="">
+    <h1>Dashboard niet bereikbaar</h1>
+    <p>Het programma kan het dashboard op <code id="url"></code> niet bereiken. Staat de NAS aan, en ben je thuis (of via Tailscale verbonden)?</p>
+    <small id="err"></small>
+    <div class="msg" id="count"></div>
+    <div class="row" style="justify-content:center">
+      <button id="settings">Adres wijzigen</button>
+      <button class="primary" id="retry">Opnieuw proberen</button>
+    </div>
+  </div>
+  <script>
+    const q = new URLSearchParams(location.search);
+    document.getElementById('url').textContent = q.get('url') || '';
+    document.getElementById('err').textContent = q.get('err') ? 'Melding: ' + q.get('err') : '';
+    const retry = () => window.desktopApp.retry();
+    document.getElementById('retry').onclick = retry;
+    document.getElementById('settings').onclick = () => window.desktopApp.openSettings();
+    let n = 15; const c = document.getElementById('count');
+    setInterval(() => { n--; c.textContent = n > 0 ? `Automatisch opnieuw proberen over ${n} s…` : 'Opnieuw proberen…'; if (n === 0) retry(); }, 1000);
+  </script>
+</body></html>

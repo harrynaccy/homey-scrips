@@ -1,0 +1,49 @@
+{
+  "name": "homey-dashboard-desktop",
+  "productName": "Homey Dashboard",
+  "version": "1.0.0",
+  "description": "Homey Dashboard als programma op je pc. Toont het dashboard dat op je NAS draait.",
+  "author": "Ramon",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --win dir --x64",
+    "dist": "electron-builder --win dir --x64 && makensis -V2 installer.nsi"
+  },
+  "devDependencies": {
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.0",
+    "resedit": "^2.0.0"
+  },
+  "build": {
+    "appId": "nl.ramon.homeydashboard",
+    "productName": "Homey Dashboard",
+    "copyright": "Ramon",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "pages/**",
+      "build/icon.ico",
+      "build/icon.png"
+    ],
+    "afterPack": "./set-exe-icon.js",
+    "win": {
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": false
+    }
+  }
+}

@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="nl"><head><meta charset="utf-8"><title>Adres van het dashboard</title><link rel="stylesheet" href="style.css"></head>
+<body>
+  <div class="card bare">
+    <h1>Adres van het dashboard</h1>
+    <p>Het adres van je Homey Dashboard op de NAS. Standaard: <code id="def"></code></p>
+    <input id="url" spellcheck="false" autocomplete="off">
+    <div class="msg" id="msg"></div>
+    <div class="row">
+      <button id="reset">Standaard</button>
+      <button id="test">Testen</button>
+      <button class="primary" id="save">Opslaan</button>
+    </div>
+  </div>
+  <script>
+    const $ = id => document.getElementById(id); const A = window.desktopApp;
+    A.getConfig().then(c => { $('url').value = c.url; $('def').textContent = c.defaultUrl; $('reset').onclick = () => { $('url').value = c.defaultUrl; }; });
+    const test = async () => {
+      $('msg').className = 'msg'; $('msg').textContent = 'Testen…';
+      const r = await A.testUrl($('url').value.trim());
+      if (r.ok) { $('msg').className = 'msg ok'; $('msg').textContent = '✓ Dashboard gevonden' + (r.mode === 'demo' ? ' (demo-modus)' : r.connected ? ', verbonden met Homey' : ''); }
+      else { $('msg').className = 'msg bad'; $('msg').textContent = '✗ Niet bereikbaar: ' + (r.error || 'onbekende fout'); }
+      return r.ok;
+    };
+    $('test').onclick = test;
+    $('save').onclick = () => A.saveUrl($('url').value.trim());
+    $('url').onkeydown = e => { if (e.key === 'Enter') A.saveUrl($('url').value.trim()); };
+  </script>
+</body></html>
