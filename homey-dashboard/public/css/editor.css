@@ -138,3 +138,72 @@ body.editing .tile .inner { pointer-events: none; }
 .awrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; }
 .awrow b { font-size: 13px; }
 .awrow .note { flex-basis: 100%; margin: 2px 0 0; }
+
+/* knoppen */
+.kb-list { display: flex; flex-direction: column; gap: 4px; }
+.kb-kind { display: flex; align-items: center; gap: 10px; padding: 6px; border-radius: 14px; background: #131820; }
+.kb-prevs { display: flex; gap: 5px; flex: none; }
+.tile.kb-prevtile { width: 62px; height: 62px; flex: none; border-radius: 14px; box-shadow: none; }
+.tile.kb-prevtile .inner { padding: 7px; }
+
+/* pictogrammen */
+.icb-top { position: sticky; top: -14px; background: #0f131a; padding: 0 0 8px; z-index: 2; }
+#sheet .icb-top { top: -22px; background: #151a23; }
+.icb-top input { width: 100% !important; height: 40px !important; }
+.icb-cats button { font-size: 12px; }
+.icb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 6px; }
+.icb-it { aspect-ratio: 1; border-radius: 11px; background: #1b212b; display: grid; place-items: center; color: #dfe4ec; }
+.icb-it .ic { width: 24px; height: 24px; }
+.icb-it:active { background: var(--accent); color: #0b0f16; }
+.icb-info { margin: 4px 0 8px; }
+.icctl { display: flex; align-items: center; gap: 6px; }
+.icprev { width: 36px; height: 36px; border-radius: 10px; background: #1b212b; display: grid; place-items: center; color: var(--accent); flex: none; }
+.icprev .ic { width: 20px; height: 20px; }
+.tgt { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 8px; color: #cfd5de; }
+.lib-ic.on { background: var(--on); color: #16130b; }
+
+/* vensters (keuze, koppelen, pictogram kiezen) */
+#sheet.wide { width: min(720px, 94vw); }
+#sheet input[type=search], #sheet input[type=text] { width: 100%; height: 42px; background: #1f2631; color: #eef1f6; border: 1px solid rgba(255,255,255,.08); border-radius: 12px; padding: 0 12px; outline: none; user-select: text; font-size: 15px; }
+#sheet input:focus { border-color: var(--accent); }
+#sheet .chips-row button { background: #1f2631; }
+#sheet .icb-it { background: #1f2631; }
+.pick-seg { margin: 0 0 10px; }
+.pick-q { margin-bottom: 8px; }
+.pick-list { display: flex; flex-direction: column; }
+.pick-it { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 9px 8px; border-radius: 12px; }
+.pick-it:active, .pick-it:hover { background: rgba(255,255,255,.06); }
+.pick-it.none { border: 1px dashed rgba(255,255,255,.14); margin-bottom: 6px; }
+.choice { display: flex; flex-direction: column; gap: 6px; }
+.choice button { display: flex; align-items: center; gap: 12px; text-align: left; padding: 12px; border-radius: 14px; background: rgba(255,255,255,.05); }
+.choice button:active, .choice button:hover { background: rgba(255,255,255,.1); }
+.choice .lib-t small { white-space: normal; }
+
+/* adresveld */
+.f.col { flex-direction: column; align-items: stretch; gap: 6px; }
+.urlf { width: 100%; display: flex; flex-direction: column; gap: 6px; }
+.url-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.url-chips button { padding: 5px 10px; border-radius: 99px; background: #1b212b; color: #aeb6c2; font-size: 12px; }
+.url-chips button:active { background: var(--accent); color: #0b0f16; }
+.url-in { display: flex; gap: 6px; align-items: center; }
+#panel .url-in input[type=text] { flex: 1; width: 0; min-width: 0; font-variant-numeric: tabular-nums; }
+.urlhint { color: #6f7888; font-size: 11.5px; }
+.urlq-list { display: flex; flex-direction: column; gap: 5px; margin-bottom: 4px; }
+.urlq-row { display: flex; gap: 5px; align-items: center; }
+#panel .urlq-row input[type=text] { flex: 1; width: 0; min-width: 0; }
+#panel .urlq-row input.nm { flex: 0 0 82px; }
+.icb-cats { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.icb-cats::-webkit-scrollbar { display: none; }
+.icb-cats button { flex: none; white-space: nowrap; }
+/* voorbeelden in het knoppen-menu: alleen de knop zelf */
+.kb-prevtile .kb-toggle .kb-row, .kb-prevtile .kb-cover .kb-row { display: none; }
+.kb-prevtile .kb-toggle, .kb-prevtile .kb-cover { justify-content: center; }
+.kb-prevtile .kb-sw { margin: 0; justify-content: center; }
+.kb-prevtile .kb-sw .switch { font-size: 17px; }
+.kb-prevtile .kb-cover .btnrow { margin: 0; gap: 3px; }
+.kb-prevtile .kb-cover .rb { font-size: 11px; height: 2.4em; }
+.kb-prevtile .kb-dim .kb-txt { display: none; }
+.kb-prevtile .kb-dim::after { content: ''; height: 9px; border-radius: 99px; margin-top: 6px; background: linear-gradient(to right, var(--muted) 0 55%, var(--soft2) 55%); }
+.kb-prevtile .kb-dim.is-on::after { background: linear-gradient(to right, var(--kon) 0 55%, var(--soft2) 55%); }
+#panel .switch:not(.on) { background: rgba(255,255,255,.18); }
+.kb-prevtile .kb-cover .face { display: none; }

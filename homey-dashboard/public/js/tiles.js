@@ -54,7 +54,7 @@
   const flash = (el, ok = true) => { el.classList.remove('flash-ok', 'flash-bad'); void el.offsetWidth; el.classList.add(ok ? 'flash-ok' : 'flash-bad'); };
   const titleOf = t => (t.opts && t.opts.title) || (tiles[t.type].title ? tiles[t.type].title(t) : tiles[t.type].label);
   D.titleOf = titleOf;
-  const head = (t, ic, sub, on) => `<div class="hd"><span class="badge${on ? ' on' : ''}">${icon(ic)}</span><div class="ht"><div class="name">${esc(titleOf(t))}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div></div>`;
+  const head = (t, ic, sub, on) => `<div class="hd"><span class="badge${on ? ' on' : ''}">${anyIcon(ic)}</span><div class="ht"><div class="name">${esc(titleOf(t))}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div></div>`;
   const size = t => ({ big: t.w * t.h >= 6 || (t.w >= 3 && t.h >= 2), wide: t.w >= 3, tall: t.h >= 3 });
 
   // schuifregelaar
@@ -85,7 +85,7 @@
         const capId = (t.opts && t.opts.cap) || D.measures(d)[0];
         const main = c[capId]; const rest = D.measures(d).filter(k => k !== capId).slice(0, sz.big ? 4 : 0);
         const alarm = main && typeof main.value === 'boolean' && main.value;
-        inner.innerHTML = head(t, D.devIcon(d), esc(zone), alarm) +
+        inner.innerHTML = head(t, t.opts.mdi || D.devIcon(d), esc(zone), alarm) +
           `<div class="big${alarm ? ' alarm' : ''}">${esc(D.fmt(main, capId))}</div>` +
           (rest.length ? `<div class="chips">${rest.map(k => `<span class="chip${typeof c[k].value === 'boolean' && c[k].value ? ' alert' : ''}">${esc(D.fmt(c[k], k))}</span>`).join('')}</div>` : '');
         D.pressable(el, { long: () => tiles.device.sheet(d.id) });
@@ -94,7 +94,7 @@
       if (kind === 'thermostat') {
         const tg = c.target_temperature; const cur = c.measure_temperature;
         const step = tg.step || 0.5;
-        inner.innerHTML = head(t, 'thermo', esc(zone)) +
+        inner.innerHTML = head(t, t.opts.mdi || 'thermo', esc(zone)) +
           `<div class="big">${cur ? esc(D.fmt(cur)) : esc(D.fmt(tg))}</div>` +
           `<div class="stepper nopress"><button class="rb" data-s="-1">${icon('minus')}</button><span>${esc(D.fmt(tg))}</span><button class="rb" data-s="1">${icon('plus')}</button></div>`;
         inner.querySelectorAll('[data-s]').forEach(b => b.onclick = () => D.setCap(d.id, 'target_temperature', D.clamp(Math.round((tg.value + step * Number(b.dataset.s)) * 100) / 100, tg.min ?? 5, tg.max ?? 35)));
@@ -103,7 +103,7 @@
       }
       if (kind === 'cover') {
         const pos = c.windowcoverings_set;
-        inner.innerHTML = head(t, 'blinds', pos ? `${esc(zone)} · ${esc(D.fmt(pos))}` : esc(zone)) +
+        inner.innerHTML = head(t, t.opts.mdi || 'blinds', pos ? `${esc(zone)} · ${esc(D.fmt(pos))}` : esc(zone)) +
           `<div class="btnrow nopress"><button class="rb" data-p="1">${icon('up')}</button>${c.windowcoverings_state ? `<button class="rb" data-st="idle">${icon('stop')}</button>` : ''}<button class="rb" data-p="0">${icon('down')}</button></div>` +
           (pos && sz.big ? D.slider('', pos.value, 0, 1, 0.01, v => D.setCap(d.id, 'windowcoverings_set', v)) : '');
         inner.querySelectorAll('[data-p]').forEach(b => b.onclick = async () => { if (await guard(t)) pos ? D.setCap(d.id, 'windowcoverings_set', Number(b.dataset.p)) : D.setCap(d.id, 'windowcoverings_state', b.dataset.p === '1' ? 'up' : 'down'); });
@@ -113,12 +113,12 @@
       }
       if (kind === 'lock') {
         const lk = !!c.locked.value;
-        inner.innerHTML = head(t, lk ? 'lock' : 'unlock', esc(zone), !lk) + `<div class="big${lk ? '' : ' alarm'}">${lk ? 'Op slot' : 'Open'}</div><div class="hint">Tik om te ${lk ? 'openen' : 'vergrendelen'}</div>`;
+        inner.innerHTML = head(t, t.opts.mdi || (lk ? 'lock' : 'unlock'), esc(zone), !lk) + `<div class="big${lk ? '' : ' alarm'}">${lk ? 'Op slot' : 'Open'}</div><div class="hint">Tik om te ${lk ? 'openen' : 'vergrendelen'}</div>`;
         D.pressable(el, { tap: async () => { if (await D.confirm(`${d.name} ${lk ? 'openen' : 'vergrendelen'}?`)) D.setCap(d.id, 'locked', !lk); }, long: () => tiles.device.sheet(d.id) });
         return;
       }
       if (kind === 'button') {
-        inner.innerHTML = head(t, 'power', esc(zone)) + `<div class="big sm">Druk</div>`;
+        inner.innerHTML = head(t, t.opts.mdi || 'power', esc(zone)) + `<div class="big sm">Druk</div>`;
         D.pressable(el, { tap: async () => { if (await guard(t)) { D.setCap(d.id, 'button', true); flash(el); } } });
         return;
       }
@@ -131,7 +131,7 @@
       if (on && c.light_hue && c.light_saturation && (!c.light_mode || c.light_mode.value !== 'temperature')) color = `hsl(${Math.round(c.light_hue.value * 360)},${Math.round(c.light_saturation.value * 100)}%,60%)`;
       if (color) el.style.setProperty('--lamp', color); else el.style.removeProperty('--lamp');
       const showSlider = c.dim && view !== 'toggle' && (sz.big || view === 'slider');
-      inner.innerHTML = head(t, D.devIcon(d), esc(zone), on) + `<div class="state">${esc(state)}</div>` +
+      inner.innerHTML = head(t, t.opts.mdi || D.devIcon(d), esc(zone), on) + `<div class="state">${esc(state)}</div>` +
         (showSlider ? D.slider('', c.dim.value ?? 0, 0, 1, 0.01, v => D.setCap(d.id, 'dim', v)) : '');
       D.pressable(el, { tap: async () => { if (await guard(t)) D.setCap(d.id, 'onoff', !on); }, long: () => tiles.device.sheet(d.id) });
     },
@@ -166,6 +166,127 @@
     },
   };
 
+
+  // ---------- Knop / pictogram (gekoppeld aan apparaat, flow of mood) ----------
+  // Knopstijlen: [sleutel, naam, uitleg, standaard-pictogram]
+  D.BUTTON_KINDS = [
+    ['3d', 'Drukknop 3D', 'Steekt uit als het uit is, ingedrukt als het aan is', 'power'],
+    ['glow', 'Verlichte knop', 'Neutraal als het uit is, licht op als het aan is', 'lightbulb'],
+    ['rocker', 'Wandschakelaar', 'Klassieke tuimelschakelaar, klapt om', 'light-switch'],
+    ['rockerled', 'Schakelaar met led', 'Wandschakelaar met een ledje dat brandt als het aan is', 'light-switch'],
+    ['ring', 'Ronde knop met ring', 'Rond pictogram, de ring licht op als het aan is', 'lightbulb-outline'],
+    ['toggle', 'Schuifschakelaar', 'Schuifje zoals op je telefoon', 'toggle-switch'],
+    ['dim', 'Dimknop', 'Tik = aan/uit, schuif = helderheid', 'brightness-6'],
+    ['scene', 'Scène- of flowknop', 'Start een flow of mood en licht kort op', 'palette'],
+    ['panic', 'Paniek- of alarmknop', 'Rode knop, vraagt altijd eerst om bevestiging', 'alarm-light'],
+    ['cover', 'Rolluikknoppen', 'Omhoog, stop en omlaag', 'window-shutter'],
+    ['icon', 'Pictogram', 'Alleen het pictogram, kleurt mee met de toestand', 'lightbulb'],
+  ];
+  const CAP_ORDER = ['onoff', 'alarm_contact', 'alarm_motion', 'alarm_smoke', 'alarm_water', 'alarm_co', 'alarm_tamper', 'locked'];
+  D.btnCap = (d, kind) => {
+    if (!d) return null; const c = d.caps;
+    if (kind === 'dim' && c.dim) return 'dim';
+    if (kind === 'cover') return c.windowcoverings_set ? 'windowcoverings_set' : c.windowcoverings_state ? 'windowcoverings_state' : null;
+    for (const k of CAP_ORDER) if (c[k]) return k;
+    const b = Object.keys(c).find(k => c[k].type === 'boolean'); if (b) return b;
+    if (c.dim) return 'dim'; if (c.windowcoverings_set) return 'windowcoverings_set';
+    return D.measures(d)[0] || Object.keys(c)[0] || null;
+  };
+  // Standaard-pictogram (naam in de bibliotheek) bij een apparaat
+  const CLASS_MDI = { light: 'lightbulb', socket: 'power-socket-eu', thermostat: 'thermostat', heater: 'radiator', lock: 'lock', windowcoverings: 'window-shutter', blinds: 'window-shutter', curtain: 'curtains', sunshade: 'window-shutter', speaker: 'speaker', amplifier: 'speaker', tv: 'television', fan: 'fan', garagedoor: 'garage', doorbell: 'doorbell', homealarm: 'shield-home', kettle: 'kettle', coffeemachine: 'coffee-maker', camera: 'cctv', airconditioning: 'air-conditioner', vacuumcleaner: 'robot-vacuum', button: 'gesture-tap-button' };
+  const CAP_MDI = { alarm_contact: 'door-open', alarm_motion: 'motion-sensor', alarm_smoke: 'smoke-detector', alarm_water: 'water-alert', alarm_co: 'molecule-co', locked: 'lock', measure_temperature: 'thermometer' };
+  D.defaultMdiName = (kind, ref) => {
+    const K = D.BUTTON_KINDS.find(k => k[0] === kind) || D.BUTTON_KINDS[0];
+    if (['cover', 'panic'].includes(kind)) return K[3];
+    if (ref && ref.target === 'flow') return kind === 'scene' ? 'play-circle' : K[3];
+    if (ref && ref.target === 'mood') return 'palette';
+    const d = ref && ref.target === 'device' ? D.dev(ref.deviceId) : null;
+    if (d) { const cap = D.btnCap(d, kind); return CLASS_MDI[d.virtualClass] || CLASS_MDI[d.class] || CAP_MDI[cap] || (d.caps.onoff ? 'power' : K[3]); }
+    return K[3];
+  };
+  D.btnTargetName = ref => {
+    if (!ref || !ref.target || ref.target === 'none') return '';
+    if (ref.target === 'device') { const d = D.dev(ref.deviceId); return d ? d.name : 'Apparaat niet gevonden'; }
+    if (ref.target === 'flow') { const f = [...D.lib.flows, ...D.lib.advancedFlows].find(x => x.id === ref.id); return f ? f.name : 'Flow niet gevonden'; }
+    if (ref.target === 'mood') { const m = D.lib.moods.find(x => x.id === ref.id); return m ? m.name : 'Mood niet gevonden'; }
+    return '';
+  };
+  const runTarget = async (t, el) => {
+    const r = t.ref || {};
+    const url = r.target === 'flow' ? `/api/flow/${r.flowType || 'flow'}/${r.id}` : r.target === 'mood' ? `/api/mood/${r.id}` : null;
+    if (!url) return;
+    const k = el.querySelector('.kb'); if (k) { k.classList.remove('hit'); void k.offsetWidth; k.classList.add('hit'); }
+    try { await D.api('POST', url); flash(el); } catch (e) { flash(el, false); D.toast('Mislukt: ' + e.message, true); }
+  };
+  tiles.button = {
+    label: 'Knop', icon: 'knob', size: [2, 2],
+    title: t => D.btnTargetName(t.ref) || (D.BUTTON_KINDS.find(k => k[0] === t.opts.kind) || [0, 'Knop'])[1],
+    render(t, inner, el) {
+      const o = t.opts || {}; const kind = o.kind || 'glow'; const r = t.ref || {};
+      const d = r.target === 'device' ? D.dev(r.deviceId) : null;
+      if (r.target === 'device' && !d) { inner.innerHTML = `<div class="empty">${icon('chip')}<span>Apparaat niet gevonden</span></div>`; return; }
+      const cap = d ? (o.cap && d.caps[o.cap] ? o.cap : D.btnCap(d, kind)) : null; const cp = d && cap ? d.caps[cap] : null;
+      const val = cp ? cp.value : null;
+      const on = kind === 'cover' ? (typeof val === 'number' ? val > 0.01 : val === 'up') : typeof val === 'number' ? val > 0 : !!val;
+      const isAlarm = cap && cap.startsWith('alarm_');
+      // toestandstekst
+      let state = '';
+      if (d) {
+        if (cap === 'onoff') { state = on ? 'Aan' : 'Uit'; if (on && d.caps.dim && kind !== 'dim') state += ' · ' + D.fmt(d.caps.dim); }
+        else state = D.fmt(cp, cap);
+        if (kind === 'dim' && d.caps.onoff && !d.caps.onoff.value) state = 'Uit';
+      }
+      const dimOn = kind === 'dim' && d && d.caps.onoff ? !!d.caps.onoff.value : on;
+      const active = o._preview !== undefined ? o._preview : kind === 'dim' ? dimOn : on; // _preview: voorbeeld in het menu
+      const ic = o.mdi || D.BUTTON_KINDS.find(k => k[0] === kind)?.[3] || 'power';
+      el.classList.toggle('offline', !!d && !d.available);
+      el.style.setProperty('--kon', o.colorOn || (isAlarm ? '#ff8a5c' : 'var(--on)'));
+      if (o.colorOff) el.style.setProperty('--koff', o.colorOff); else el.style.removeProperty('--koff');
+      const showLabel = o.label !== false, showState = o.state !== false && !!state;
+      const label = showLabel ? `<div class="kb-label">${esc(titleOf(t))}</div>` : '';
+      const st = showState ? `<div class="kb-state">${esc(state)}</div>` : '';
+      const svg = anyIcon(ic);
+      let face;
+      if (kind === 'rocker' || kind === 'rockerled') face = `<div class="face"><div class="paddle">${svg}${kind === 'rockerled' ? '<i class="led"></i>' : ''}</div></div>`;
+      else if (kind === 'panic') face = `<div class="face"><div class="cap">${svg}</div></div>`;
+      else face = `<div class="face">${svg}</div>`;
+      let body;
+      if (kind === 'cover') {
+        body = `<div class="kb-row">${label ? `<span class="kb-mini">${svg}</span>` : ''}<div>${label}${st}</div></div><div class="face">${svg}</div><div class="btnrow nopress"><button class="rb" data-p="up">${icon('up')}</button><button class="rb" data-p="idle">${icon('stop')}</button><button class="rb" data-p="down">${icon('down')}</button></div>`;
+      } else if (kind === 'dim') {
+        body = `<div class="kb-row"><div class="face sm">${svg}</div><div class="kb-txt">${label}${st}</div></div>` + (d && d.caps.dim ? D.slider('', d.caps.dim.value ?? 0, 0, 1, 0.01, v => D.setCap(d.id, 'dim', v)) : '');
+      } else if (kind === 'toggle') {
+        body = `<div class="kb-row"><div class="face sm">${svg}</div><div class="kb-txt">${label}${st}</div></div><div class="kb-sw"><span class="switch${active ? ' on' : ''}"><i></i></span></div>`;
+      } else body = face + (label || st ? `<div class="kb-txt">${label}${st}</div>` : '');
+      inner.innerHTML = `<div class="kb kb-${kind}${active ? ' is-on' : ''}${isAlarm ? ' is-alarm' : ''}${!showLabel && !showState ? ' nolabel' : ''}">${body}</div>`;
+
+      if (kind === 'cover') {
+        inner.querySelectorAll('[data-p]').forEach(b => b.onclick = async () => {
+          if (!d || !(await guard(t))) return; const p = b.dataset.p;
+          if (p === 'idle') { if (d.caps.windowcoverings_state) D.setCap(d.id, 'windowcoverings_state', 'idle'); return; }
+          if (d.caps.windowcoverings_set) D.setCap(d.id, 'windowcoverings_set', p === 'up' ? 1 : 0);
+          else if (d.caps.windowcoverings_state) D.setCap(d.id, 'windowcoverings_state', p);
+        });
+        D.pressable(el, { long: d ? () => tiles.device.sheet(d.id) : null });
+        return;
+      }
+      const tap = async () => {
+        if (!r.target || r.target === 'none') return;
+        if (kind === 'panic') { if (!(await D.confirm(`${titleOf(t)}: weet je het zeker?`, 'Ja, doorgaan'))) return; }
+        else if (!(await guard(t))) return;
+        if (r.target !== 'device') return runTarget(t, el);
+        const tc = kind === 'dim' && d.caps.onoff ? 'onoff' : cap; const c = d.caps[tc];
+        if (!c || !c.setable) { tiles.device.sheet(d.id); return; }
+        if (tc === 'locked' && kind !== 'panic' && !(await D.confirm(`${d.name} ${c.value ? 'openen' : 'vergrendelen'}?`))) return;
+        if (c.type === 'boolean' || typeof c.value === 'boolean') D.setCap(d.id, tc, !c.value);
+        else if (tc === 'dim') D.setCap(d.id, 'dim', c.value > 0 ? 0 : 1);
+        else tiles.device.sheet(d.id);
+        if (kind === 'scene' || kind === 'panic') { const k = el.querySelector('.kb'); if (k) { k.classList.remove('hit'); void k.offsetWidth; k.classList.add('hit'); } }
+      };
+      D.pressable(el, { tap, long: d ? () => tiles.device.sheet(d.id) : null });
+    },
+  };
+
   // ---------- Zone ----------
   tiles.zone = {
     label: 'Zone', icon: 'home', size: [3, 4],
@@ -191,7 +312,7 @@
     label: 'Flow', icon: 'play', size: [2, 2],
     title: t => { const f = [...D.lib.flows, ...D.lib.advancedFlows].find(x => x.id === t.ref.id); return f ? f.name : 'Flow niet gevonden'; },
     render(t, inner, el) {
-      inner.innerHTML = `<div class="actbtn"><span class="badge xl">${icon(t.opts.icon || 'play')}</span><div class="name">${esc(titleOf(t))}</div></div>`;
+      inner.innerHTML = `<div class="actbtn"><span class="badge xl">${anyIcon(t.opts.mdi || t.opts.icon || 'play')}</span><div class="name">${esc(titleOf(t))}</div></div>`;
       D.pressable(el, { tap: async () => {
         if (!(await guard(t))) return;
         try { await D.api('POST', `/api/flow/${t.ref.flowType || 'flow'}/${t.ref.id}`); flash(el); } catch (e) { flash(el, false); D.toast('Flow mislukt: ' + e.message, true); }
@@ -205,7 +326,7 @@
     title: t => { const m = D.lib.moods.find(x => x.id === t.ref.id); return m ? m.name : 'Mood niet gevonden'; },
     render(t, inner, el) {
       const m = D.lib.moods.find(x => x.id === t.ref.id);
-      inner.innerHTML = `<div class="actbtn"><span class="badge xl">${icon('sparkles')}</span><div class="name">${esc(titleOf(t))}</div>${m ? `<div class="sub">${esc(D.zoneName(m.zone))}</div>` : ''}</div>`;
+      inner.innerHTML = `<div class="actbtn"><span class="badge xl">${anyIcon(t.opts.mdi || 'sparkles')}</span><div class="name">${esc(titleOf(t))}</div>${m ? `<div class="sub">${esc(D.zoneName(m.zone))}</div>` : ''}</div>`;
       D.pressable(el, { tap: async () => {
         if (!(await guard(t))) return;
         try { await D.api('POST', `/api/mood/${t.ref.id}`); flash(el); } catch (e) { flash(el, false); D.toast('Mood mislukt: ' + e.message, true); }

@@ -6,6 +6,7 @@ const { HomeyAdapter } = require('./homey');
 const { DemoAdapter } = require('./demo');
 const { defaultConfig } = require('./default-config');
 const { AppBridge } = require('./appbridge');
+const icons = require('./icons');
 
 const PORT = Number(process.env.PORT || 8095);
 const DATA = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
@@ -75,6 +76,10 @@ app.post('/api/library/refresh', wrap(async () => { if (homey.refresh) await hom
 app.get('/api/location', wrap(() => homey.location()));
 app.get('/api/notifications', wrap(() => homey.notifications()));
 app.get('/api/insights', wrap(req => homey.insightEntries(req.query.uri, req.query.id, req.query.resolution || 'last24Hours')));
+
+// pictogrammen (Material Design Icons)
+app.get('/api/icons', wrap(req => ({ ...icons.search(req.query.q, req.query.cat, Number(req.query.offset) || 0, Math.min(400, Number(req.query.limit) || 200)), cats: icons.categories() })));
+app.get('/api/icons/:name', wrap(req => icons.get(req.params.name) || {}));
 
 app.post('/api/device/:id/:cap', wrap(req => homey.setCapability(req.params.id, req.params.cap, req.body.value)));
 app.post('/api/flow/:type/:id', wrap(req => homey.triggerFlow(req.params.id, req.params.type)));

@@ -4,7 +4,7 @@
   const E = D.editor = { sel: null, section: 'bibliotheek', undo: [], redo: [], libCat: 'devices', libQ: '', bgScope: 'all' };
 
   const SECTIONS = [
-    ['bibliotheek', 'book', 'Toevoegen'], ['tegel', 'sliders', 'Tegel'], ['tabs', 'layers', 'Tabbladen'],
+    ['bibliotheek', 'book', 'Toevoegen'], ['knoppen', 'knob', 'Knoppen'], ['pictogrammen', 'shapes', 'Pictogrammen'], ['tegel', 'sliders', 'Tegel'], ['tabs', 'layers', 'Tabbladen'],
     ['scherm', 'sun', 'Scherm'], ['uiterlijk', 'palette', 'Uiterlijk'], ['raster', 'grid', 'Raster'], ['systeem', 'server', 'Systeem'],
   ];
 
@@ -12,7 +12,7 @@
   E.open = () => {
     if (D.editing) return;
     D.editing = true; document.body.classList.add('editing');
-    E.undo = []; E.redo = []; E.sel = null;
+    E.undo = []; E.redo = []; E.sel = null; E.urls();
     E.layout(); D.renderTabbar(); D.renderGrid();
     $('#panel').hidden = false; E.refreshPanel();
     window.addEventListener('resize', E.layout);
@@ -86,7 +86,7 @@
       el.querySelectorAll('.edit-ov').forEach(n => n.remove());
       const ov = document.createElement('div'); ov.className = 'edit-ov' + (t.locked ? ' locked' : '');
       const oi = t.type === 'device' && D.dev(t.ref.deviceId) ? D.devIcon(D.dev(t.ref.deviceId)) : (D.tiles[t.type] ? D.tiles[t.type].icon : 'chip');
-      ov.innerHTML = `<span class="lbl">${icon(oi)}${esc(D.titleOf(t))}</span>${t.locked ? `<span class="lk">${icon('lock')}</span>` : '<span class="rs">' + icon('resize') + '</span>'}`;
+      ov.innerHTML = `<span class="lbl">${anyIcon((t.opts && t.opts.mdi) || oi)}${esc(D.titleOf(t))}</span>${t.locked ? `<span class="lk">${icon('lock')}</span>` : '<span class="rs">' + icon('resize') + '</span>'}`;
       el.appendChild(ov); el.classList.toggle('sel', t.id === E.sel);
       E.dragify(ov, t);
     }
@@ -164,6 +164,15 @@
     select: (k, v, opts, fx) => `<select data-k="${k}" data-fx="${fx}">${opts.map(([val, l]) => `<option value="${esc(val)}"${String(val) === String(v) ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>`,
     text: (k, v, fx, ph = '') => `<input type="text" data-k="${k}" data-fx="${fx}" value="${esc(v ?? '')}" placeholder="${esc(ph)}">`,
     num: (k, v, min, max, fx) => `<span class="num"><button class="ib sm" data-step="-1">${icon('minus')}</button><input type="number" data-k="${k}" data-fx="${fx}" data-num min="${min}" max="${max}" value="${v}"><button class="ib sm" data-step="1">${icon('plus')}</button></span>`,
+    // adresveld: standaardbegin al ingevuld, snelknoppen, ✕ om te wissen, eerder gebruikte adressen als suggestie
+    url: (k, v, fx) => {
+      const U = E.urls(); const val = v || U.prefix || '';
+      const recent = [...new Set([...D.cfg.tabs.flatMap(t => t.tiles).filter(t => t.type === 'web' && t.opts && t.opts.url).map(t => t.opts.url), ...U.quick.map(q => q[1])])];
+      return `<div class="urlf"><div class="url-chips">${U.quick.filter(q => q[1]).map(([n, u]) => `<button data-urlq="${esc(u)}" title="${esc(u)}">${esc(n || u)}</button>`).join('')}<button data-urlq="https://">https://</button><button data-urlq="http://">http://</button></div>
+        <div class="url-in"><input type="text" inputmode="url" autocapitalize="off" autocomplete="off" spellcheck="false" data-urlk="${k}" data-fx="${fx}" value="${esc(val)}" list="urlrecent" placeholder="http://…"><button class="ib sm" data-urlclear title="Leegmaken">${icon('x')}</button></div>
+        <datalist id="urlrecent">${recent.map(u => `<option value="${esc(u)}">`).join('')}</datalist>${v ? '' : '<small class="urlhint">Het begin is al ingevuld. Typ de rest erachter, of tik op ✕ voor een heel ander adres.</small>'}</div>`;
+    },
+    icon: (cur, custom) => `<span class="icctl"><span class="icprev">${anyIcon(cur)}</span><button class="btn sm" data-pickicon>${icon('shapes')}Kiezen</button>${custom ? `<button class="ib sm" data-clearicon title="Standaard pictogram">${icon('refresh')}</button>` : ''}</span>`,
     seg: (k, v, opts, fx) => `<div class="seg">${opts.map(([val, l]) => `<button data-segk="${k}" data-fx="${fx}" data-v="${esc(val)}" class="${String(val) === String(v) ? 'act' : ''}">${l}</button>`).join('')}</div>`,
   };
   E.fmtOut = (v, f) => f === '%' ? Math.round(v * 100) + '%' : f === 'px' ? v + 'px' : f === 'x' ? Number(v).toFixed(2) + '×' : f === 'b' ? Math.round(v / 255 * 100) + '%' : f === 'min' ? v + ' min' : f === 's' ? v + ' s' : f === 'deg' ? v + '°' : v;
@@ -185,13 +194,26 @@
     const apply = (k, v, fx, live) => E.commit(k, () => setPath(D.cfg, k, v), () => { (FX[fx] || FX.none)(); if (fx === 'panel' || (!live && fx === 'tilepanel')) {} });
     root.querySelectorAll('[data-k]').forEach(inp => {
       const k = inp.dataset.k, fx = inp.dataset.fx || 'none';
-      if (inp.hasAttribute('data-bool')) inp.onclick = () => { const v = !getPath(D.cfg, k); inp.classList.toggle('on', v); apply(k, v, fx); if (fx === 'panel' || fx === 'tilepanel') E.refreshPanel(); };
+      if (inp.hasAttribute('data-bool')) inp.onclick = () => { const v = !inp.classList.contains('on'); inp.classList.toggle('on', v); apply(k, v, fx); if (fx === 'panel' || fx === 'tilepanel') E.refreshPanel(); };
       else if (inp.type === 'range') {
         inp.oninput = () => { const v = Number(inp.value); const o = inp.parentNode.querySelector('output'); if (o) o.textContent = E.fmtOut(v, o.dataset.fmt); apply(k, v, fx === 'tilepanel' ? 'tile' : fx, true); };
       } else if (inp.tagName === 'SELECT') inp.onchange = () => { const raw = inp.value; const v = raw === '' ? undefined : (/^-?\d+(\.\d+)?$/.test(raw) && inp.dataset.str === undefined ? Number(raw) : raw); apply(k, v, fx); if (fx === 'tilepanel' || fx === 'panel') E.refreshPanel(); };
       else if (inp.type === 'color') { inp.oninput = () => { inp.classList.remove('unset'); apply(k, inp.value, fx === 'tilepanel' ? 'tile' : fx, true); }; inp.onchange = () => { if (fx === 'tilepanel') E.refreshPanel(); }; }
       else if (inp.type === 'number') inp.onchange = () => { const min = Number(inp.min), max = Number(inp.max); const v = D.clamp(Number(inp.value) || 0, min, max); inp.value = v; apply(k, v, fx); };
       else inp.oninput = () => apply(k, inp.value, fx === 'tilepanel' ? 'tile' : fx, true);
+    });
+    root.querySelectorAll('[data-urlk]').forEach(inp => {
+      const k = inp.dataset.urlk, fx = inp.dataset.fx || 'none';
+      const toEnd = () => { inp.focus(); const n = inp.value.length; try { inp.setSelectionRange(n, n); } catch (e) { /* */ } };
+      inp.oninput = () => apply(k, inp.value.trim(), fx, true);
+      // bij het eerste tikken in het veld: cursor achteraan, zodat je direct achter het begin verder typt
+      let fresh = false;
+      inp.onfocus = () => { fresh = true; setTimeout(() => { if (fresh) toEnd(); }, 0); };
+      inp.onclick = () => { if (fresh) { fresh = false; toEnd(); } };
+      inp.onblur = () => { fresh = false; };
+      const box = inp.closest('.urlf');
+      box.querySelectorAll('[data-urlq]').forEach(b => b.onclick = () => { inp.value = b.dataset.urlq; apply(k, inp.value, fx); toEnd(); });
+      box.querySelector('[data-urlclear]').onclick = () => { inp.value = ''; apply(k, '', fx); toEnd(); };
     });
     root.querySelectorAll('[data-step]').forEach(b => b.onclick = () => { const inp = b.parentNode.querySelector('input'); inp.value = Number(inp.value) + Number(b.dataset.step); inp.onchange(); });
     root.querySelectorAll('[data-segk]').forEach(b => b.onclick = () => { const raw = b.dataset.v; const v = /^-?\d+(\.\d+)?$/.test(raw) ? Number(raw) : raw; apply(b.dataset.segk, v, b.dataset.fx); E.refreshPanel(); });
@@ -284,8 +306,182 @@
     E.commit(null, () => tab.tiles.push(nt), () => { E.sel = nt.id; D.renderGrid(); const el = D.tileEls.get(nt.id); if (el) { el.classList.add('flash-ok'); } E.refreshPanel(); D.toast(`${D.titleOf(nt)} toegevoegd`); });
   };
 
+  // ---------- adressen: standaardbegin en snelknoppen ----------
+  const URL_DEFAULTS = () => ({ prefix: 'http://192.168.178.79:', quick: [['NAS', 'http://192.168.178.79:'], ['Spotify', 'http://192.168.178.79:8090/'], ['Homey', 'http://192.168.178.13/'], ['GitHub', 'https://harrynaccy.github.io/']] });
+  E.urls = () => {
+    const s = D.cfg.settings;
+    if (!s.urls || typeof s.urls !== 'object') s.urls = URL_DEFAULTS();
+    if (!Array.isArray(s.urls.quick)) s.urls.quick = URL_DEFAULTS().quick;
+    if (typeof s.urls.prefix !== 'string') s.urls.prefix = URL_DEFAULTS().prefix;
+    return s.urls;
+  };
+
+  // ---------- pictogrammen (grote bibliotheek op de server) ----------
+  E._iconCache = new Map();
+  E.getIcon = async name => {
+    if (!name) return null;
+    if (E._iconCache.has(name)) return E._iconCache.get(name);
+    const ic = await D.api('GET', '/api/icons/' + encodeURIComponent(name)).catch(() => null);
+    if (ic && ic.p) { E._iconCache.set(name, ic); return ic; }
+    return null;
+  };
+  const niceName = n => String(n || '').replace(/-/g, ' ');
+  // Zoekveld + categorieën + raster; onPick(icoon) bij tikken
+  E.iconBrowser = (root, onPick) => {
+    const st = E._icb || (E._icb = { q: '', cat: '' });
+    root.innerHTML = `<div class="icb-top"><input type="search" class="icb-q" placeholder="Zoek: lamp, raam, wasmachine, sensor…" value="${esc(st.q)}"><div class="chips-row icb-cats"></div></div>
+      <div class="note icb-info"></div><div class="icb-grid"></div><div class="acts"><button class="btn sm icb-more" hidden>Meer laden</button></div>`;
+    const q = root.querySelector('.icb-q'), grid = root.querySelector('.icb-grid'), more = root.querySelector('.icb-more'), info = root.querySelector('.icb-info'), cats = root.querySelector('.icb-cats');
+    let offset = 0, token = 0;
+    const drawCats = () => {
+      cats.innerHTML = [['', 'Alle'], ...(E._iconCats || [])].map(([k, l]) => `<button data-c="${esc(k)}" class="${k === st.cat ? 'act' : ''}">${esc(l)}</button>`).join('');
+      cats.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { st.cat = b.dataset.c; drawCats(); load(false); });
+    };
+    const load = async append => {
+      const my = ++token;
+      if (!append) { offset = 0; grid.innerHTML = '<div class="muted pad">Laden…</div>'; }
+      const r = await D.api('GET', `/api/icons?q=${encodeURIComponent(st.q)}&cat=${encodeURIComponent(st.cat)}&offset=${offset}&limit=160`).catch(e => ({ error: e.message, items: [], total: 0 }));
+      if (my !== token || !root.isConnected) return;
+      if (!E._iconCats && r.cats) { E._iconCats = r.cats; drawCats(); }
+      if (!append) grid.innerHTML = '';
+      r.items.forEach(i => E._iconCache.set(i.n, i));
+      grid.insertAdjacentHTML('beforeend', r.items.map(i => `<button class="icb-it" data-n="${esc(i.n)}" title="${esc(niceName(i.n))}">${anyIcon(i)}</button>`).join(''));
+      offset += r.items.length;
+      info.textContent = r.error ? 'Laden mislukt: ' + r.error : r.total ? `${r.total} pictogrammen${st.q ? ` voor "${st.q}"` : ''}` : 'Niets gevonden. Probeer een ander woord, in het Nederlands of Engels.';
+      more.hidden = offset >= r.total;
+    };
+    drawCats();
+    let qt; q.oninput = () => { st.q = q.value; clearTimeout(qt); qt = setTimeout(() => load(false), 250); };
+    more.onclick = () => load(true);
+    grid.onclick = e => { const b = e.target.closest('[data-n]'); if (b) onPick(E._iconCache.get(b.dataset.n)); };
+    load(false);
+  };
+  // Venster: pictogram kiezen
+  E.pickIcon = () => new Promise(resolve => {
+    let done = false; const finish = v => { if (done) return; done = true; D._sheetCancel = null; D.closeSheet(); resolve(v); };
+    D.openSheet(`<div class="sheet-hd"><div><h2>Pictogram kiezen</h2><div class="sub">Tik op een pictogram</div></div><button class="xbtn" data-close>${icon('x')}</button></div><div id="icb-sheet"></div>`, 'wide');
+    D._sheetCancel = () => { if (!done) { done = true; resolve(null); } };
+    $('#sheet [data-close]').onclick = () => finish(null);
+    E.iconBrowser($('#icb-sheet'), ic => finish(ic));
+  });
+
+  // ---------- venster: koppelen aan apparaat, flow of mood ----------
+  E.targetOpts = kind => {
+    const onoff = d => Object.values(d.caps).some(c => c.setable && c.type === 'boolean');
+    return {
+      '3d': { targets: ['device', 'flow', 'mood'], allowNone: true },
+      glow: { targets: ['device', 'flow', 'mood'], allowNone: true },
+      ring: { targets: ['device', 'flow', 'mood'], allowNone: true },
+      icon: { targets: ['device', 'flow', 'mood'], allowNone: true, sub: 'Het pictogram kleurt mee met de toestand' },
+      rocker: { targets: ['device'], filter: onoff, allowNone: true },
+      rockerled: { targets: ['device'], filter: onoff, allowNone: true },
+      toggle: { targets: ['device'], filter: onoff, allowNone: true },
+      dim: { targets: ['device'], filter: d => !!d.caps.dim, sub: 'Alleen dimbare apparaten' },
+      scene: { targets: ['flow', 'mood', 'device'], allowNone: true },
+      panic: { targets: ['flow', 'device', 'mood'], allowNone: true },
+      cover: { targets: ['device'], filter: d => !!(d.caps.windowcoverings_set || d.caps.windowcoverings_state), sub: 'Alleen rolluiken, gordijnen en zonwering' },
+    }[kind] || { targets: ['device', 'flow', 'mood'], allowNone: true };
+  };
+  E.pickTarget = (opt = {}) => new Promise(resolve => {
+    const targets = opt.targets || ['device']; let cur = targets[0]; let q = '';
+    let done = false; const finish = v => { if (done) return; done = true; D._sheetCancel = null; D.closeSheet(); resolve(v); };
+    const TL = { device: 'Apparaten', flow: 'Flows', mood: 'Moods' };
+    D.openSheet(`<div class="sheet-hd"><div><h2>${esc(opt.title || 'Koppelen aan')}</h2><div class="sub">${esc(opt.sub || 'Kies wat deze knop bedient of laat zien')}</div></div><button class="xbtn" data-close>${icon('x')}</button></div>
+      ${targets.length > 1 ? `<div class="seg pick-seg">${targets.map(k => `<button data-tt="${k}" class="${k === cur ? 'act' : ''}">${TL[k]}</button>`).join('')}</div>` : ''}
+      <input type="search" class="pick-q" placeholder="Zoeken…">
+      ${opt.allowNone ? `<button class="pick-it none" data-none><span class="lib-ic">${icon('x')}</span><span class="lib-t"><b>Nog niet koppelen</b><small>Kan later bij Tegel → Gekoppeld aan</small></span></button>` : ''}
+      <div class="pick-list"></div>`, 'wide');
+    D._sheetCancel = () => { if (!done) { done = true; resolve(null); } };
+    const box = $('#sheet'); const list = box.querySelector('.pick-list');
+    const row = (attrs, ic, name, sub, on) => `<button class="pick-it" ${attrs}><span class="lib-ic${on ? ' on' : ''}">${anyIcon(ic)}</span><span class="lib-t"><b>${esc(name)}</b><small>${esc(sub || '')}</small></span></button>`;
+    const draw = () => {
+      const L = D.lib; const m = s => !q || String(s).toLowerCase().includes(q.toLowerCase()); let h = '';
+      if (cur === 'device') {
+        for (const z of [...L.zones].sort((a, b) => a.name.localeCompare(b.name))) {
+          const ds = L.devices.filter(d => d.zone === z.id && (!opt.filter || opt.filter(d)) && (m(d.name) || m(z.name))).sort((a, b) => a.name.localeCompare(b.name));
+          if (ds.length) h += `<div class="lib-zone">${esc(z.name)}</div>` + ds.map(d => { const cap = D.btnCap(d); const on = d.caps.onoff && d.caps.onoff.value; return row(`data-dev="${esc(d.id)}"`, D.devIcon(d), d.name, cap ? D.fmt(d.caps[cap], cap) : '', on); }).join('');
+        }
+      } else if (cur === 'flow') h = [...L.flows, ...L.advancedFlows].filter(f => m(f.name)).sort((a, b) => a.name.localeCompare(b.name)).map(f => row(`data-flow="${esc(f.id)}" data-ft="${esc(f.type || 'flow')}"`, 'play', f.name, f.type === 'advancedflow' ? 'Advanced flow' : 'Flow')).join('');
+      else h = L.moods.filter(x => m(x.name)).map(x => row(`data-mood="${esc(x.id)}"`, 'sparkles', x.name, D.zoneName(x.zone))).join('');
+      list.innerHTML = h || '<div class="muted pad">Niets gevonden</div>';
+    };
+    box.onclick = e => {
+      if (e.target.closest('[data-close]')) return finish(null);
+      const tt = e.target.closest('[data-tt]'); if (tt) { cur = tt.dataset.tt; box.querySelectorAll('[data-tt]').forEach(b => b.classList.toggle('act', b === tt)); draw(); return; }
+      if (e.target.closest('[data-none]')) return finish({ target: 'none' });
+      const it = e.target.closest('.pick-it'); if (!it) return;
+      if (it.dataset.dev) finish({ target: 'device', deviceId: it.dataset.dev });
+      else if (it.dataset.flow) finish({ target: 'flow', id: it.dataset.flow, flowType: it.dataset.ft });
+      else if (it.dataset.mood) finish({ target: 'mood', id: it.dataset.mood });
+    };
+    box.querySelector('.pick-q').oninput = e => { q = e.target.value; draw(); };
+    draw();
+  });
+
+  // ---------- knop of pictogram-tegel toevoegen ----------
+  E.addButton = async (kind, ref, mdi) => {
+    const tab = D.currentTab(); let auto = false;
+    if (!mdi) { mdi = await E.getIcon(D.defaultMdiName(kind, ref)); auto = true; }
+    const [w, h] = { cover: [2, 3], dim: [3, 2], toggle: [3, 2] }[kind] || [2, 2];
+    const spot = E.firstFree(tab, w, h);
+    if (!spot) { D.toast('Geen ruimte meer op dit tabblad. Maak ruimte of vergroot het raster.', true); return; }
+    const opts = { kind }; if (mdi) opts.mdi = mdi; if (auto) opts.mdiAuto = true;
+    const nt = { id: D.uid('w'), type: 'button', ref, opts, style: kind === 'icon' ? { frameless: true } : {}, ...spot };
+    E.commit(null, () => tab.tiles.push(nt), () => { E.sel = nt.id; D.renderGrid(); const el = D.tileEls.get(nt.id); if (el) el.classList.add('flash-ok'); E.refreshPanel(); D.toast(`${D.titleOf(nt)} toegevoegd. Tik erop om kleuren en pictogram aan te passen.`); });
+  };
+
+  // Knoppen
+  E.render.knoppen = () => `<p class="note">Kies een knopstijl en tik op <b>+</b>. Daarna kies je welk apparaat, welke flow of welke mood de knop bedient. De knop komt op <b>${esc(D.currentTab().name)}</b>.</p>
+    <div class="kb-list">${D.BUTTON_KINDS.map(([k, n, sub]) => `<div class="kb-kind"><div class="kb-prevs"><div class="tile kb-prevtile" data-prev="${k}" data-on="0"><div class="inner"></div></div><div class="tile kb-prevtile" data-prev="${k}" data-on="1"><div class="inner"></div></div></div>
+      <span class="lib-t"><b>${esc(n)}</b><small>${esc(sub)}</small></span><button class="lib-add" data-addkind="${k}" title="Toevoegen">${icon('plus')}</button></div>`).join('')}</div>
+    <p class="note">Links zie je de knop als hij uit staat, rechts als hij aan staat. Kleuren, pictogram en tekst pas je daarna aan bij <b>Tegel</b>.</p>`;
+  E.wire.knoppen = async root => {
+    const draw = () => root.querySelectorAll('[data-prev]').forEach(el => {
+      const k = el.dataset.prev; const mdi = E._iconCache.get((D.BUTTON_KINDS.find(x => x[0] === k) || [])[3]);
+      const t = { id: 'prev-' + k, type: 'button', ref: { target: 'none' }, opts: { kind: k, mdi, label: false, state: false, _preview: el.dataset.on === '1' }, style: {} };
+      try { D.tiles.button.render(t, el.querySelector('.inner'), el); } catch (e) { /* */ }
+    });
+    draw();
+    root.querySelectorAll('[data-addkind]').forEach(b => b.onclick = async () => {
+      const kind = b.dataset.addkind; const ref = await E.pickTarget(E.targetOpts(kind)); if (!ref) return;
+      E.addButton(kind, ref);
+    });
+    const missing = [...new Set(D.BUTTON_KINDS.map(k => k[3]))].filter(n => !E._iconCache.has(n));
+    if (missing.length) { await Promise.all(missing.map(E.getIcon)); if (root.isConnected) draw(); }
+  };
+
+  // Pictogrammen
+  E.render.pictogrammen = () => `<p class="note">Tik op een pictogram om het op <b>${esc(D.currentTab().name)}</b> te zetten, gekoppeld aan een apparaat, of om het te gebruiken voor de geselecteerde tegel. Zoeken kan in het Nederlands en Engels.</p><div id="icb"></div>`;
+  E.wire.pictogrammen = root => E.iconBrowser(root.querySelector('#icb'), ic => E.useIcon(ic));
+  E.useIcon = ic => {
+    if (!ic) return;
+    const f = E.sel && D.findTile(E.sel); const canSel = f && ['device', 'button', 'flow', 'mood'].includes(f.tile.type);
+    D.openSheet(`<div class="sheet-hd"><span class="badge big">${anyIcon(ic)}</span><div><h2>${esc(niceName(ic.n))}</h2><div class="sub">Wat wil je met dit pictogram?</div></div><button class="xbtn" data-close>${icon('x')}</button></div>
+      <div class="choice">
+        <button data-a="device"><span class="lib-ic">${icon('bulb')}</span><span class="lib-t"><b>Op het dashboard, gekoppeld</b><small>Kleurt mee: lamp aan = verlicht, raam open = oranje. Tik = aan/uit.</small></span></button>
+        <button data-a="kind"><span class="lib-ic">${icon('knob')}</span><span class="lib-t"><b>Als knop</b><small>Kies een knopstijl (3D, verlicht, wandschakelaar…) met dit pictogram</small></span></button>
+        <button data-a="plain"><span class="lib-ic">${icon('shapes')}</span><span class="lib-t"><b>Alleen het pictogram</b><small>Als versiering of label, zonder koppeling</small></span></button>
+        ${canSel ? `<button data-a="sel"><span class="lib-ic">${icon('sliders')}</span><span class="lib-t"><b>Voor de geselecteerde tegel</b><small>${esc(D.titleOf(f.tile))}</small></span></button>` : ''}
+      </div>`);
+    $('#sheet').onclick = async e => {
+      if (e.target.closest('[data-close]')) return D.closeSheet();
+      const a = e.target.closest('[data-a]'); if (!a) return; const act = a.dataset.a;
+      if (act === 'sel') { D.closeSheet(); E.commit(null, () => { f.tile.opts = f.tile.opts || {}; f.tile.opts.mdi = ic; delete f.tile.opts.mdiAuto; }, () => { D.renderGrid(); E.refreshPanel(); D.toast('Pictogram aangepast'); }); return; }
+      if (act === 'plain') { D.closeSheet(); E.addButton('icon', { target: 'none' }, ic); return; }
+      if (act === 'device') { const ref = await E.pickTarget(E.targetOpts('icon')); if (ref) E.addButton('icon', ref, ic); return; }
+      if (act === 'kind') {
+        $('#sheet').innerHTML = `<div class="sheet-hd"><span class="badge big">${anyIcon(ic)}</span><div><h2>Knopstijl kiezen</h2><div class="sub">Met het pictogram ${esc(niceName(ic.n))}</div></div><button class="xbtn" data-close>${icon('x')}</button></div>
+          <div class="choice">${D.BUTTON_KINDS.filter(k => k[0] !== 'icon').map(([k, n, sub]) => `<button data-k2="${k}"><span class="lib-t"><b>${esc(n)}</b><small>${esc(sub)}</small></span></button>`).join('')}</div>`;
+        $('#sheet').onclick = async e2 => {
+          if (e2.target.closest('[data-close]')) return D.closeSheet();
+          const b = e2.target.closest('[data-k2]'); if (!b) return;
+          const ref = await E.pickTarget(E.targetOpts(b.dataset.k2)); if (ref) E.addButton(b.dataset.k2, ref, ic);
+        };
+      }
+    };
+  };
+
   // Tegel
-  const ICON_CHOICES = ['play', 'sparkles', 'home', 'power', 'bulb', 'bell', 'moon', 'sun', 'lock', 'speaker', 'tv', 'garage', 'thermo', 'fan', 'bolt', 'users'];
   E.render.tegel = () => {
     const f = E.sel && D.findTile(E.sel);
     if (!f) return `<div class="empty-note">${icon('sliders')}<p>Tik op een tegel om die te bewerken.</p><p class="muted">Sleep een tegel om hem te verplaatsen. Met het hoekje rechtsonder maak je hem groter of kleiner.</p></div>`;
@@ -296,23 +492,34 @@
       spec += F.row('Apparaat', F.select(`${P}.ref.deviceId`, t.ref.deviceId, D.lib.devices.map(x => [x.id, `${x.name} (${D.zoneName(x.zone)})`]).sort((a, b) => a[1].localeCompare(b[1])), 'tilepanel'));
       spec += F.row('Weergave', F.select(`${P}.opts.view`, t.opts.view || 'auto', [['auto', 'Automatisch'], ['toggle', 'Alleen knop'], ['slider', 'Knop + schuif'], ['value', 'Eén waarde groot']], 'tilepanel'));
       if (d && (t.opts.view === 'value' || D.devKind(d) === 'sensor')) spec += F.row('Waarde', F.select(`${P}.opts.cap`, t.opts.cap || D.measures(d)[0] || '', Object.keys(d.caps).map(k => [k, d.caps[k].title || k]), 'tile'));
+      spec += F.row('Pictogram', F.icon(t.opts.mdi || (d ? D.devIcon(d) : 'chip'), !!t.opts.mdi));
       spec += F.row('Zone tonen', F.toggle(`${P}.opts.showZone`, t.opts.showZone !== false, 'tile'));
       spec += `<p class="note">Op het dashboard: tik = aan/uit, lang drukken = alle bediening.</p>`;
     } else if (t.type === 'flow') {
       spec += F.row('Flow', F.select(`${P}.ref.id`, t.ref.id, [...D.lib.flows, ...D.lib.advancedFlows].map(x => [x.id, x.name]), 'tile'));
-      spec += `<div class="icons-pick">${ICON_CHOICES.map(i => `<button data-segk="${P}.opts.icon" data-fx="tile" data-v="${i}" class="${(t.opts.icon || 'play') === i ? 'act' : ''}">${icon(i)}</button>`).join('')}</div>`;
-    } else if (t.type === 'mood') spec += F.row('Mood', F.select(`${P}.ref.id`, t.ref.id, D.lib.moods.map(x => [x.id, x.name]), 'tile'));
+      spec += F.row('Pictogram', F.icon(t.opts.mdi || t.opts.icon || 'play', !!t.opts.mdi));
+    } else if (t.type === 'mood') spec += F.row('Mood', F.select(`${P}.ref.id`, t.ref.id, D.lib.moods.map(x => [x.id, x.name]), 'tile')) + F.row('Pictogram', F.icon(t.opts.mdi || 'sparkles', !!t.opts.mdi));
+    else if (t.type === 'button') {
+      const o = t.opts; const d = t.ref && t.ref.target === 'device' ? D.dev(t.ref.deviceId) : null;
+      spec += F.row('Knopstijl', F.select(`${P}.opts.kind`, o.kind || 'glow', D.BUTTON_KINDS.map(k => [k[0], k[1]]), 'tilepanel'));
+      spec += F.row('Gekoppeld aan', `<span class="tgt">${esc(D.btnTargetName(t.ref) || 'Niets')}</span><button class="btn sm" data-retarget>Wijzigen</button>`);
+      if (d) spec += F.row('Toestand van', F.select(`${P}.opts.cap`, o.cap || '', [['', 'Automatisch'], ...Object.keys(d.caps).map(k => [k, d.caps[k].title || k])], 'tilepanel'), 'Welke waarde de knop laat zien');
+      spec += F.row('Pictogram', F.icon(o.mdi || 'chip', !!o.mdi && !o.mdiAuto));
+      spec += F.row('Kleur als aan', F.colorOpt(`${P}.opts.colorOn`, o.colorOn, th.onColor, 'tilepanel')) + F.row('Kleur als uit', F.colorOpt(`${P}.opts.colorOff`, o.colorOff, '#9aa3b2', 'tilepanel'));
+      spec += F.row('Naam tonen', F.toggle(`${P}.opts.label`, o.label !== false, 'tile')) + F.row('Toestand tonen', F.toggle(`${P}.opts.state`, o.state !== false, 'tile'), 'Bijv. "Aan · 70%" of "Open"');
+      spec += `<p class="note">${o.kind === 'panic' ? 'Deze knop vraagt altijd eerst om bevestiging.' : 'Op het dashboard: tik = bedienen, lang drukken = alle bediening van het apparaat.'}</p>`;
+    }
     else if (t.type === 'variable') { const v = D.lib.variables.find(x => x.id === t.ref.id); if (v && v.type === 'number') spec += F.row('Stapgrootte', F.text(`${P}.opts.step`, t.opts.step || 1, 'tile')) + F.row('Eenheid', F.text(`${P}.opts.unit`, t.opts.unit || '', 'tile', 'bijv. °C')); }
     else if (t.type === 'insight') spec += F.row('Periode', F.seg(`${P}.opts.resolution`, t.opts.resolution || 'last24Hours', Object.entries(D.RES).map(([k, l]) => [k, l.replace('Laatste ', '')]), 'tile')) + F.row('Lijnkleur', F.colorOpt(`${P}.opts.color`, t.opts.color, th.accent, 'tilepanel'));
     else if (t.type === 'energy') spec += F.row('Totaal van', F.select(`${P}.opts.mainDeviceId`, t.opts.mainDeviceId || '', [['', 'Som van alle apparaten'], ...D.lib.devices.filter(d => d.caps.measure_power).map(d => [d.id, d.name])], 'tile'), 'Kies je P1-meter voor het echte huisverbruik');
     else if (t.type === 'apps') spec += F.row('Alleen problemen', F.toggle(`${P}.opts.onlyProblems`, t.opts.onlyProblems, 'tile'));
     else if (t.type === 'clock') spec += F.row('Seconden', F.toggle(`${P}.opts.seconds`, t.opts.seconds, 'tile')) + F.row('Datum', F.toggle(`${P}.opts.date`, t.opts.date !== false, 'tile'));
     else if (t.type === 'text') spec += `<textarea data-k="${P}.opts.text" data-fx="tile" rows="4">${esc(t.opts.text || '')}</textarea>` + F.row('Uitlijnen', F.seg(`${P}.opts.align`, t.opts.align || 'left', [['left', 'Links'], ['center', 'Midden'], ['right', 'Rechts']], 'tile')) + F.row('Grootte', F.range(`${P}.opts.size`, t.opts.size || 1, 0.5, 4, 0.05, 'tile', 'x'));
-    else if (t.type === 'web') spec += F.row('Adres (URL)', F.text(`${P}.opts.url`, t.opts.url, 'none', 'http://…')) + `<button class="btn sm" data-reload>${icon('refresh')}Laden</button>` + F.row('Bedienbaar', F.toggle(`${P}.opts.interactive`, t.opts.interactive !== false, 'tile'), 'Uit = alleen kijken') + F.row('Zoom', F.range(`${P}.opts.zoom`, t.opts.zoom || 1, 0.3, 2, 0.05, 'tile', 'x')) + F.row('Verversen', F.num(`${P}.opts.refresh`, t.opts.refresh || 0, 0, 1440, 'tile'), 'minuten, 0 = nooit');
+    else if (t.type === 'web') spec += `<div class="f col"><label>Adres (URL)</label>${F.url(`${P}.opts.url`, t.opts.url, 'none')}</div>` + `<button class="btn sm" data-reload>${icon('refresh')}Laden</button>` + F.row('Bedienbaar', F.toggle(`${P}.opts.interactive`, t.opts.interactive !== false, 'tile'), 'Uit = alleen kijken') + F.row('Zoom', F.range(`${P}.opts.zoom`, t.opts.zoom || 1, 0.3, 2, 0.05, 'tile', 'x')) + F.row('Verversen', F.num(`${P}.opts.refresh`, t.opts.refresh || 0, 0, 1440, 'tile'), 'minuten, 0 = nooit');
 
     const tabsOpts = D.cfg.tabs.filter(x => x.id !== f.tab.id).map(x => [x.id, x.name]);
     const hdIcon = t.type === 'device' && D.dev(t.ref.deviceId) ? D.devIcon(D.dev(t.ref.deviceId)) : (T ? T.icon : 'chip');
-    return `<div class="tile-hd">${icon(hdIcon)}<div><b>${esc(D.titleOf(t))}</b><small>${esc(T ? T.label : t.type)} · ${t.w}×${t.h}</small></div></div>` +
+    return `<div class="tile-hd">${anyIcon(t.opts.mdi || hdIcon)}<div><b>${esc(D.titleOf(t))}</b><small>${esc(T ? T.label : t.type)} · ${t.w}×${t.h}</small></div></div>` +
       F.group('Inhoud', F.row('Titel', F.text(`${P}.opts.title`, t.opts.title, 'tile', T && T.title ? T.title({ ...t, opts: {} }) : '')) + spec) +
       F.group('Plaats en grootte', F.row('Breedte', F.num(`${P}.w`, t.w, 1, f.tab.grid.cols, 'tilepos')) + F.row('Hoogte', F.num(`${P}.h`, t.h, 1, f.tab.grid.rows, 'tilepos')) + F.row('Kolom', F.num(`${P}.x`, t.x, 0, f.tab.grid.cols - 1, 'tilepos')) + F.row('Rij', F.num(`${P}.y`, t.y, 0, f.tab.grid.rows - 1, 'tilepos')) + F.row('Vastzetten', F.toggle(`${P}.locked`, t.locked, 'tilepanel'), 'Kan dan niet per ongeluk verschuiven')) +
       F.group('Stijl', F.row('Achtergrond', F.colorOpt(`${P}.style.bg`, s.bg, th.tileBg, 'tilepanel')) + F.row('Doorzichtigheid', F.range(`${P}.style.opacity`, s.opacity ?? th.tileOpacity, 0, 1, 0.01, 'tile', '%')) +
@@ -332,6 +539,19 @@
       if (!E.fits(f.tab, r, t.id)) { D.toast('Past niet: buiten het raster of op een andere tegel', true); inp.value = t[key]; return; }
       E.commit(null, () => { t[key] = v; }, () => { D.renderGrid(); E.refreshPanel(); });
     });
+    const pi = root.querySelector('[data-pickicon]');
+    if (pi) pi.onclick = async () => { const ic = await E.pickIcon(); if (ic) E.commit(null, () => { t.opts.mdi = ic; delete t.opts.mdiAuto; }, () => { D.renderGrid(); E.refreshPanel(); }); };
+    const ci = root.querySelector('[data-clearicon]');
+    if (ci) ci.onclick = async () => {
+      const ic = t.type === 'button' ? await E.getIcon(D.defaultMdiName(t.opts.kind, t.ref)) : null;
+      E.commit(null, () => { if (ic) { t.opts.mdi = ic; t.opts.mdiAuto = true; } else delete t.opts.mdi; }, () => { D.renderGrid(); E.refreshPanel(); });
+    };
+    const rt = root.querySelector('[data-retarget]');
+    if (rt) rt.onclick = async () => {
+      const kind = t.opts.kind || 'glow'; const ref = await E.pickTarget(E.targetOpts(kind)); if (!ref) return;
+      const ic = t.opts.mdiAuto || !t.opts.mdi ? await E.getIcon(D.defaultMdiName(kind, ref)) : null;
+      E.commit(null, () => { t.ref = ref; delete t.opts.cap; if (ic) { t.opts.mdi = ic; t.opts.mdiAuto = true; } }, () => { D.renderGrid(); E.refreshPanel(); });
+    };
     const rl = root.querySelector('[data-reload]'); if (rl) rl.onclick = () => { const el = D.tileEls.get(t.id); if (el) el.querySelector('.inner').innerHTML = ''; D.renderGrid(); };
     root.querySelector('[data-resetstyle]').onclick = () => E.commit(null, () => { t.style = {}; }, () => { D.renderGrid(); E.refreshPanel(); });
     root.querySelector('[data-dup]').onclick = () => {
@@ -395,6 +615,8 @@
       bgBody += F.row('Vervagen', F.range(`${bp}.blur`, b.blur || 0, 0, 40, 1, 'bg', 'px')) + F.row('Donkerder maken', F.range(`${bp}.dim`, b.dim || 0, 0, 0.9, 0.01, 'bg', '%'));
       if (own) bgBody += `<button class="btn sm ghost" data-dropbg>${icon('x')}Terug naar algemene achtergrond</button>`;
     }
+    const nOwn = D.cfg.tabs.filter(t => t.background).length;
+    bgBody += `<div class="acts"><button class="btn sm" data-bgall>${icon('copy')}Deze achtergrond op alle tabbladen</button></div><p class="note">${nOwn ? `${nOwn} ${nOwn === 1 ? 'tabblad heeft' : 'tabbladen hebben'} nu een eigen achtergrond. Met deze knop krijgen alle tabbladen dezelfde achtergrond.` : 'Alle tabbladen gebruiken nu dezelfde achtergrond.'}</p>`;
     const n = S.night; let sun = '';
     if (n.mode === 'sun') { const st = D.sunTimes(new Date(), n.lat, n.lon); const f = d => d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }); sun = `<p class="note">Vandaag: donker vanaf ${f(st.set)} tot ${f(st.rise)}</p>`; }
     return F.group('Achtergrond', bgBody) +
@@ -412,6 +634,12 @@
     const own = root.querySelector('[data-ownbg]'); if (own) own.onclick = () => E.commit(null, () => { D.currentTab().background = D.clone(D.cfg.settings.background); }, () => { D.applyBackground(); E.refreshPanel(); });
     const drop = root.querySelector('[data-dropbg]'); if (drop) drop.onclick = () => E.commit(null, () => { D.currentTab().background = null; }, () => { D.applyBackground(); E.refreshPanel(); });
     const pv = root.querySelector('[data-preview]'); if (pv) pv.onclick = () => D.startSaver(true);
+    root.querySelector('[data-bgall]').onclick = async () => {
+      const tab = D.currentTab(); const src = (E.bgScope === 'tab' && tab.background) || D.cfg.settings.background;
+      const from = E.bgScope === 'tab' && tab.background ? `van "${tab.name}"` : 'die nu is ingesteld';
+      if (!(await D.confirm(`De achtergrond ${from} gebruiken voor alle tabbladen? Eigen achtergronden van tabbladen worden weggehaald.`, 'Toepassen'))) return;
+      E.commit(null, () => { D.cfg.settings.background = D.clone(src); D.cfg.tabs.forEach(t => { t.background = null; }); }, () => { E.bgScope = 'all'; D.applyBackground(); E.refreshPanel(); D.toast('Achtergrond op alle tabbladen gezet'); });
+    };
     const file = root.querySelector('#bgfile'); if (file) file.onchange = () => E.uploadBg(file.files[0]);
     const gal = root.querySelector('#gallery');
     if (gal) {
@@ -488,11 +716,17 @@
         <div class="acts"><button class="btn sm" data-relib>${icon('refresh')}Bibliotheek vernieuwen</button><button class="btn sm" data-reload>${icon('refresh')}Dashboard herladen</button></div>`) +
       F.group('Eigen apps', '<div id="awstat"><div class="muted">Laden…</div></div>') +
       F.group('Back-ups', `<p class="note">Elke dag wordt automatisch een back-up gemaakt (14 dagen bewaard).</p><div class="acts"><button class="btn sm" data-bk>${icon('download')}Back-up maken</button><button class="btn sm" data-export>${icon('download')}Exporteren</button><label class="btn sm">${icon('upload')}Importeren<input type="file" accept=".json" id="impfile" hidden></label></div><div id="bklist" class="bklist"><div class="muted">Laden…</div></div>`) +
+      F.group('Adressen invullen', F.row('Standaardbegin', F.text('settings.urls.prefix', E.urls().prefix, 'none', 'http://192.168.178.79:'), 'Staat al ingevuld bij een nieuw adres') +
+        `<p class="note">Snelknoppen boven het adresveld:</p><div class="urlq-list">${E.urls().quick.map((q, i) => `<div class="urlq-row"><input type="text" class="nm" data-k="settings.urls.quick.${i}.0" data-fx="none" value="${esc(q[0])}" placeholder="Naam"><input type="text" data-k="settings.urls.quick.${i}.1" data-fx="none" value="${esc(q[1])}" placeholder="http://…"><button class="ib sm" data-delurl="${i}" title="Verwijderen">${icon('trash')}</button></div>`).join('')}</div>
+        <div class="acts"><button class="btn sm" data-addurl>${icon('plus')}Snelknop toevoegen</button><button class="btn sm ghost" data-reseturl>${icon('refresh')}Standaard terugzetten</button></div>`) +
       F.group('Achterkant openen', F.row('Aantal tikken', F.num('settings.unlock.taps', u.taps, 3, 8, 'none')) + F.row('Binnen', F.range('settings.unlock.window', u.window, 800, 3000, 100, 'none', 'n'), 'milliseconden') + `<p class="note">Tik op een lege plek of op de tabbalk.</p>`) +
       F.group('Opnieuw beginnen', `<button class="btn sm danger" data-reset>${icon('trash')}Alles terugzetten naar begin</button>`) +
       `<p class="note center">Homey Dashboard · ${D.hasFully() ? 'Fully Kiosk' : 'browser'} · ${window.innerWidth}×${window.innerHeight}</p>`;
   };
   E.wire.systeem = async root => {
+    root.querySelector('[data-addurl]').onclick = () => E.commit(null, () => E.urls().quick.push(['', E.urls().prefix || 'http://']), () => E.refreshPanel());
+    root.querySelector('[data-reseturl]').onclick = async () => { if (!(await D.confirm('Standaardbegin en snelknoppen terugzetten?', 'Terugzetten'))) return; E.commit(null, () => { D.cfg.settings.urls = URL_DEFAULTS(); }, () => E.refreshPanel()); };
+    root.querySelectorAll('[data-delurl]').forEach(b => b.onclick = () => E.commit(null, () => E.urls().quick.splice(Number(b.dataset.delurl), 1), () => E.refreshPanel()));
     root.querySelector('[data-relib]').onclick = async () => { D.toast('Vernieuwen…'); await D.api('POST', '/api/library/refresh').catch(e => D.toast(e.message, true)); await D.loadLibrary(); D.renderAll(); E.refreshPanel(); D.toast('Bibliotheek bijgewerkt'); };
     root.querySelector('[data-reload]').onclick = async () => { await E.saveNow(); location.reload(); };
     root.querySelector('[data-bk]').onclick = async () => { await E.saveNow(); await D.api('POST', '/api/backups'); D.toast('Back-up gemaakt'); E.refreshPanel(); };

@@ -226,7 +226,7 @@
   D.refreshWhere = pred => { for (const tab of D.cfg.tabs) for (const t of tab.tiles) if (pred(t)) D.refreshTile(t.id); };
   D.refreshDevice = deviceId => {
     const d = D.dev(deviceId);
-    D.refreshWhere(t => (t.type === 'device' && t.ref && t.ref.deviceId === deviceId) || (t.type === 'zone' && d && t.ref && t.ref.zoneId === d.zone) || t.type === 'energy');
+    D.refreshWhere(t => ((t.type === 'device' || t.type === 'button') && t.ref && t.ref.deviceId === deviceId) || (t.type === 'zone' && d && t.ref && t.ref.zoneId === d.zone) || t.type === 'energy');
     if (D._sheetDevice === deviceId && D.tiles.device.refreshSheet) D.tiles.device.refreshSheet(deviceId);
   };
 

@@ -30,6 +30,7 @@ function defaultConfig() {
       startTab: home.id,
       tabbar: { height: 46, showIcons: true, showNames: true, opacity: 0.55 },
       unlock: { taps: 4, window: 1500 },
+      urls: { prefix: 'http://192.168.178.79:', quick: [['NAS', 'http://192.168.178.79:'], ['Spotify', `${NAS}/`], ['Homey', 'http://192.168.178.13/'], ['GitHub', 'https://harrynaccy.github.io/']] },
     },
     themes: [],
     tabs: [home, kamers, spotify],

@@ -49,8 +49,19 @@ window.ICONS = {
   stop: 'M6 6h12v12H6z',
   move: 'M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20',
   resize: 'M21 15v6h-6M21 21l-7-7M3 9V3h6M3 3l7 7',
+  shapes: 'M8.5 3 13 11H4zM17.5 21a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM3 14h7v7H3z',
+  knob: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
 };
 window.icon = function (name, cls) {
   const d = window.ICONS[name] || window.ICONS.chip;
   return `<svg class="ic ${cls || ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${d}"/></svg>`;
+};
+
+// Pictogram uit de grote bibliotheek ({ n: naam, p: pad }) of een eigen lijn-icoon (naam)
+window.anyIcon = function (x, cls) {
+  if (x && typeof x === 'object' && x.p) {
+    const d = String(x.p).replace(/[^MmLlHhVvCcSsQqTtAaZz0-9.,\s-]/g, '');
+    return `<svg class="ic mdi ${cls || ''}" viewBox="0 0 24 24" fill="currentColor"><path d="${d}"/></svg>`;
+  }
+  return window.icon(x, cls);
 };

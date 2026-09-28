@@ -73,8 +73,56 @@ Ga in Fully Kiosk naar *Instellingen* en stel in:
   - **Uiterlijk**: thema's (ook eigen thema's opslaan), kleuren, lettertype, glaseffect.
   - **Raster**: kolommen, rijen en ruimte per tabblad.
   - **Systeem**: Homey-status, bibliotheek vernieuwen, back-ups (elke dag automatisch), export/import.
+  - **Knoppen**: 11 knopstijlen, gekoppeld aan een apparaat, flow of mood (zie hieronder).
+  - **Pictogrammen**: ruim 7000 pictogrammen om op je dashboard te zetten (zie hieronder).
 - Een tegel **verplaats** je door hem te slepen. **Groter of kleiner** maken doe je met het rondje rechtsonder.
 - Met de pijltjes linksboven kun je **ongedaan maken** en **opnieuw** doen. Alles wordt automatisch opgeslagen.
+
+## Knoppen
+
+Op de achterkant, onder **Knoppen**, zie je van elke stijl hoe hij eruitziet als hij uit staat (links) en aan staat (rechts).
+Tik op **+** en kies wat de knop bedient: een apparaat, een flow of een mood.
+
+| Stijl | Wat het doet |
+|---|---|
+| Drukknop 3D | Steekt uit als het uit is, zit ingedrukt als het aan is |
+| Verlichte knop | Neutraal als het uit is, licht op als het aan is |
+| Wandschakelaar | Tuimelschakelaar die omklapt |
+| Schakelaar met led | Wandschakelaar met een ledje dat brandt als het aan is |
+| Ronde knop met ring | De ring licht op als het aan is |
+| Schuifschakelaar | Schuifje zoals op je telefoon |
+| Dimknop | Tik = aan/uit, schuif = helderheid |
+| Scène- of flowknop | Start een flow of mood en licht kort op |
+| Paniek- of alarmknop | Rode knop, vraagt altijd eerst om bevestiging |
+| Rolluikknoppen | Omhoog, stop en omlaag |
+| Pictogram | Alleen het pictogram, kleurt mee met de toestand |
+
+Tik daarna op de knop en ga naar **Tegel**. Daar stel je in: de knopstijl, waaraan hij gekoppeld is, welke waarde hij laat zien,
+het pictogram, de kleur als hij aan of uit is, en of de naam en de toestand eronder staan.
+
+## Pictogrammen
+
+Onder **Pictogrammen** staan ruim 7000 pictogrammen (Material Design Icons), ingedeeld in categorieën zoals Lampen, Sensoren,
+Deuren en ramen, Klimaat en Huishoudelijke apparaten. Zoeken kan in het Nederlands en het Engels, bijvoorbeeld *lamp*, *raam*, *wasmachine* of *rookmelder*.
+Tik op een pictogram en kies:
+- **Op het dashboard, gekoppeld**: het pictogram kleurt mee met het apparaat. Lamp aan = verlicht, raam open = oranje.
+- **Als knop**: kies een knopstijl met dit pictogram.
+- **Alleen het pictogram**: als versiering of label.
+- **Voor de geselecteerde tegel**: geeft een bestaande tegel dit pictogram.
+
+Bij apparaat-, flow- en mood-tegels kun je het pictogram ook wijzigen onder **Tegel → Pictogram → Kiezen**.
+De pictogrammen staan op de NAS, dus ze werken ook zonder internet.
+
+## Adressen invullen (webpagina-tegels)
+
+Bij een webpagina-tegel staat het begin van het adres al ingevuld (`http://192.168.178.79:`, je NAS). Je typt alleen de rest erachter, zoals `8090/playlist.html`.
+Met de snelknoppen boven het veld (NAS, Spotify, Homey, GitHub, https://, http://) vul je in één tik een ander begin in. Met **✕** maak je het veld leeg voor een heel ander adres.
+Het standaardbegin en de snelknoppen pas je aan onder **Systeem → Adressen invullen**.
+
+## Eén achtergrond voor alle tabbladen
+
+Onder **Scherm → Achtergrond** zet de knop **Deze achtergrond op alle tabbladen** de achtergrond die je bekijkt op alle tabbladen.
+Eigen achtergronden van losse tabbladen worden dan weggehaald. Met de pijltjes linksboven kun je dat ongedaan maken.
 
 ## Widgets van je eigen Homey-apps (Spotify Dashboard)
 
@@ -86,11 +134,19 @@ Alle gegevens komen van de app op je Homey. Alleen je Homey praat met Spotify. B
 
 Heb je de widgets in je Homey-app aangepast? Kopieer dan de inhoud van `widgets/<naam>/public/` uit de app naar `appwidgets/nl.ramon.spotifydashboard/<naam>/` op de NAS.
 
+## Bijwerken op de NAS
+
+1. Kopieer de mappen `server/` en `public/` (en `LEESMIJ.md`) over de oude heen in `docker/homey-dashboard`.
+   Laat `docker-compose.yml` en de map `data/` staan: daar staan je sleutel en je indeling.
+2. Herstart de container in **Container Manager → Container → homey-dashboard → Opnieuw starten**.
+3. Tik op de tablet 4× om de achterkant te openen en kies **Systeem → Dashboard herladen**.
+
 ## Waar staat wat?
 
 ```
 docker-compose.yml     instellingen container (Homey-adres + sleutel)
 server/                server en Homey-koppeling
+server/mdi-icons.json  de pictogrammen (Material Design Icons, zie mdi-icons.LICENSE)
 public/                het dashboard zelf
 appwidgets/             widgets van je eigen Homey-apps
 data/config.json       jouw indeling (wordt automatisch aangemaakt)

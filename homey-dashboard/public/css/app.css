@@ -181,3 +181,78 @@ input, select, textarea { font: inherit; }
 .btn.sm { height: 34px; padding: 0 12px; font-size: 13px; border-radius: 10px; }
 .btn .ic { width: 18px; height: 18px; }
 .btn:disabled { opacity: .4; }
+
+/* ---------- knoppen en pictogrammen ---------- */
+.ic.mdi { stroke: none; }
+.kb { --kon: var(--on); --koff: var(--muted); --face: min(56cqh, 72cqw); height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .5em; text-align: center; min-height: 0; }
+.kb.nolabel { --face: min(80cqh, 80cqw); }
+.kb-txt { min-width: 0; max-width: 100%; display: flex; flex-direction: column; gap: .1em; }
+.kb-label { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kb-state { color: var(--muted); font-size: .8em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kb.is-on .kb-state { color: var(--kon); }
+.kb .face { position: relative; flex: none; width: var(--face); height: var(--face); display: grid; place-items: center; transition: transform .16s ease, box-shadow .2s ease, background .25s ease, border-color .25s ease; }
+.kb .face > .ic, .kb .paddle > .ic, .kb .cap > .ic { width: 46%; height: 46%; color: var(--koff); transition: color .25s, filter .25s; }
+.kb.is-on .face > .ic, .kb.is-on .paddle > .ic { color: var(--kon); filter: drop-shadow(0 0 .35em color-mix(in srgb, var(--kon) 70%, transparent)); }
+.kb.hit .face { animation: kbhit .9s ease; }
+@keyframes kbhit { 25% { box-shadow: 0 0 0 .25em var(--kon), 0 0 1.6em var(--kon); } }
+.kb-row { display: flex; align-items: center; gap: .7em; width: 100%; min-width: 0; text-align: left; }
+.kb-row .kb-txt { flex: 1; }
+.kb .face.sm { --face: 2.6em; border-radius: 50%; background: var(--soft); }
+.kb .face.sm > .ic { width: 55%; height: 55%; }
+.kb.is-on .face.sm { background: color-mix(in srgb, var(--kon) 22%, transparent); }
+.kb-mini { width: 2.4em; height: 2.4em; border-radius: 50%; background: var(--soft); display: grid; place-items: center; flex: none; }
+.kb-mini .ic { width: 55%; height: 55%; }
+.kb-cover, .kb-dim, .kb-toggle { align-items: stretch; justify-content: space-between; }
+.kb-dim .rng { margin-top: auto; }
+.tile .kb-dim.is-on .rng { background: linear-gradient(to right, var(--kon) 0 var(--p), var(--soft2) var(--p) 100%); }
+.kb-sw { display: flex; justify-content: flex-end; margin-top: auto; }
+.kb-sw .switch { font-size: 1.25em; }
+.tile .kb-toggle .switch.on { background: var(--kon); }
+
+/* 1. drukknop 3D: hoog = uit, laag = aan */
+.kb-3d .face { border-radius: 24%; background: linear-gradient(180deg, color-mix(in srgb, var(--text) 18%, var(--tile-solid)), color-mix(in srgb, var(--text) 7%, var(--tile-solid)));
+  box-shadow: 0 .5em 0 color-mix(in srgb, #000 60%, var(--tile-solid)), 0 .9em 1.4em rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.22); transform: translateY(-.25em); }
+.kb-3d.is-on .face, .tile.pressing .kb-3d .face { transform: translateY(.25em); background: linear-gradient(180deg, color-mix(in srgb, var(--kon) 16%, var(--tile-solid)), color-mix(in srgb, var(--kon) 26%, var(--tile-solid)));
+  box-shadow: 0 .06em 0 color-mix(in srgb, #000 60%, var(--tile-solid)), 0 .2em .5em rgba(0,0,0,.4), inset 0 .3em .7em rgba(0,0,0,.45); }
+.tile.pressing .kb-3d:not(.is-on) .face { background: linear-gradient(180deg, color-mix(in srgb, var(--text) 10%, var(--tile-solid)), color-mix(in srgb, var(--text) 16%, var(--tile-solid))); }
+
+/* 2. verlichte knop */
+.kb-glow .face { border-radius: 26%; background: color-mix(in srgb, var(--text) 7%, transparent); border: .12em solid color-mix(in srgb, var(--text) 14%, transparent); }
+.kb-glow.is-on .face { background: color-mix(in srgb, var(--kon) 16%, transparent); border-color: var(--kon);
+  box-shadow: 0 0 1.3em color-mix(in srgb, var(--kon) 55%, transparent), inset 0 0 1.1em color-mix(in srgb, var(--kon) 35%, transparent); }
+
+/* 3 + 4. wandschakelaar (met led) */
+.kb-rocker .face, .kb-rockerled .face { width: calc(var(--face) * .8); border-radius: 12%; background: linear-gradient(160deg, #f4f4f1, #d6d6d1); box-shadow: 0 .3em .9em rgba(0,0,0,.45), inset 0 1px 0 #fff; perspective: 10em; }
+.kb .paddle { position: absolute; inset: 13%; border-radius: 9%; display: grid; place-items: center; transform: rotateX(16deg); transition: transform .22s ease, background .22s;
+  background: linear-gradient(180deg, #dcdcd6, #fbfbf8 60%); box-shadow: 0 .12em .25em rgba(0,0,0,.28), inset 0 -.1em .2em rgba(0,0,0,.06); }
+.kb.is-on .paddle { transform: rotateX(-16deg); background: linear-gradient(180deg, #fbfbf8 40%, #dcdcd6); }
+.kb .paddle > .ic { width: 50%; height: 50%; color: var(--koff, #8a8a86); }
+.kb-rocker .paddle > .ic, .kb-rockerled .paddle > .ic { color: #8b8b86; }
+.kb-rocker.is-on .paddle > .ic, .kb-rockerled.is-on .paddle > .ic { color: var(--kon); filter: none; }
+.kb .led { position: absolute; bottom: 9%; left: 50%; width: .5em; height: .5em; margin-left: -.25em; border-radius: 50%; background: #b9b9b4; box-shadow: inset 0 1px 1px rgba(0,0,0,.3); transition: background .25s, box-shadow .25s; }
+.kb.is-on .led { background: var(--kon); box-shadow: 0 0 .5em var(--kon), 0 0 1em var(--kon); }
+
+/* 5. ronde knop met ring */
+.kb-ring .face { border-radius: 50%; background: color-mix(in srgb, var(--text) 7%, transparent); box-shadow: inset 0 0 0 .2em color-mix(in srgb, var(--text) 16%, transparent); }
+.kb-ring.is-on .face { background: color-mix(in srgb, var(--kon) 12%, transparent); box-shadow: inset 0 0 0 .2em var(--kon), 0 0 1.4em color-mix(in srgb, var(--kon) 50%, transparent); }
+
+/* 8. scène */
+.kb-scene .face { border-radius: 28%; background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 38%, transparent), color-mix(in srgb, var(--accent) 12%, transparent)); border: .1em solid color-mix(in srgb, var(--accent) 45%, transparent); }
+.kb-scene .face > .ic { color: var(--text); }
+.kb-scene.is-on .face { box-shadow: 0 0 1.3em color-mix(in srgb, var(--kon) 50%, transparent); }
+
+/* 9. paniek */
+.kb-panic .face { border-radius: 50%; background: radial-gradient(circle at 50% 35%, #555a63, #2a2d33); box-shadow: 0 .3em .8em rgba(0,0,0,.5), inset 0 0 0 .18em #ffcc33; }
+.kb-panic .cap { position: absolute; inset: 14%; border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle at 40% 30%, #ff6b6b, #c41d1d 70%); box-shadow: 0 .25em 0 #7d0f0f, 0 .4em .7em rgba(0,0,0,.45), inset 0 .1em .15em rgba(255,255,255,.35); transform: translateY(-.15em); transition: transform .15s, box-shadow .15s; }
+.kb-panic .cap > .ic { color: #fff; width: 52%; height: 52%; }
+.tile.pressing .kb-panic .cap { transform: translateY(.15em); box-shadow: 0 .05em 0 #7d0f0f, inset 0 .2em .5em rgba(0,0,0,.4); }
+.kb-panic.is-on .cap { animation: panicpulse 1.2s ease-in-out infinite; }
+@keyframes panicpulse { 50% { box-shadow: 0 .25em 0 #7d0f0f, 0 0 1.6em #ff3b3b; } }
+
+/* 11. alleen pictogram */
+.kb-icon .face > .ic { width: 82%; height: 82%; }
+.kb-icon.is-on.is-alarm .face > .ic { animation: iconblink 1.4s ease-in-out infinite; }
+@keyframes iconblink { 50% { opacity: .55; } }
+.kb-cover .face { --face: min(30cqh, 60cqw); align-self: center; }
+.kb-cover .face > .ic { width: 80%; height: 80%; }
+.kb-cover .btnrow { margin-top: 0; }
