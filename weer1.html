@@ -181,43 +181,8 @@
     <div class="ruimte"></div>
 
     <div>
-      <div class="sectie-titel">Wind deze week<span class="legenda">gem. · max km/u</span></div>
-      <div class="week" id="week"><div class="dag vandaag">
-              <span class="naam">vand.</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18h10a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.1 11 3.5 3.5 0 0 0 7 18z"></path></svg>
-              <span class="max"></span>
-              <span class="min">10°</span>
-            </div><div class="dag">
-              <span class="naam">ma</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18h10a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.1 11 3.5 3.5 0 0 0 7 18z"></path></svg>
-              <span class="max">16°</span>
-              <span class="min">11°</span>
-            </div><div class="dag">
-              <span class="naam">di</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 15h10a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.1 8 3.5 3.5 0 0 0 7 15z"></path><path d="M8 18l-1 3M12 18l-1 3M16 18l-1 3"></path></svg>
-              <span class="max">14°</span>
-              <span class="min">9°</span>
-            </div><div class="dag">
-              <span class="naam">wo</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v1.5M3 8h1.5M4.5 4.5l1 1M11.5 4.5l-1 1"></path><path d="M5.3 10.5A3.5 3.5 0 0 1 11 6.2"></path><path d="M9 20h8.5a3.5 3.5 0 0 0 .5-6.96A5 5 0 0 0 8.4 14 3 3 0 0 0 9 20z"></path></svg>
-              <span class="max">17°</span>
-              <span class="min">9°</span>
-            </div><div class="dag">
-              <span class="naam">do</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18h10a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.1 11 3.5 3.5 0 0 0 7 18z"></path></svg>
-              <span class="max">16°</span>
-              <span class="min">10°</span>
-            </div><div class="dag">
-              <span class="naam">vr</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
-              <span class="max">19°</span>
-              <span class="min">11°</span>
-            </div><div class="dag">
-              <span class="naam">za</span>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v1.5M3 8h1.5M4.5 4.5l1 1M11.5 4.5l-1 1"></path><path d="M5.3 10.5A3.5 3.5 0 0 1 11 6.2"></path><path d="M9 20h8.5a3.5 3.5 0 0 0 .5-6.96A5 5 0 0 0 8.4 14 3 3 0 0 0 9 20z"></path></svg>
-              <span class="max">18°</span>
-              <span class="min">12°</span>
-            </div></div>
+      <div class="sectie-titel">Wind deze week<span class="legenda">min · max km/u</span></div>
+      <div class="week" id="week"></div>
     </div>
 
     <div class="tegels">
@@ -518,13 +483,13 @@
         $("week").innerHTML = d.daily.time.map((dag, n) => {
           const datum = new Date(dag + "T12:00");
           const max = Math.round(d.daily.wind_speed_10m_max[n]);
-          // gemiddelde van de uurwaarden van die dag (geen uurwaarden: maximum)
+          // laagste uurwaarde van die dag (geen uurwaarden: maximum)
           const perUur = d.hourly.time.map((t, k) => t.startsWith(dag) ? d.hourly.wind_speed_10m?.[k] : null).filter(w => w != null);
-          const gem = perUur.length ? Math.round(perUur.reduce((a, b) => a + b, 0) / perUur.length) : max;
+          const min = perUur.length ? Math.round(Math.min(...perUur)) : max;
           return `<div class="dag${n === 0 ? " vandaag" : ""}">
               <span class="naam">${n === 0 ? "vand." : DAGEN[datum.getDay()]}</span>
               ${svg("wind")}
-              <span class="max">${gem}</span>
+              <span class="max">${min}</span>
               <span class="min">${max}</span>
             </div>`;
         }).join("");
