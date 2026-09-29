@@ -8,4 +8,9 @@ contextBridge.exposeInMainWorld('desktopApp', {
   saveUrl: url => ipcRenderer.invoke('cfg:save', url),
   retry: () => ipcRenderer.invoke('app:retry'),
   openSettings: () => ipcRenderer.invoke('app:settings'),
+  getBackup: () => ipcRenderer.invoke('backup:get'),
+  setBackup: v => ipcRenderer.invoke('backup:set', v),
+  runBackup: () => ipcRenderer.invoke('backup:run'),
+  openBackupFolder: () => ipcRenderer.invoke('backup:open'),
+  chooseBackupFolder: () => ipcRenderer.invoke('backup:choose'),
 });

@@ -27,16 +27,59 @@
       if (x.fix && x.fix.type === 'restartApp') fix = `<button class="btn sm${x.fix.optional ? '' : ' primary'}" data-hrestart="${esc(x.fix.appId)}">${icon('refresh')}${esc(x.fix.optional ? 'Probeer: ' + x.fix.label.toLowerCase() : x.fix.label)}</button>`;
       else if (x.fix && x.fix.type === 'assistant') fix = editor ? `<button class="btn sm primary" data-hai="${group}:${i}">${icon('sparkles')}${esc(x.fix.label)}</button>` : '<small class="muted">Repareren: achterkant → Controle</small>';
       else if (x.fix && x.fix.type === 'advice') fix = `<small class="h-adv">${esc(x.fix.text)}</small>`;
+      if (x.canDelete) fix += x.kind === 'flow'
+        ? `<button class="btn sm danger" data-hdelflow="${esc(x.id)}" data-adv="${x.adv ? 1 : 0}" data-name="${esc(x.title)}">${icon('trash')}Flow verwijderen</button>`
+        : `<button class="btn sm danger" data-hdeldev="${esc(x.id)}" data-name="${esc(x.title)}">${icon('trash')}Apparaat verwijderen</button>`;
       return `<div class="h-row ${x.sev}"><i class="h-dot"></i><div class="h-t"><b>${esc(x.title)}</b><span>${esc(x.problem)}</span>${x.detail ? `<small>${esc(x.detail)}</small>` : ''}${fix ? `<div class="h-fix">${fix}</div>` : ''}</div></div>`;
     };
     const dev = d.devices.map((x, i) => row(x, i, 'devices')).join('');
     const fl = d.flows.map((x, i) => row(x, i, 'flows')).join('');
-    return `<div class="h-sum ${d.errors ? 'bad' : d.warnings ? 'warn' : 'ok'}">${icon(d.errors + d.warnings ? 'bell' : 'check')}<div><b>${esc(summary(d))}</b><small>Gecontroleerd om ${time(d.at)} · ${d.devicesTotal} apparaten, ${d.flowsTotal} flows</small></div></div>
+    const del = H.deleted.filter(x => !x.restored).map(x => `<div class="h-row info"><i class="h-dot"></i><div class="h-t"><b>${esc(x.name)}</b><span>Verwijderd om ${time(x.at)}</span><div class="h-fix"><button class="btn sm" data-hundo="${esc(x.batch)}">${icon('undo')}Terugzetten</button></div></div></div>`).join('');
+    return (del ? `<h4 class="h-h">Net verwijderd</h4>${del}` : '') + `<div class="h-sum ${d.errors ? 'bad' : d.warnings ? 'warn' : 'ok'}">${icon(d.errors + d.warnings ? 'bell' : 'check')}<div><b>${esc(summary(d))}</b><small>Gecontroleerd om ${time(d.at)} · ${d.devicesTotal} apparaten, ${d.flowsTotal} flows</small></div></div>
       <h4 class="h-h">Apparaten en apps</h4>${dev || '<p class="note">Geen problemen gevonden.</p>'}
       <h4 class="h-h">Flows</h4>${fl || '<p class="note">Geen problemen gevonden.</p>'}
       ${d.flowsDisabled ? `<p class="note">${d.flowsDisabled} ${d.flowsDisabled === 1 ? 'flow staat' : 'flows staan'} uit (geen probleem, ter info).</p>` : ''}`;
   };
+  H.deleted = [];
+  const pinFor = async acties => {
+    if (!(await D.api('POST', '/api/flows/needpin', { acties })).pin) return '';
+    if (!(await D.api('GET', '/api/flows/pin')).set) throw new Error('Stel eerst een pincode in: achterkant → Assistent → Instellingen → Pincode voor flows');
+    return D.editor.ai.askPin('Voer je pincode in om te verwijderen.');
+  };
   H.wire = (root, rerender) => {
+    const again = async () => { await H.load(true); rerender && rerender(); };
+    root.querySelectorAll('[data-hdelflow]').forEach(b => b.onclick = async () => {
+      const name = b.dataset.name; const adv = b.dataset.adv === '1';
+      if (!(await D.confirm(`Flow "${name}" verwijderen uit Homey? Er wordt eerst een kopie bewaard, zodat je hem kunt terugzetten.`, 'Verwijderen'))) return;
+      try {
+        const acties = [{ actie: 'flow_verwijderen', flowId: b.dataset.hdelflow, geavanceerd: adv, omschrijving: name }];
+        const pin = await pinFor(acties); if (pin === null) return;
+        const r = await D.api('POST', '/api/flows/apply', { acties, pin });
+        if (!r.steps[0] || !r.steps[0].ok) throw new Error((r.steps[0] && r.steps[0].note) || 'Verwijderen lukte niet');
+        H.deleted.push({ name: 'Flow ' + name, batch: r.batch, at: Date.now() });
+        D.toast(`Flow "${name}" verwijderd`); await D.loadLibrary(); await again();
+      } catch (e) { D.toast(e.message, true); }
+    });
+    root.querySelectorAll('[data-hdeldev]').forEach(b => b.onclick = async () => {
+      const id = b.dataset.hdeldev; const name = b.dataset.name;
+      try {
+        const u = await D.api('GET', '/api/health/usage/' + encodeURIComponent(id));
+        const where = [u.flows.length ? `${u.flows.length} ${u.flows.length === 1 ? 'flow' : 'flows'} (${u.flows.slice(0, 4).join(', ')}${u.flows.length > 4 ? ', …' : ''})` : '', u.tiles.length ? `${u.tiles.length} ${u.tiles.length === 1 ? 'tegel' : 'tegels'}` : ''].filter(Boolean).join(' en ');
+        if (!(await D.confirm(`"${name}" uit Homey verwijderen? ${where ? 'Het wordt gebruikt in ' + where + '; die werken daarna niet meer.' : 'Het wordt nergens in flows of tegels gebruikt.'}`, 'Verder'))) return;
+        if (!(await D.confirm(`Weet je het zeker? Dit is niet terug te draaien. Wil je "${name}" later terug, dan moet je het opnieuw koppelen.`, 'Ja, verwijderen'))) return;
+        if (!(await D.api('GET', '/api/flows/pin')).set) throw new Error('Stel eerst een pincode in: achterkant → Assistent → Instellingen → Pincode voor flows');
+        const pin = await D.editor.ai.askPin(`Voer je pincode in om "${name}" te verwijderen.`); if (pin === null) return;
+        await D.api('POST', '/api/health/delete-device/' + encodeURIComponent(id), { pin });
+        D.toast(`"${name}" is verwijderd uit Homey`); await D.loadLibrary(); D.renderAll(); await again();
+      } catch (e) { D.toast(e.message, true); }
+    });
+    root.querySelectorAll('[data-hundo]').forEach(b => b.onclick = async () => {
+      try {
+        const r = await D.api('POST', '/api/flows/undo/' + encodeURIComponent(b.dataset.hundo));
+        const x = H.deleted.find(y => y.batch === b.dataset.hundo); if (x) x.restored = true;
+        D.toast(r.ok ? 'Teruggezet' : 'Deels teruggezet: ' + r.problems.join(', '), !r.ok); await D.loadLibrary(); await again();
+      } catch (e) { D.toast(e.message, true); }
+    });
     root.querySelectorAll('[data-hrestart]').forEach(b => b.onclick = async () => {
       const id = b.dataset.hrestart; const a = (D.lib.apps || []).find(x => x.id === id);
       if (!(await D.confirm(`De app ${a ? a.name : id} herstarten? Apparaten van deze app zijn dan even niet te bedienen.`, 'Herstarten'))) return;

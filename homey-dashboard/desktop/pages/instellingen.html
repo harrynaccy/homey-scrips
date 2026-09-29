@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="nl"><head><meta charset="utf-8"><title>Adres van het dashboard</title><link rel="stylesheet" href="style.css"></head>
+<html lang="nl"><head><meta charset="utf-8"><title>Instellingen</title><link rel="stylesheet" href="style.css"></head>
 <body>
   <div class="card bare">
     <h1>Adres van het dashboard</h1>
@@ -10,6 +10,18 @@
       <button id="reset">Standaard</button>
       <button id="test">Testen</button>
       <button class="primary" id="save">Opslaan</button>
+    </div>
+    <h1 style="margin-top:26px">Automatische back-up</h1>
+    <p>Het programma zet regelmatig een volledige back-up van het dashboard (map, indeling en docker-compose.yml) op deze pc. Daarmee zet je alles weer op een nieuwe NAS; zie de handleiding, hoofdstuk Voorbereiding.</p>
+    <label class="chk"><input type="checkbox" id="b-on"> Elke <select id="b-days"><option value="1">dag</option><option value="7">week</option><option value="14">2 weken</option><option value="30">maand</option></select> een back-up maken</label>
+    <label class="chk"><input type="checkbox" id="b-keys"> Met sleutels (sneller terugzetten; bewaar de map dan veilig)</label>
+    <p style="margin:10px 0 4px">Map: <code id="b-folder"></code></p>
+    <small id="b-last"></small>
+    <div class="msg" id="b-msg"></div>
+    <div class="row">
+      <button id="b-choose">Andere map…</button>
+      <button id="b-open">Map openen</button>
+      <button class="primary" id="b-run">Nu maken</button>
     </div>
   </div>
   <script>
@@ -25,5 +37,21 @@
     $('test').onclick = test;
     $('save').onclick = () => A.saveUrl($('url').value.trim());
     $('url').onkeydown = e => { if (e.key === 'Enter') A.saveUrl($('url').value.trim()); };
+    const showB = b => {
+      $('b-on').checked = b.enabled; $('b-keys').checked = b.keys; $('b-days').value = String(b.days); $('b-folder').textContent = b.folder;
+      $('b-last').textContent = b.last ? 'Laatste back-up: ' + new Date(b.last).toLocaleString('nl-NL') : 'Nog geen back-up gemaakt';
+      if (b.lastError) { $('b-msg').className = 'msg bad'; $('b-msg').textContent = 'Laatste poging mislukt: ' + b.lastError; }
+    };
+    A.getBackup().then(showB);
+    const setB = () => A.setBackup({ enabled: $('b-on').checked, keys: $('b-keys').checked, days: Number($('b-days').value) }).then(showB);
+    $('b-on').onchange = setB; $('b-keys').onchange = setB; $('b-days').onchange = setB;
+    $('b-choose').onclick = () => A.chooseBackupFolder().then(showB);
+    $('b-open').onclick = () => A.openBackupFolder();
+    $('b-run').onclick = async () => {
+      $('b-msg').className = 'msg'; $('b-msg').textContent = 'Back-up maken… (kan een minuut duren)';
+      const r = await A.runBackup();
+      $('b-msg').className = 'msg ' + (r.ok ? 'ok' : 'bad'); $('b-msg').textContent = r.ok ? '✓ Opgeslagen: ' + r.file : '✗ ' + r.error;
+      A.getBackup().then(b => { $('b-last').textContent = b.last ? 'Laatste back-up: ' + new Date(b.last).toLocaleString('nl-NL') : ''; });
+    };
   </script>
 </body></html>

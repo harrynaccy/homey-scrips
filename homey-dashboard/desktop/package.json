@@ -1,7 +1,7 @@
 {
   "name": "homey-dashboard-desktop",
   "productName": "Homey Dashboard",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Homey Dashboard als programma op je pc. Toont het dashboard dat op je NAS draait.",
   "author": "Ramon",
   "license": "UNLICENSED",

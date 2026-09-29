@@ -108,16 +108,21 @@ class FlowService {
   setOwn(set) { fs.writeFileSync(this.ownFile, JSON.stringify([...set])); }
   needsPin(acties) {
     const own = this.own();
-    return (acties || []).some(a => a && (a.actie === 'flow_aanpassen' || (a.actie === 'flow_verwijderen' && !own.has(a.flowId))));
+    return (acties || []).some(a => a && (a.actie === 'flow_aanpassen' || (a.actie === 'flow_verwijderen' && (a.geavanceerd || !own.has(a.flowId)))));
   }
   async apply(acties, pin) {
     const list = (acties || []).filter(a => a && ['flow_maken', 'flow_aanpassen', 'flow_verwijderen'].includes(a.actie));
     if (this.needsPin(list)) this.checkPin(pin);
-    const batch = { id: 'b' + Date.now().toString(36), at: new Date().toISOString(), created: [], updated: [], deleted: [] };
+    const batch = { id: 'b' + Date.now().toString(36), at: new Date().toISOString(), created: [], updated: [], deleted: [], deletedAdv: [] };
     const keys = {}; const steps = []; const own = this.own();
     let folder = null;
     for (const a of list) {
       try {
+        if (a.actie === 'flow_verwijderen' && a.geavanceerd) {
+          const before = await this.homey.getAdvancedFlowRaw(a.flowId);
+          await this.homey.deleteAdvancedFlow(a.flowId);
+          batch.deletedAdv.push(before); steps.push({ ok: true, text: a.omschrijving, id: a.flowId }); continue;
+        }
         if (a.actie === 'flow_verwijderen') {
           const before = await this.homey.getFlowRaw(a.flowId);
           await this.homey.deleteFlow(a.flowId); own.delete(a.flowId);
@@ -140,8 +145,8 @@ class FlowService {
       } catch (e) { steps.push({ ok: false, text: a.omschrijving, note: String(e.message || e) }); }
     }
     this.setOwn(own);
-    const changed = batch.created.length || batch.updated.length || batch.deleted.length;
-    if (changed) { const b = this.batches(); b.push(batch); this.saveBatches(b); console.log(`[flows] ${batch.id}: ${batch.created.length} gemaakt, ${batch.updated.length} aangepast, ${batch.deleted.length} verwijderd`); }
+    const changed = batch.created.length || batch.updated.length || batch.deleted.length || batch.deletedAdv.length;
+    if (changed) { const b = this.batches(); b.push(batch); this.saveBatches(b); console.log(`[flows] ${batch.id}: ${batch.created.length} gemaakt, ${batch.updated.length} aangepast, ${batch.deleted.length + batch.deletedAdv.length} verwijderd`); }
     if (this.homey.refresh && this.homey.status.mode !== 'demo') await this.homey.refresh().catch(() => {});
     return { batch: changed ? batch.id : null, keys, steps };
   }
@@ -154,6 +159,10 @@ class FlowService {
     for (const f of b.deleted || []) {
       const { id, ...rest } = f; void id;
       await this.homey.createFlow(rest).then(nid => own.add(nid)).catch(e => problems.push(e.message));
+    }
+    for (const f of b.deletedAdv || []) {
+      const { id, ...rest } = f; void id;
+      await this.homey.createAdvancedFlow(rest).catch(e => problems.push(e.message));
     }
     this.setOwn(own);
     this.saveBatches(all.filter(x => x !== b));

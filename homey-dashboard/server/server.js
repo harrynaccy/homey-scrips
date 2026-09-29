@@ -10,6 +10,8 @@ const icons = require('./icons');
 const { Assistant, friendlyError } = require('./assistant');
 const { FlowService } = require('./flows');
 const { Health } = require('./health');
+const { nl } = require('./nl');
+const { fullBackup } = require('./backup');
 
 const PORT = Number(process.env.PORT || 8095);
 const DATA = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
@@ -59,6 +61,7 @@ function broadcast(type, data) {
 homey.on('update', u => broadcast('update', u));
 homey.on('library', () => broadcast('library', { at: Date.now() }));
 homey.on('status', s => broadcast('status', s));
+homey.on('link', l => broadcast('link', l));
 
 // ---------- brug naar widgets van je eigen Homey-apps ----------
 const AW_DIR = process.env.APPWIDGETS_DIR || path.join(__dirname, '..', 'appwidgets');
@@ -76,11 +79,12 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 
 const wrap = fn => async (req, res) => {
   try { res.json((await fn(req, res)) ?? { ok: true }); } catch (err) {
-    console.error(err); res.status(500).json({ error: String(err.message || err) });
+    console.error(err); res.status(500).json({ error: nl(err) });
   }
 };
 
 app.get('/api/status', wrap(() => homey.status));
+app.get('/api/ping', wrap(() => ({ t: Date.now(), homey: homey.link || null })));
 app.get('/api/library', wrap(() => homey.library() || {}));
 app.post('/api/library/refresh', wrap(async () => { if (homey.refresh) await homey.refresh(); return homey.library(); }));
 app.get('/api/location', wrap(() => homey.location()));
@@ -101,14 +105,16 @@ app.post('/api/alarm/:id', wrap(req => homey.setAlarm(req.params.id, !!req.body.
 
 app.get('/api/assistant', wrap(() => ({ ...assistant.status(), flows: flows.supported(), pinSet: flows.pinSet() })));
 // flows in Homey (alleen via een voorstel van de assistent; aanpassen van bestaande flows vraagt de pincode)
-const fail = (res, err) => { console.error('[flows]', err.message || err); res.status(400).json({ error: String(err.message || err) }); };
+const fail = (res, err) => { console.error('[fout]', err.message || err); res.status(400).json({ error: nl(err) }); };
 app.get('/api/flows/pin', wrap(() => ({ set: flows.pinSet() })));
 app.post('/api/flows/pin', (req, res) => { try { flows.setPin(req.body.old, req.body.pin); res.json({ ok: true }); } catch (e) { fail(res, e); } });
 // controle van apparaten en flows
 app.get('/api/health', async (req, res) => {
   try { res.json(await health.run(req.query.force === '1')); }
-  catch (e) { console.error('[controle]', e.message || e); res.status(500).json({ error: 'Controleren lukt niet: ' + (e.message || e) + '. Heeft de Homey-sleutel het recht om flows en apps te bekijken?' }); }
+  catch (e) { console.error('[controle]', e.message || e); res.status(500).json({ error: 'Controleren lukt niet. ' + nl(e) }); }
 });
+app.get('/api/health/usage/:id', async (req, res) => { try { res.json(await health.usage(req.params.id, readConfig())); } catch (e) { fail(res, e); } });
+app.post('/api/health/delete-device/:id', async (req, res) => { try { res.json(await health.deleteDevice(req.params.id, flows, req.body.pin)); } catch (e) { fail(res, e); } });
 app.post('/api/health/restart-app/:id', async (req, res) => { try { res.json(await health.restartApp(req.params.id)); } catch (e) { fail(res, e); } });
 app.post('/api/flows/needpin', wrap(req => ({ pin: flows.needsPin(req.body.acties) })));
 app.post('/api/flows/apply', async (req, res) => { try { res.json(await flows.apply(req.body.acties, req.body.pin)); } catch (e) { fail(res, e); } });
@@ -159,8 +165,10 @@ app.get('/api/events', (req, res) => {
   res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
   res.flushHeaders();
   res.write(`event: status\ndata: ${JSON.stringify(homey.status)}\n\n`);
+  if (homey.link) res.write(`event: link\ndata: ${JSON.stringify(homey.link)}\n\n`);
   clients.add(res);
-  const ping = setInterval(() => res.write(': ping\n\n'), 25000);
+  // hartslag: laat de browser weten dat de NAS er nog is (verbindingsbalk onderaan)
+  const ping = setInterval(() => res.write(`event: hb\ndata: ${Date.now()}\n\n`), 10000);
   req.on('close', () => { clearInterval(ping); clients.delete(res); });
 });
 
@@ -190,6 +198,17 @@ app.delete('/api/backgrounds/:file', wrap(req => {
 }));
 
 // back-ups
+// volledige back-up (map + data + docker-compose.yml + projectgegevens) voor een nieuwe NAS
+app.get('/api/fullbackup', (req, res) => {
+  try {
+    const keys = req.query.keys !== '0';
+    const buf = fullBackup({ dataDir: DATA, keys });
+    const day = new Date().toISOString().slice(0, 10);
+    console.log(`[back-up] volledige back-up ${keys ? 'met' : 'zonder'} sleutels, ${(buf.length / 1048576).toFixed(1)} MB`);
+    res.set({ 'Content-Type': 'application/zip', 'Content-Disposition': `attachment; filename="homey-dashboard-volledig-${day}${keys ? '' : '-zonder-sleutels'}.zip"`, 'Content-Length': buf.length });
+    res.end(buf);
+  } catch (e) { console.error('[back-up]', e); res.status(500).json({ error: 'Back-up maken lukt niet. ' + nl(e) }); }
+});
 app.get('/api/backups', wrap(() => fs.readdirSync(BK_DIR).filter(n => n.endsWith('.json')).sort().reverse()
   .map(n => ({ name: n, size: fs.statSync(path.join(BK_DIR, n)).size, date: fs.statSync(path.join(BK_DIR, n)).mtime }))));
 app.post('/api/backups', wrap(() => {

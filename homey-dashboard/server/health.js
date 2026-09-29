@@ -23,7 +23,7 @@ function checkDevices({ devices = [], apps = [] }, now = Date.now()) {
     const app = appById.get(appIdOf(d.driver));
     if (d.available === false) {
       const radio = /zigbee|zwave|z-wave/i.test(d.driver || '') ? 'Zigbee/Z-Wave: haal de stroom of batterij er even af, zet het dichter bij Homey of koppel opnieuw.' : '';
-      out.push({ sev: 'error', kind: 'device', id: d.id, title: d.name, problem: 'Niet bereikbaar', detail: [d.unavailableMessage && String(d.unavailableMessage).replace(/([^.!?])$/, '$1.'), app && !isRunning(app) ? `De app ${app.name} werkt niet; herstarten helpt meestal.` : radio].filter(Boolean).join(' '), fix: restart(app) });
+      out.push({ sev: 'error', kind: 'device', id: d.id, canDelete: true, title: d.name, problem: 'Niet bereikbaar', detail: [d.unavailableMessage && String(d.unavailableMessage).replace(/([^.!?])$/, '$1.'), app && !isRunning(app) ? `De app ${app.name} werkt niet; herstarten helpt meestal.` : radio].filter(Boolean).join(' '), fix: restart(app) });
       continue;
     }
     const c = d.caps || {};
@@ -78,7 +78,7 @@ function checkFlows({ flows = [], advancedFlows = [], devices = [], apps = [] })
     const fix = f.adv
       ? { type: 'advice', label: 'Zelf aanpassen', text: 'Dit is een geavanceerde flow. Open hem in de Homey-app en vervang of verwijder de kaartjes met een rood uitroepteken.' }
       : { type: 'assistant', label: 'Laat Claude repareren', prompt: `Repareer de flow "${f.name}" (id ${f.id}). Problemen: ${probs.join('; ')}. Lees de flow, zoek het juiste vervangende apparaat of kaartje en stel een aangepaste versie voor. Weet je niet zeker welk apparaat bedoeld is, vraag het mij dan eerst.` };
-    out.push({ sev, kind: 'flow', id: f.id, title: f.name + (f.adv ? ' (geavanceerd)' : ''), problem: probs[0], detail: probs.slice(1).join(' · '), enabled: f.enabled !== false, fix });
+    out.push({ sev, kind: 'flow', id: f.id, adv: f.adv, canDelete: true, title: f.name + (f.adv ? ' (geavanceerd)' : ''), problem: probs[0], detail: probs.slice(1).join(' · '), enabled: f.enabled !== false, fix });
   }
   // flows die uitstaan: alleen ter info
   const off = all.filter(f => f.enabled === false && !out.some(o => o.id === f.id)).length;
@@ -90,7 +90,7 @@ class Health {
   async run(force) {
     if (!force && this.last && Date.now() - this.last.at < 60 * 1000) return this.last;
     const data = await this.homey.healthData();
-    this.apps = data.apps;
+    this.apps = data.apps; this.data = data;
     const devices = checkDevices(data);
     const flows = checkFlows(data);
     const sevOrder = { error: 0, warn: 1 };
@@ -98,6 +98,24 @@ class Health {
     this.last = { at: Date.now(), devices: sort(devices), flows: sort(flows.issues), flowsDisabled: flows.disabled, flowsTotal: flows.total, devicesTotal: data.devices.length,
       errors: [...devices, ...flows.issues].filter(x => x.sev === 'error').length, warnings: [...devices, ...flows.issues].filter(x => x.sev === 'warn').length };
     return this.last;
+  }
+  // waar wordt een apparaat gebruikt? (voordat je het verwijdert)
+  async usage(id, cfg) {
+    const data = this.data || await this.homey.healthData();
+    const uses = cards => cards.some(c => c && [c.id, c.droptoken].some(v => String(v || '').startsWith('homey:device:' + id)));
+    const flows = [...data.flows.filter(f => uses([f.trigger, ...(f.conditions || []), ...(f.actions || [])])).map(f => f.name),
+      ...data.advancedFlows.filter(f => uses(Object.values(f.cards || {}))).map(f => f.name + ' (geavanceerd)')];
+    const tiles = [];
+    for (const tab of (cfg && cfg.tabs) || []) for (const t of tab.tiles || []) if (t.ref && t.ref.deviceId === id) tiles.push(`${(t.opts && t.opts.title) || 'tegel'} op ${tab.name}`);
+    return { flows, tiles };
+  }
+  async deleteDevice(id, flows, pin) {
+    flows.checkPin(pin);
+    const d = (this.data ? this.data.devices : this.homey.library().devices).find(x => x.id === id);
+    console.log(`[controle] apparaat verwijderen: ${d ? d.name : id}`);
+    await this.homey.deleteDevice(id);
+    this.last = null;
+    return { ok: true };
   }
   async restartApp(id) {
     const a = [...(this.apps || []), ...(this.homey.library().apps || [])].find(x => x.id === id);

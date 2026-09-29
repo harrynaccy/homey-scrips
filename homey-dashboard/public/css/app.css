@@ -327,3 +327,29 @@ iframe.manual { flex: 1; width: 100%; border: 0; background: #0b1018; }
 .tile.h-warn .h-big { background: rgba(255,179,71,.2); color: #ffc070; }
 .tile.h-bad .h-big { background: rgba(255,93,77,.2); color: #ff8a7a; animation: hPulse 2s infinite; }
 @keyframes hPulse { 50% { box-shadow: 0 0 0 8px rgba(255,93,77,0); } 0% { box-shadow: 0 0 0 0 rgba(255,93,77,.45); } }
+
+/* ---------- verbindingsbalk linksonder ---------- */
+#connbar { position: fixed; left: 10px; bottom: 10px; z-index: 60; display: flex; align-items: center; gap: 4px; padding: 5px 9px; border-radius: 999px;
+  background: rgba(10,13,18,.55); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,.08); color: #cfd6e0; font: inherit; cursor: pointer; }
+#connbar .cb-node { display: grid; place-items: center; width: 22px; height: 22px; }
+#connbar .cb-node .ic { width: 16px; height: 16px; opacity: .85; }
+#connbar .cb-link { position: relative; width: 36px; height: 4px; display: block; }
+#connbar .cb-link i { position: absolute; inset: 0; border-radius: 2px;
+  background-image: radial-gradient(circle, var(--cb) 1.9px, transparent 2.3px); background-size: 8px 4px; background-repeat: repeat-x; animation: cbFlow 1s linear infinite; }
+#connbar .cb-link b { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -52%); font-size: 11px; line-height: 1; color: #ff5d4d; display: none; }
+@keyframes cbFlow { from { background-position: 0 0; } to { background-position: 8px 0; } }
+#connbar .l1 { --cb: #52d48a; } #connbar .l2 { --cb: #52d48a; }
+#connbar.nas-slow .l1, #connbar.homey-slow .l2 { --cb: #ffb347; }
+#connbar.nas-slow .l1 i, #connbar.homey-slow .l2 i { animation-duration: 2.4s; opacity: .9; }
+#connbar.nas-down .l1 i, #connbar.homey-down .l2 i { animation: none; background-image: linear-gradient(90deg, #ff5d4d 40%, transparent 40% 60%, #ff5d4d 60%); background-size: 100% 2px; background-position: 0 1px; opacity: .8; }
+#connbar.nas-down .l1 b, #connbar.homey-down .l2 b { display: block; }
+#connbar.homey-unknown .l2 i { animation: none; --cb: #5b6474; }
+#connbar.nas-down .cb-node:nth-of-type(3) .ic, #connbar.nas-down .cb-node:nth-of-type(5) .ic, #connbar.homey-down .cb-node:nth-of-type(5) .ic { opacity: .35; }
+#connbar .cb-msg { font-size: 11.5px; color: #ff8a7a; font-weight: 600; margin-left: 2px; }
+#connbar .cb-msg:empty { display: none; }
+#connbar.nas-down, #connbar.homey-down { border-color: rgba(255,93,77,.45); }
+.cb-row { display: flex; gap: 10px; padding: 10px 2px; border-bottom: 1px solid rgba(255,255,255,.06); }
+.cb-row b { display: block; } .cb-row small { display: block; color: #8a93a3; font-size: 12px; margin-top: 2px; }
+.cb-dot { width: 11px; height: 11px; border-radius: 50%; margin-top: 4px; flex: none; background: #52d48a; }
+.cb-row.slow .cb-dot { background: #ffb347; } .cb-row.down .cb-dot { background: #ff5d4d; } .cb-row.unknown .cb-dot { background: #5b6474; }
+body.editing #connbar { left: 10px; bottom: 10px; }

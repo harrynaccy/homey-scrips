@@ -1098,6 +1098,7 @@
   };
 
   // Systeem
+  const fullKeys = () => !(D.cfg.settings.backup && D.cfg.settings.backup.keys === false);
   E.render.systeem = () => {
     const st = D.status; const L = D.lib; const u = D.cfg.settings.unlock;
     const stat = st.mode === 'demo' ? `<span class="stat warn">Demo-modus</span><p class="note">Er is nog geen Homey gekoppeld. Je ziet voorbeeldapparaten. Vul HOMEY_ADDRESS en HOMEY_TOKEN in (zie de handleiding).</p>`
@@ -1106,6 +1107,9 @@
         <div class="acts"><button class="btn sm primary" data-manual>${icon('book')}Gebruiksaanwijzing</button><button class="btn sm" data-relib>${icon('refresh')}Bibliotheek vernieuwen</button><button class="btn sm" data-reload>${icon('refresh')}Dashboard herladen</button></div>`) +
       F.group('Eigen apps', '<div id="awstat"><div class="muted">Laden…</div></div>') +
       F.group('Back-ups', `<p class="note">Elke dag wordt automatisch een back-up gemaakt (14 dagen bewaard).</p><div class="acts"><button class="btn sm" data-bk>${icon('download')}Back-up maken</button><button class="btn sm" data-export>${icon('download')}Exporteren</button><label class="btn sm">${icon('upload')}Importeren<input type="file" accept=".json" id="impfile" hidden></label></div><div id="bklist" class="bklist"><div class="muted">Laden…</div></div>`) +
+      F.group('Volledige back-up (voor een nieuwe NAS)', `<p class="note">Eén zip met alles om het dashboard op een andere NAS weer op te zetten: de hele map uit <b>docker</b>, je indeling, achtergronden, back-ups, pincode, <b>docker-compose.yml</b> en de projectgegevens voor Container Manager. Uitleg: handleiding, hoofdstuk <b>Voorbereiding</b>.</p>` +
+        F.row('Met sleutels', F.toggle('settings.backup.keys', fullKeys(), 'panel'), fullKeys() ? 'Sneller terugzetten; bewaar de zip veilig' : 'Sleutels vul je bij het terugzetten zelf in') +
+        `<div class="acts"><a class="btn sm primary" href="/api/fullbackup?keys=${fullKeys() ? 1 : 0}" download>${icon('download')}Volledige back-up downloaden</a></div>`) +
       F.group('Adressen invullen', F.row('Standaardbegin', F.text('settings.urls.prefix', E.urls().prefix, 'none', 'http://192.168.178.79:'), 'Staat al ingevuld bij een nieuw adres') +
         `<p class="note">Snelknoppen boven het adresveld:</p><div class="urlq-list">${E.urls().quick.map((q, i) => `<div class="urlq-row"><input type="text" class="nm" data-k="settings.urls.quick.${i}.0" data-fx="none" value="${esc(q[0])}" placeholder="Naam"><input type="text" data-k="settings.urls.quick.${i}.1" data-fx="none" value="${esc(q[1])}" placeholder="http://…"><button class="ib sm" data-delurl="${i}" title="Verwijderen">${icon('trash')}</button></div>`).join('')}</div>
         <div class="acts"><button class="btn sm" data-addurl>${icon('plus')}Snelknop toevoegen</button><button class="btn sm ghost" data-reseturl>${icon('refresh')}Standaard terugzetten</button></div>`) +

@@ -3,7 +3,7 @@ Unicode true
 !include "MUI2.nsh"
 
 !define APPNAME "Homey Dashboard"
-!define VERSION "1.0.0"
+!define VERSION "1.1.0"
 !define EXE "Homey Dashboard.exe"
 !define APPID "nl.ramon.homeydashboard"
 !define UNINSTKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APPID}"

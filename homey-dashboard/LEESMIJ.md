@@ -197,3 +197,10 @@ data/backgrounds/      geüploade achtergrondfoto's
 - Het dashboard is nu **alleen in je eigen netwerk** bereikbaar. Zet **geen** poort open in je router.
 - Voor toegang van buiten komt later **Tailscale**. Dan kunnen alleen jouw eigen apparaten erbij.
 - Deel `docker-compose.yml` niet, want daar staat je Homey-sleutel in.
+
+## Opnieuw opzetten op een (nieuwe) NAS
+
+Achterkant → **Systeem** → **Volledige back-up downloaden** geeft één zip met alles: deze map,
+de map `data`, `docker-compose.yml` en `PROJECT-GEGEVENS.txt`. Het Windows-programma (vanaf 1.1.0)
+zet zo'n back-up elke week in *Documenten\Homey Dashboard back-ups*. De volledige uitleg staat in de
+handleiding (F1), hoofdstuk **Voorbereiding**.

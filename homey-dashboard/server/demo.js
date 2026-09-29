@@ -106,7 +106,12 @@ class DemoAdapter extends EventEmitter {
     };
     setInterval(() => this.tick(), 4000);
   }
-  async start() { this.emit('status', this.status); }
+  async start() {
+    this.emit('status', this.status);
+    const since = Date.now();
+    const beat = () => { this.link = { ok: true, ms: 8 + Math.round(Math.random() * 30), at: Date.now(), since, error: null }; this.emit('link', this.link); };
+    beat(); setInterval(beat, 20000);
+  }
   library() { return this.cache; }
   find(id) { return this.cache.devices.find(d => d.id === id); }
   tick() {
@@ -171,7 +176,15 @@ class DemoAdapter extends EventEmitter {
     if (name !== 'user') return [];
     return this.cache.users.filter(u => !query || u.name.toLowerCase().includes(query.toLowerCase())).map(u => ({ id: u.id, name: u.name, athomId: 'demo-' + u.id }));
   }
-  _flows() { if (!this._fl) { this._fl = new Map(); this._folders = [{ id: 'fo1', name: 'Spotify' }]; } return this._fl; }
+  _flows() {
+    if (!this._fl) {
+      this._fl = new Map(); this._folders = [{ id: 'fo1', name: 'Spotify' }];
+      // een kapotte oude flow, om de Controle te laten zien
+      this._fl.set('f-oud', { id: 'f-oud', name: 'Oude badkamerlamp', folder: null, enabled: true, trigger: { id: 'homey:device:weg123:turned_on', args: {} }, conditions: [], actions: [{ id: 'homey:device:d15:on', group: 'then', args: {} }] });
+      this.cache.flows.push({ id: 'f-oud', name: 'Oude badkamerlamp', enabled: true, folder: null, triggerable: false, type: 'flow' });
+    }
+    return this._fl;
+  }
   async getFlowRaw(id) {
     const f = this._flows().get(id);
     if (f) return JSON.parse(JSON.stringify(f));
@@ -192,6 +205,10 @@ class DemoAdapter extends EventEmitter {
     this.emit('library', this.cache);
   }
   async deleteFlow(id) { this._flows().delete(id); this.cache.flows = this.cache.flows.filter(x => x.id !== id); this.emit('library', this.cache); }
+  async getAdvancedFlowRaw(id) { const f = this.cache.advancedFlows.find(x => x.id === id); if (!f) throw new Error('Flow niet gevonden'); return { id, name: f.name, folder: null, enabled: true, cards: { a: { type: 'trigger', id: 'homey:manager:cron:time_exactly' } } }; }
+  async createAdvancedFlow(flow) { const id = 'demo-af-' + Math.random().toString(36).slice(2, 8); this.cache.advancedFlows.push({ id, name: flow.name, enabled: true, folder: null, triggerable: false, type: 'advancedflow' }); this.emit('library', this.cache); return id; }
+  async deleteAdvancedFlow(id) { this.cache.advancedFlows = this.cache.advancedFlows.filter(x => x.id !== id); this.emit('library', this.cache); }
+  async deleteDevice(id) { this.cache.devices = this.cache.devices.filter(x => x.id !== id); this.emit('library', this.cache); }
   async flowFolder(name) { this._flows(); let f = this._folders.find(x => x.name === name); if (!f) { f = { id: 'fo' + (this._folders.length + 1), name }; this._folders.push(f); } return f.id; }
   // ---- controle (nep-problemen om te laten zien hoe het werkt) ----
   async healthData() {
@@ -205,10 +222,11 @@ class DemoAdapter extends EventEmitter {
       return x;
     });
     const apps = [...this.cache.apps, { id: 'com.tuya.cloud', name: 'Tuya Cloud', state: this._tuyaOk ? 'running' : 'crashed', enabled: true, ready: this._tuyaOk, crashed: !this._tuyaOk }];
+    this._flows();
     const flows = this.cache.flows.map(f => ({ id: f.id, name: f.name, enabled: f.enabled !== false, broken: false, trigger: { id: 'homey:manager:flow:programmatic_trigger', args: {} }, conditions: [], actions: [{ id: 'homey:device:d1:on', group: 'then', args: {} }] }));
     for (const [id, f] of this._flows()) { const i = flows.findIndex(x => x.id === id); const full = { ...f, broken: false }; if (i >= 0) flows[i] = full; else flows.push(full); }
-    flows.push({ id: 'f-oud', name: 'Oude badkamerlamp', enabled: true, broken: true, trigger: { id: 'homey:device:weg123:turned_on', args: {} }, conditions: [], actions: [{ id: 'homey:device:d15:on', group: 'then', args: {} }] });
-    const advancedFlows = [{ id: 'af1', name: 'Avondroutine', enabled: true, broken: false, cards: { a: { type: 'trigger', id: 'homey:manager:cron:time_exactly' }, b: { type: 'action', id: 'homey:app:com.tuya.cloud:scene' } } }];
+    for (const f of flows) if (f.id === 'f-oud') f.broken = true;
+    const advancedFlows = this.cache.advancedFlows.map(f => ({ id: f.id, name: f.name, enabled: true, broken: false, cards: { a: { type: 'trigger', id: 'homey:manager:cron:time_exactly' }, b: { type: 'action', id: 'homey:app:com.tuya.cloud:scene' } } }));
     return { devices, apps, flows, advancedFlows };
   }
   async restartApp(id) { if (id === 'com.tuya.cloud') this._tuyaOk = true; }

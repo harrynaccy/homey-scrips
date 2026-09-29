@@ -1,6 +1,6 @@
 'use strict';
 // Homey Dashboard voor Windows: een eigen venster naar het dashboard op de NAS.
-const { app, BrowserWindow, Menu, shell, ipcMain, net } = require('electron');
+const { app, BrowserWindow, Menu, shell, ipcMain, net, dialog, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -14,6 +14,53 @@ let cfg = {};
 const dashUrl = () => (cfg.url || DEFAULT_URL).replace(/\/+$/, '');
 
 let win = null, settingsWin = null;
+
+// ---------- automatische volledige back-up naar deze pc ----------
+const backupCfg = () => ({ enabled: true, keys: true, days: 7, keep: 8, folder: path.join(app.getPath('documents'), 'Homey Dashboard back-ups'), last: null, lastError: null, ...(cfg.backup || {}) });
+let backupBusy = false;
+function notify(title, body) { try { if (Notification.isSupported()) new Notification({ title, body, icon: ICON }).show(); } catch (e) { /* */ } }
+function runBackup(manual) {
+  if (backupBusy) return Promise.resolve({ ok: false, error: 'Er wordt al een back-up gemaakt' });
+  const b = backupCfg(); backupBusy = true;
+  const day = new Date().toISOString().slice(0, 10);
+  const file = path.join(b.folder, `homey-dashboard-volledig-${day}${b.keys ? '' : '-zonder-sleutels'}.zip`);
+  return new Promise(resolve => {
+    const done = r => {
+      backupBusy = false;
+      cfg.backup = { ...backupCfg(), ...(r.ok ? { last: new Date().toISOString(), lastError: null, lastFile: file } : { lastError: r.error }) }; writeCfg(cfg);
+      if (manual || !r.ok) notify(r.ok ? 'Back-up gemaakt' : 'Back-up mislukt', r.ok ? file : r.error);
+      resolve(r);
+    };
+    try {
+      fs.mkdirSync(b.folder, { recursive: true });
+      const req = net.request(`${dashUrl()}/api/fullbackup?keys=${b.keys ? 1 : 0}`);
+      const t = setTimeout(() => { req.abort(); done({ ok: false, error: 'De NAS reageerde niet binnen 5 minuten' }); }, 5 * 60 * 1000);
+      req.on('response', res => {
+        if (res.statusCode !== 200) { clearTimeout(t); res.resume(); return done({ ok: false, error: `Het dashboard op de NAS gaf een fout (${res.statusCode})` }); }
+        const tmp = file + '.deel'; const out = fs.createWriteStream(tmp);
+        res.on('data', d => out.write(d));
+        res.on('end', () => out.end(() => {
+          clearTimeout(t);
+          try {
+            fs.renameSync(tmp, file);
+            // alleen de nieuwste back-ups bewaren
+            const old = fs.readdirSync(b.folder).filter(n => /^homey-dashboard-volledig-.*\.zip$/.test(n)).sort().reverse().slice(b.keep);
+            for (const n of old) fs.unlinkSync(path.join(b.folder, n));
+            done({ ok: true, file });
+          } catch (e) { done({ ok: false, error: e.message }); }
+        }));
+        res.on('error', e => { clearTimeout(t); out.destroy(); done({ ok: false, error: e.message }); });
+      });
+      req.on('error', e => { clearTimeout(t); done({ ok: false, error: 'Geen verbinding met de NAS (' + e.message + ')' }); });
+      req.end();
+    } catch (e) { done({ ok: false, error: e.message }); }
+  });
+}
+function backupDue() {
+  const b = backupCfg();
+  if (!b.enabled || backupBusy) return;
+  if (!b.last || Date.now() - new Date(b.last).getTime() > b.days * 86400e3) runBackup(false);
+}
 
 function loadDashboard() {
   if (!win) return;
@@ -57,8 +104,8 @@ function createWindow() {
 function openSettings() {
   if (settingsWin) { settingsWin.focus(); return; }
   settingsWin = new BrowserWindow({
-    parent: win || undefined, modal: !!win, width: 520, height: 360, resizable: false, minimizable: false, maximizable: false,
-    title: 'Adres van het dashboard', icon: ICON, backgroundColor: '#151a23', autoHideMenuBar: true,
+    parent: win || undefined, modal: !!win, width: 540, height: 640, resizable: false, minimizable: false, maximizable: false,
+    title: 'Instellingen', icon: ICON, backgroundColor: '#151a23', autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true },
   });
   settingsWin.setMenu(null);
@@ -83,6 +130,15 @@ ipcMain.handle('cfg:get', () => ({ url: dashUrl(), defaultUrl: DEFAULT_URL }));
 ipcMain.handle('cfg:test', (e, url) => testUrl(url));
 ipcMain.handle('cfg:save', (e, url) => { cfg.url = String(url || '').trim() || DEFAULT_URL; writeCfg(cfg); if (settingsWin) settingsWin.close(); loadDashboard(); return true; });
 ipcMain.handle('app:retry', () => loadDashboard());
+ipcMain.handle('backup:get', () => backupCfg());
+ipcMain.handle('backup:set', (e, v) => { cfg.backup = { ...backupCfg(), ...v }; writeCfg(cfg); return backupCfg(); });
+ipcMain.handle('backup:run', () => runBackup(true));
+ipcMain.handle('backup:open', () => { const f = backupCfg().folder; fs.mkdirSync(f, { recursive: true }); shell.openPath(f); });
+ipcMain.handle('backup:choose', async () => {
+  const r = await dialog.showOpenDialog(settingsWin || win, { title: 'Map voor back-ups kiezen', defaultPath: backupCfg().folder, properties: ['openDirectory', 'createDirectory'] });
+  if (r.canceled || !r.filePaths[0]) return backupCfg();
+  cfg.backup = { ...backupCfg(), folder: r.filePaths[0] }; writeCfg(cfg); return backupCfg();
+});
 ipcMain.handle('app:settings', () => openSettings());
 
 function buildMenu() {
@@ -92,7 +148,9 @@ function buildMenu() {
       { label: 'Bewerken (achterkant)', accelerator: 'CmdOrCtrl+E', click: run('window.D && D.editor && (D.editing ? D.editor.close() : D.editor.open())') },
       { label: 'Herladen', accelerator: 'F5', click: loadDashboard },
       { type: 'separator' },
-      { label: 'Adres wijzigen…', accelerator: 'CmdOrCtrl+,', click: openSettings },
+      { label: 'Instellingen (adres en back-up)…', accelerator: 'CmdOrCtrl+,', click: openSettings },
+      { label: 'Nu een volledige back-up maken', click: () => runBackup(true) },
+      { label: 'Back-upmap openen', click: () => { const f = backupCfg().folder; fs.mkdirSync(f, { recursive: true }); shell.openPath(f); } },
       { label: 'Openen in browser', click: () => shell.openExternal(dashUrl()) },
       { type: 'separator' },
       { label: 'Afsluiten', accelerator: 'Alt+F4', role: 'quit' },
@@ -112,6 +170,10 @@ if (!app.requestSingleInstanceLock()) app.quit();
 else {
   app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
   app.setAppUserModelId('nl.ramon.homeydashboard');
-  app.whenReady().then(() => { cfg = readCfg(); buildMenu(); createWindow(); });
+  app.whenReady().then(() => {
+    cfg = readCfg(); buildMenu(); createWindow();
+    // wekelijkse back-up: 1 minuut na het starten controleren, daarna elke 3 uur
+    setTimeout(backupDue, 60 * 1000); setInterval(backupDue, 3 * 3600 * 1000);
+  });
   app.on('window-all-closed', () => app.quit());
 }

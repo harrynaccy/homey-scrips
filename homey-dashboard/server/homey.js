@@ -37,6 +37,7 @@ class HomeyAdapter extends EventEmitter {
       this.status = { mode: 'homey', connected: true, error: null, since: new Date().toISOString(), homeyId: this.api.id };
       await this.refresh();
       await this.subscribe();
+      this.startHeartbeat();
       this.emit('status', this.status);
     } catch (err) {
       this.status = { mode: 'homey', connected: false, error: String(err.message || err), since: null };
@@ -44,6 +45,24 @@ class HomeyAdapter extends EventEmitter {
       console.error('[homey] verbinden mislukt:', err.message || err);
       setTimeout(() => this.start(), 30000);
     }
+  }
+
+  // elke 20 s een klein verzoek aan Homey: is hij er nog, en hoe snel?
+  startHeartbeat() {
+    clearInterval(this.hb);
+    const beat = async () => {
+      const t = Date.now();
+      try {
+        await Promise.race([this.api.zones.getZones(), new Promise((_, rej) => setTimeout(() => rej(new Error('ETIMEDOUT')), 8000))]);
+        const ms = Date.now() - t; const was = this.link && this.link.ok;
+        this.link = { ok: true, ms, at: Date.now(), since: was ? this.link.since : Date.now(), error: null };
+      } catch (e) {
+        const was = this.link && !this.link.ok;
+        this.link = { ok: false, ms: null, at: Date.now(), since: was ? this.link.since : Date.now(), error: String(e.message || e) };
+      }
+      this.emit('link', this.link);
+    };
+    beat(); this.hb = setInterval(beat, 20000);
   }
 
   async safe(fn, fallback) {
@@ -187,6 +206,13 @@ class HomeyAdapter extends EventEmitter {
   async createFlow(flow) { const f = await this.api.flow.createFlow({ flow }); return f.id; }
   async updateFlow(id, flow) { await this.api.flow.updateFlow({ id, flow }); }
   async deleteFlow(id) { await this.api.flow.deleteFlow({ id }); }
+  async getAdvancedFlowRaw(id) {
+    const f = await this.api.flow.getAdvancedFlow({ id });
+    return { id: f.id, name: f.name, folder: f.folder || null, enabled: f.enabled, cards: f.cards || {} };
+  }
+  async createAdvancedFlow(flow) { const f = await this.api.flow.createAdvancedFlow({ advancedflow: flow }); return f.id; }
+  async deleteAdvancedFlow(id) { await this.api.flow.deleteAdvancedFlow({ id }); }
+  async deleteDevice(id) { await this.api.devices.deleteDevice({ id }); setTimeout(() => this.refresh().catch(() => {}), 3000); }
   async flowFolder(name) {
     const all = Object.values(await this.api.flow.getFlowFolders());
     const f = all.find(x => x.name === name);

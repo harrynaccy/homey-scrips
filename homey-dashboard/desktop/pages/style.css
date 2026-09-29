@@ -17,3 +17,6 @@ button:hover { filter: brightness(1.12); }
 small { color: #7d8697; }
 code { background: #1f2631; padding: 1px 6px; border-radius: 6px; }
 .center { text-align: center; }
+.chk { display: flex; align-items: center; gap: 8px; margin: 8px 0; color: #cfd6e0; font-size: 14px; }
+.chk input { width: 18px; height: 18px; accent-color: #5aa9ff; }
+select { background: #1f2631; color: #eef1f6; border: 1px solid rgba(255,255,255,.1); border-radius: 8px; padding: 4px 6px; font: inherit; }

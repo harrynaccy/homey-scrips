@@ -12,10 +12,13 @@
   D.clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
   // ---------- API ----------
+  D.NO_NAS = 'Geen verbinding met het dashboard op de NAS. Staat de NAS aan en is de wifi goed?';
   D.api = async (method, url, body) => {
-    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json', 'X-Client-Id': D.clientId }, body: body === undefined ? undefined : JSON.stringify(body) });
+    let res;
+    try { res = await fetch(url, { method, headers: { 'Content-Type': 'application/json', 'X-Client-Id': D.clientId }, body: body === undefined ? undefined : JSON.stringify(body) }); }
+    catch (e) { throw new Error(D.NO_NAS); }
     const j = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(j.error || res.statusText);
+    if (!res.ok) throw new Error(j.error || ({ 404: 'Dit bestaat niet (meer).', 413: 'Het bestand is te groot.', 502: D.NO_NAS, 503: 'Het dashboard op de NAS start net op. Probeer het over een minuut opnieuw.', 504: D.NO_NAS }[res.status]) || `Er ging iets mis op de NAS (fout ${res.status}).`);
     return j;
   };
   D.loadLibrary = async () => { const l = await D.api('GET', '/api/library'); for (const k of ['devices', 'zones', 'flows', 'advancedFlows', 'moods', 'variables', 'insights', 'apps', 'users', 'alarms']) l[k] = l[k] || []; D.lib = l; D.devById = new Map(D.lib.devices.map(d => [d.id, d])); };
@@ -39,6 +42,7 @@
   })();
 
   // ---------- live updates ----------
+  D.conn = { nasAt: 0, nasErr: false, nasSince: Date.now(), homey: null };
   D.connectEvents = () => {
     const es = new EventSource('/api/events');
     es.addEventListener('appevent', ev => { try { window.__awBus.dispatch(JSON.parse(ev.data)); } catch (e) { /* */ } });
@@ -60,7 +64,12 @@
       if (m.by === D.clientId || D.editing) return;
       D.cfg = await D.api('GET', '/api/config'); D.applyAll();
     });
-    es.onerror = () => { /* EventSource maakt zelf opnieuw verbinding */ };
+    // verbindingsbalk: hartslag van de NAS en status van Homey
+    const seen = () => { D.conn.nasAt = Date.now(); D.conn.nasErr = false; D.connbar && D.connbar.update(); };
+    es.onopen = seen;
+    es.addEventListener('hb', seen);
+    es.addEventListener('link', ev => { D.conn.homey = JSON.parse(ev.data); seen(); });
+    es.onerror = () => { D.conn.nasErr = true; D.connbar && D.connbar.update(); /* EventSource maakt zelf opnieuw verbinding */ };
   };
 
   // ---------- helpers ----------
@@ -291,7 +300,7 @@
   D.renderTileContent = (t, el) => {
     const inner = el.querySelector('.inner'); const T = D.tiles[t.type];
     if (!T) { inner.innerHTML = `<div class="empty">Onbekend tegeltype</div>`; return; }
-    try { T.render(t, inner, el); } catch (e) { console.error(e); inner.innerHTML = `<div class="empty">Fout: ${D.esc(e.message)}</div>`; }
+    try { T.render(t, inner, el); } catch (e) { console.error(e); inner.innerHTML = `<div class="empty">Deze tegel kan niet worden getoond</div>`; }
   };
   D.refreshTile = id => { const el = D.tileEls.get(id); const f = D.findTile(id); if (el && f) D.renderTileContent(f.tile, el); };
   D.refreshWhere = pred => { for (const tab of D.cfg.tabs) for (const t of tab.tiles) if (pred(t)) D.refreshTile(t.id); };

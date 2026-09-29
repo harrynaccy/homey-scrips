@@ -338,3 +338,5 @@ button.info:hover { border-color: var(--accent); color: var(--accent); }
 .h-err { color: #ff8a7a; }
 .h-list .note { margin: 4px 0; }
 #sheet .h-list { max-height: 70vh; overflow-y: auto; }
+.h-fix { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.h-row.info .h-dot { background: #5aa9ff; }

@@ -99,7 +99,15 @@
     <li><b>Tablet:</b> tik <b>4× snel</b> op een lege plek of op de tabbalk onderaan.</li>
     <li><b>Laptop of pc:</b> klik 4× snel op een lege plek, of druk in het Windows-programma op <kbd>Ctrl</kbd>+<kbd>E</kbd>.</li>
   </ul>
-  <p>Het dashboard wordt dan kleiner getoond, met rechts het menu. Links in het menu staan de onderdelen: <b class="m">Toevoegen</b>, <b class="m">Knoppen</b>, <b class="m">Pictogrammen</b>, <b class="m">Tegel</b>, <b class="m">Tabbladen</b>, <b class="m">Scherm</b>, <b class="m">Uiterlijk</b>, <b class="m">Raster</b> en <b class="m">Systeem</b>.</p>
+  <p>Het dashboard wordt dan kleiner getoond, met rechts het menu. Links in het menu staan de onderdelen: <b class="m">Toevoegen</b>, <b class="m">Assistent</b>, <b class="m">Controle</b>, <b class="m">Knoppen</b>, <b class="m">Pictogrammen</b>, <b class="m">Tegel</b>, <b class="m">Tabbladen</b>, <b class="m">Scherm</b>, <b class="m">Uiterlijk</b>, <b class="m">Raster</b> en <b class="m">Systeem</b>.</p>
+  <h3>De verbindingsbalk linksonder</h3>
+  <p>Linksonder staat altijd een klein balkje: <b>scherm</b> — <b>NAS</b> — <b>Homey</b>.</p>
+  <ul>
+    <li><b>Groen, met bewegende puntjes</b>: de verbinding is goed.</li>
+    <li><b>Oranje, puntjes bewegen langzaam</b>: traag, of bezig opnieuw te verbinden.</li>
+    <li><b>Rood, onderbroken lijn met ✕</b>: geen verbinding. Ernaast staat wat er mis is, bijvoorbeeld <i>NAS niet bereikbaar</i> of <i>Homey reageert niet</i>.</li>
+  </ul>
+  <p>Tik op het balkje voor details: reactietijd, sinds wanneer, en wat je kunt controleren.</p>
   <h3>Opslaan, ongedaan maken, klaar</h3>
   <ul>
     <li>Je hoeft nooit zelf op te slaan. Bovenin zie je <i>Opslaan…</i> en daarna <i>Opgeslagen</i>.</li>
@@ -115,6 +123,92 @@
   <h3>Schuifregelaars</h3>
   <p>Elke schuifregelaar heeft <kbd>–</kbd> en <kbd>+</kbd> ernaast. Tik één keer voor één stap. <b>Houd ingedrukt</b> om steeds sneller door te lopen. Een waarde terugzetten naar de standaard doe je met het blauwe bolletje voor de naam.</p>
   <div class="tip">De achterkant openen kan ook met een ander aantal tikken: zie <a href="#systeem">Systeem → Achterkant openen</a>.</div>
+</section>
+
+<section id="voorbereiding" data-title="Voorbereiding: opnieuw opzetten op een (nieuwe) NAS">
+  <h2>Voorbereiding: opnieuw opzetten op een (nieuwe) NAS</h2>
+  <p>Krijg je een andere NAS, of moet je alles opnieuw installeren? Dit hoofdstuk zegt precies wat je nodig hebt en wat je waar zet. Met een <b>volledige back-up</b> ben je in een kwartier klaar.</p>
+
+  <h3>1. Zorg dat je een volledige back-up hebt</h3>
+  <p>Een volledige back-up is één zip met álles: de hele map van het dashboard, je indeling, achtergronden, back-ups, pincode, flow-geschiedenis, <code>docker-compose.yml</code> en de projectgegevens voor Container Manager (<code>PROJECT-GEGEVENS.txt</code>).</p>
+  <ul>
+    <li><b>Automatisch:</b> het Windows-programma zet er elke week een in <b>Documenten\Homey Dashboard back-ups</b> (instellen: <kbd>Ctrl</kbd>+<kbd>,</kbd>). De nieuwste 8 blijven bewaard.</li>
+    <li><b>Zelf:</b> achterkant → <b class="m">Systeem</b> → <i>Volledige back-up</i> → <b>Volledige back-up downloaden</b>.</li>
+    <li><b>Met of zonder sleutels:</b> met sleutels staan je Homey- en Claude-sleutel in de zip (sneller terugzetten, maar bewaar de zip dan veilig). Zonder sleutels vul je die bij het terugzetten zelf in.</li>
+  </ul>
+  <div class="let">Een back-up die alleen op de NAS staat, helpt niet als die NAS kapotgaat. Bewaar hem op je pc (dat doet het Windows-programma), en eventueel ook op een usb-stick of in de cloud.</div>
+
+  <h3>2. Wat je nodig hebt</h3>
+  <table>
+    <tr><th>Wat</th><th>Waar vind je het</th></tr>
+    <tr><td>Een Synology NAS met <b>Container Manager</b></td><td>Pakketcentrum → Container Manager installeren</td></tr>
+    <tr><td>Het <b>IP-adres van de NAS</b> (vast)</td><td>In je router, of Configuratiescherm → Netwerk. Geef de NAS een vast adres in de router.</td></tr>
+    <tr><td>Het <b>IP-adres van Homey</b> (vast)</td><td>Homey-app → Instellingen → Algemeen, of in je router. Nu: <code>192.168.178.13</code></td></tr>
+    <tr><td>De <b>Homey-sleutel</b> (<code>HOMEY_TOKEN</code>)</td><td>In de back-up (met sleutels), of een nieuwe maken: zie stap 3</td></tr>
+    <tr><td>De <b>Claude-sleutel</b> (<code>ANTHROPIC_API_KEY</code>, alleen voor de Assistent)</td><td>In de back-up, of een nieuwe maken op platform.claude.com → API keys</td></tr>
+    <tr><td>Poort <b>8095</b> vrij op de NAS</td><td>Anders een andere poort kiezen in <code>docker-compose.yml</code> (<code>PORT</code> en <code>ports</code>)</td></tr>
+  </table>
+
+  <h3>3. (Alleen zonder sleutels) Een Homey-sleutel maken</h3>
+  <ol>
+    <li>Ga naar <b>my.homey.app</b> → je Homey → <b>Instellingen</b> → <b>API-sleutels</b> → <b>Nieuwe API-sleutel</b>.</li>
+    <li>Naam: <i>Homey Dashboard NAS</i>. Laat alles aangevinkt (bovenaan <b>Homey</b>), in elk geval <b>Apparaten</b>, <b>Flows</b> (het hoofdvinkje, voor de Assistent en Controle), <b>Apps</b>, <b>Zones</b>, <b>Moods</b>, <b>Variabelen</b>, <b>Logs</b>, <b>Wekkers</b>, <b>Gebruikers</b>, <b>Notificaties</b> en <b>Systeem</b>.</li>
+    <li>Klik <b>Maken</b> en kopieer de sleutel meteen; hij wordt maar één keer getoond.</li>
+  </ol>
+
+  <h3>4. De bestanden op de NAS zetten</h3>
+  <ol>
+    <li>Maak in <b>File Station</b> de map <code>docker/Homey Dashboard</code> (op volume1).</li>
+    <li>Pak de volledige back-up uit op je pc en zet <b>de inhoud</b> in die map. <code>docker-compose.yml</code>, <code>package.json</code> en de mappen <code>server</code>, <code>public</code> en <code>data</code> moeten er <b>direct</b> in staan, niet in een extra submap.</li>
+    <li>Open <code>docker-compose.yml</code> (Container Manager kan dat straks ook) en controleer:
+      <ul>
+        <li><code>HOMEY_ADDRESS=http://192.168.178.13</code> (het adres van Homey)</li>
+        <li><code>HOMEY_TOKEN=…</code> en <code>ANTHROPIC_API_KEY=…</code> (zonder sleutels: hier plakken)</li>
+        <li><code>SPOTIFY_BASE=http://&lt;IP-van-de-NAS&gt;:8090</code> (als het IP van de NAS veranderd is)</li>
+      </ul></li>
+  </ol>
+  <p>De map <code>node_modules</code> hoeft niet mee: die wordt bij de eerste start vanzelf opgehaald (daarvoor moet de NAS internet hebben).</p>
+
+  <h3>5. Het project maken in Container Manager</h3>
+  <p>Deze gegevens staan ook in <code>PROJECT-GEGEVENS.txt</code> in de back-up.</p>
+  <table>
+    <tr><th>Veld</th><th>Waarde</th></tr>
+    <tr><td>Projectnaam</td><td><code>homey-dashboard</code></td></tr>
+    <tr><td>Pad</td><td><code>/volume1/docker/Homey Dashboard</code></td></tr>
+    <tr><td>Bron</td><td><b>Bestaande docker-compose.yml gebruiken</b></td></tr>
+    <tr><td>Web portal</td><td>niet nodig</td></tr>
+  </table>
+  <ol>
+    <li><b>Container Manager → Project → Maken</b>, vul de velden hierboven in en klik door tot <b>Klaar</b>.</li>
+    <li>De eerste start duurt een paar minuten (onderdelen downloaden). Kijk eventueel in <b>Container → homey-dashboard → Logboek</b>: klaar is het bij <i>Homey Dashboard draait op poort 8095</i>.</li>
+  </ol>
+
+  <h3>6. Controleren</h3>
+  <ol>
+    <li>Open <code>http://&lt;IP-van-de-NAS&gt;:8095</code>. Je indeling moet er weer staan.</li>
+    <li>De <b>verbindingsbalk</b> linksonder: beide lijnen groen met bewegende puntjes?</li>
+    <li>Achterkant → <b class="m">Systeem</b>: <i>Verbonden met Homey</i>, met het juiste aantal apparaten.</li>
+    <li><b class="m">Controle</b> → <b>Nu controleren</b>.</li>
+    <li><b class="m">Assistent</b>: stel een kleine vraag (en tik op Annuleren).</li>
+  </ol>
+
+  <h3>7. Tablet en pc naar het nieuwe adres</h3>
+  <ul>
+    <li><b>Fully Kiosk:</b> Web Content Settings → <b>Start URL</b> → <code>http://&lt;IP-van-de-NAS&gt;:8095</code> (zie <a href="#tablet">Tablet met Fully Kiosk</a>).</li>
+    <li><b>Windows-programma:</b> <kbd>Ctrl</kbd>+<kbd>,</kbd> → nieuw adres → <b>Testen</b> → <b>Opslaan</b>.</li>
+    <li><b>Snelkoppelingen in de browser</b>: opnieuw maken met het nieuwe adres.</li>
+  </ul>
+
+  <h3>Checklist</h3>
+  <ul class="check">
+    <li>☐ Volledige back-up (zip) op de pc</li>
+    <li>☐ Container Manager geïnstalleerd, NAS heeft een vast IP-adres en internet</li>
+    <li>☐ Map <code>docker/Homey Dashboard</code> met de inhoud van de zip</li>
+    <li>☐ <code>docker-compose.yml</code>: HOMEY_ADDRESS, HOMEY_TOKEN, ANTHROPIC_API_KEY, SPOTIFY_BASE</li>
+    <li>☐ Project <code>homey-dashboard</code> gemaakt en gestart</li>
+    <li>☐ Dashboard opent, verbindingsbalk groen, Systeem zegt verbonden</li>
+    <li>☐ Tablet en Windows-programma naar het nieuwe adres</li>
+  </ul>
 </section>
 
 <section id="tegels" data-title="Tegels toevoegen en indelen">
@@ -251,6 +345,8 @@
   <h3>Repareren</h3>
   <ul>
     <li><b>App herstarten</b>: vraagt eerst om bevestiging. Na 20 seconden wordt opnieuw gecontroleerd. Apparaten van die app zijn tijdens het herstarten even niet te bedienen.</li>
+    <li><b>Flow verwijderen</b>: bij elke flow met een fout. Na een bevestiging (en je pincode, behalve bij flows die de assistent zelf maakte) wordt de flow verwijderd. Er wordt eerst een kopie bewaard: bovenaan staat hij onder <i>Net verwijderd</i> met de knop <b>Terugzetten</b>.</li>
+    <li><b>Apparaat verwijderen</b>: alleen bij apparaten die niet bereikbaar zijn. Je ziet eerst in welke flows en tegels het gebruikt wordt, daarna volgen twee bevestigingen en je pincode. <b>Dit is niet terug te draaien</b>: wil je het apparaat terug, dan moet je het opnieuw koppelen in de Homey-app, en flows en tegels opnieuw instellen.</li>
     <li><b>Laat Claude repareren</b>: opent de <b class="m">Assistent</b> met de vraag al ingevuld. Tik op <b>Vraag</b>. Claude leest de flow, zoekt het juiste apparaat en doet een voorstel. Omdat het een bestaande flow is, vraagt <b>Toepassen</b> je pincode.</li>
   </ul>
   <h3>Tegel op het dashboard</h3>
@@ -450,7 +546,7 @@
   <p>Het programma <b>Homey Dashboard</b> opent je dashboard van de NAS in een eigen venster. Browser, snelkoppeling en tablet blijven gewoon werken.</p>
   <h3>Installeren</h3>
   <ol>
-    <li>Start <code>Homey-Dashboard-Setup-1.0.0.exe</code> (of eerst <code>samenvoegen.bat</code> als je de delen hebt).</li>
+    <li>Start <code>Homey-Dashboard-Setup-1.1.0.exe</code> (of eerst <code>samenvoegen.bat</code> als je de delen hebt).</li>
     <li>Zegt Windows <i>"Windows heeft uw pc beschermd"</i>? Klik <b>Meer informatie</b> → <b>Toch uitvoeren</b>.</li>
     <li>Volg de stappen. Er komen snelkoppelingen op het bureaublad en in het startmenu.</li>
   </ol>
@@ -464,16 +560,18 @@
     <tr><td><kbd>F5</kbd></td><td>Herladen</td></tr>
     <tr><td><kbd>F11</kbd></td><td>Volledig scherm</td></tr>
     <tr><td><kbd>Ctrl</kbd>+<kbd>+</kbd> / <kbd>Ctrl</kbd>+<kbd>-</kbd> / <kbd>Ctrl</kbd>+<kbd>0</kbd></td><td>Groter / kleiner / normaal</td></tr>
-    <tr><td><kbd>Ctrl</kbd>+<kbd>,</kbd></td><td>Adres van het dashboard wijzigen (met <b>Testen</b>)</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>,</kbd></td><td>Instellingen: adres van het dashboard (met <b>Testen</b>) en automatische back-up</td></tr>
   </table>
+  <h3>Automatische back-up (vanaf versie 1.1.0)</h3>
+  <p>Het programma maakt elke week een <b>volledige back-up</b> van het dashboard op de NAS en zet die in <b>Documenten\Homey Dashboard back-ups</b>. De nieuwste 8 blijven bewaard. In de instellingen (<kbd>Ctrl</kbd>+<kbd>,</kbd>) kies je hoe vaak (dag, week, 2 weken, maand), met of zonder sleutels, een andere map, of <b>Nu maken</b>. In het menu (<kbd>Alt</kbd>) staan ook <i>Nu een volledige back-up maken</i> en <i>Back-upmap openen</i>. Mislukt een back-up, dan zie je een melding en probeert het programma het later opnieuw.</p>
   <p>Is de NAS niet bereikbaar, dan zie je een melding en probeert het programma het elke 15 seconden opnieuw.</p>
 </section>
 
 <section id="nas" data-title="Bijwerken op de NAS">
   <h2>Bijwerken op de NAS</h2>
   <ol>
-    <li>Pak de nieuwe zip uit en kopieer alles <b>over de oude bestanden heen</b> in <code>docker/homey-dashboard</code>.</li>
-    <li>Start de container opnieuw: <b>Container Manager → Container → homey-dashboard → Opnieuw starten</b>.</li>
+    <li>Pak de nieuwe zip uit en kopieer alles <b>over de oude bestanden heen</b> in <code>docker/Homey Dashboard</code>.</li>
+    <li>Start het project opnieuw: <b>Container Manager → Project → homey-dashboard → Stoppen</b>, daarna <b>Starten</b>. (Alleen de container herstarten is genoeg bij gewone updates, maar niet als je <code>docker-compose.yml</code> hebt veranderd.)</li>
     <li>Op de tablet: achterkant → <b class="m">Systeem</b> → <b>Dashboard herladen</b>.</li>
   </ol>
   <div class="let">Gooi de map nooit eerst leeg: <code>docker-compose.yml</code> (met je Homey-sleutel) en de map <code>data/</code> (indeling, back-ups, foto's) moeten blijven staan.</div>
@@ -507,6 +605,16 @@
     <li><i>Kan het dashboard op de NAS niet bereiken</i>: de wifi of de NAS was even weg. Tik op <b>Opnieuw proberen</b>.</li>
     <li><i>Flows maken mislukt</i>: de Homey-sleutel (<code>HOMEY_TOKEN</code>) moet het recht <b>Flows</b> hebben (het hoofdvinkje, niet alleen <i>Flows starten</i>).</li>
   </ul>
+  <h3>Wat betekenen de foutmeldingen?</h3>
+  <table>
+    <tr><th>Melding</th><th>Wat te doen</th></tr>
+    <tr><td>Geen verbinding met het dashboard op de NAS</td><td>Staat de NAS aan? Is de wifi goed? Draait het project in Container Manager?</td></tr>
+    <tr><td>Homey reageert niet</td><td>Staat Homey aan en heeft hij netwerk? Klopt <code>HOMEY_ADDRESS</code>?</td></tr>
+    <tr><td>De Homey-sleutel mag dit niet</td><td>Maak een sleutel met meer rechten (hoofdstuk <a href="#voorbereiding">Voorbereiding</a>, stap 3)</td></tr>
+    <tr><td>De Homey-sleutel wordt niet geaccepteerd</td><td>Controleer <code>HOMEY_TOKEN</code> in <code>docker-compose.yml</code></td></tr>
+    <tr><td>Dit bestaat niet (meer)</td><td>Het apparaat of de flow is in Homey verwijderd. Kijk bij <b class="m">Controle</b></td></tr>
+    <tr><td>Er ging iets mis: …</td><td>Een melding die nog niet vertaald is. Maak een screenshot en stuur hem door.</td></tr>
+  </table>
   <h3>Kan ik veilig terug naar de browser?</h3>
   <p>Ja. Browser, snelkoppeling, tablet en Windows-programma tonen allemaal hetzelfde dashboard van de NAS.</p>
 </section>
