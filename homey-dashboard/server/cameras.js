@@ -6,6 +6,7 @@ const path = require('path');
 const { Readable } = require('stream');
 
 const DEFAULT_SS = process.env.SURVEILLANCE_URL || 'http://192.168.178.79:5000';
+const nlErr = (msg, code) => { const e = new Error(msg); e.nl = true; if (code != null) e.code = code; return e; };
 const withTimeout = (ms, p) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('ETIMEDOUT')), ms))]);
 // foutcodes bij het inloggen (auth.cgi) en bij de camera-functies (entry.cgi) betekenen iets anders
 const AUTH_ERR = { 400: 'verkeerde gebruikersnaam of wachtwoord', 401: 'gebruiker is uitgeschakeld', 402: 'geen rechten', 403: 'deze gebruiker heeft tweestapsverificatie; maak een aparte gebruiker zonder', 404: 'tweestapsverificatie mislukt', 407: 'te veel pogingen, IP tijdelijk geblokkeerd' };
@@ -51,7 +52,7 @@ class Cameras {
       if (!this.sid) {
         const q = new URLSearchParams({ api: 'SYNO.API.Auth', method: 'login', version: '6', account: ss.user, passwd: ss.pass, session: 'SurveillanceStation', format: 'sid' });
         const j = await withTimeout(8000, fetch(`${ss.url}/webapi/auth.cgi?${q}`).then(r => r.json()));
-        if (!j.success) throw new Error('Inloggen bij Surveillance Station lukt niet: ' + (AUTH_ERR[j.error && j.error.code] || 'fout ' + (j.error && j.error.code)));
+        if (!j.success) throw nlErr('Inloggen bij Surveillance Station lukt niet: ' + (AUTH_ERR[j.error && j.error.code] || 'fout ' + (j.error && j.error.code)));
         this.sid = j.data.sid;
       }
       const r = await withTimeout(10000, fetch(`${ss.url}/webapi/entry.cgi?${new URLSearchParams({ ...params, _sid: this.sid })}`));
@@ -61,25 +62,43 @@ class Cameras {
       if (j.success) return j;
       const code = j.error && j.error.code;
       if ([105, 106, 107, 119].includes(code) && attempt === 0) { this.sid = null; continue; }
-      const e = new Error('Surveillance Station: ' + (SS_ERR[code] || 'fout') + ` (code ${code})`); e.code = code; throw e;
+      throw nlErr('Surveillance Station: ' + (SS_ERR[code] || 'fout') + ` (code ${code})`, code);
     }
     throw new Error('Surveillance Station: geen toegang');
   }
   // Niet elke versie van Surveillance Station kent dezelfde vraag: probeer ze op volgorde en onthoud wat werkt.
+  async apiInfo() {
+    if (this.info) return this.info;
+    try {
+      const { ss } = this.load();
+      const q = new URLSearchParams({ api: 'SYNO.API.Info', method: 'query', version: '1', query: 'SYNO.SurveillanceStation.Camera,SYNO.SurveillanceStation.VideoStreaming' });
+      const j = await withTimeout(8000, fetch(`${ss.url}/webapi/query.cgi?${q}`).then(r => r.json()));
+      this.info = (j && j.data) || {};
+    } catch (e) { this.info = {}; }
+    return this.info;
+  }
   async ssSnapshot(ssId) {
+    const info = (await this.apiInfo())['SYNO.SurveillanceStation.Camera'] || {};
+    const max = String(info.maxVersion || 9);
     const base = { api: 'SYNO.SurveillanceStation.Camera', method: 'GetSnapshot' };
-    const ways = [{ version: '9', id: ssId, profileType: '1' }, { version: '9', id: ssId }, { version: '8', cameraId: ssId }, { version: '1', cameraId: ssId }, { version: '9', cameraId: ssId }];
-    const order = this.snapWay != null ? [ways[this.snapWay], ...ways.filter((_, i) => i !== this.snapWay)] : ways;
-    let last = null;
+    const ways = [
+      { version: max, id: ssId }, { version: max, id: ssId, profileType: '0' }, { version: max, cameraId: ssId },
+      { version: '9', id: ssId }, { version: '8', id: ssId }, { version: '8', cameraId: ssId }, { version: '7', cameraId: ssId },
+      { version: '4', cameraId: ssId }, { version: '1', cameraId: ssId },
+    ].filter((w, i, a) => a.findIndex(x => JSON.stringify(x) === JSON.stringify(w)) === i);
+    const order = this.snapWay != null ? [this.snapWay, ...ways.filter(w => JSON.stringify(w) !== JSON.stringify(this.snapWay))] : ways;
+    const tried = []; let last = null;
     for (const w of order) {
+      const label = `v${w.version} ${w.id ? 'id' : 'cameraId'}${w.profileType ? '+profiel' : ''}`;
       try {
         const r = await this.ssCall({ ...base, ...w }, true);
-        if (r && r.headers && /^image\//.test(r.headers.get('content-type') || '')) { this.snapWay = ways.indexOf(w); return r; }
-        last = new Error('Surveillance Station gaf geen afbeelding terug');
-      } catch (e) { last = e; if (e.code === 105 || e.code === 117) break; }
+        if (r && r.headers && /^image\//.test(r.headers.get('content-type') || '')) { this.snapWay = w; return r; }
+        tried.push(label + ': geen afbeelding');
+      } catch (e) { last = e; tried.push(`${label}: ${e.code != null ? 'code ' + e.code : e.message}`); if (e.code === 105 || e.code === 117) break; }
     }
-    if (last && (last.code === 105 || last.code === 117 || last.code === 400)) last.message += '. Controleer in Surveillance Station → Gebruiker dat "Dashboard" het profiel Toeschouwer heeft en dat live beeld en momentopnamen voor deze camera zijn toegestaan.';
-    throw last || new Error('Geen beeld van Surveillance Station');
+    const rights = last && [105, 117].includes(last.code);
+    throw nlErr(`Surveillance Station geeft geen beeld${rights ? ' (geen rechten)' : ''}. Geprobeerd: ${tried.join('; ')}.` +
+      (rights ? ' Geef de gebruiker in Surveillance Station het profiel Toeschouwer.' : ' Stuur deze melding door; tot die tijd kun je bij "Camera toevoegen" de bron Rechtstreeks (Reolink) of Homey gebruiken.'), last && last.code);
   }
   async ssCameras() {
     const j = await this.ssCall({ api: 'SYNO.SurveillanceStation.Camera', method: 'List', version: '9' });
@@ -99,7 +118,7 @@ class Cameras {
   async fetchSnapshot(c) {
     let r;
     if (c.source === 'ss') {
-      if (!c.ssId) throw new Error('Kies eerst welke camera uit Surveillance Station');
+      if (!c.ssId) throw nlErr('Kies eerst welke camera uit Surveillance Station');
       r = await this.ssSnapshot(c.ssId);
     } else if (c.source === 'homey') {
       if (!c.deviceId) throw new Error('Kies eerst het camera-apparaat uit Homey');
@@ -110,7 +129,7 @@ class Cameras {
       r = await withTimeout(10000, fetch(`http://${c.ip}/cgi-bin/api.cgi?${q}`));
     }
     const type = r.headers.get('content-type') || '';
-    if (!r.ok || !/^image\//.test(type)) throw new Error('De camera gaf geen beeld' + (r.ok ? '' : ` (${r.status})`) + '. Klopt het IP-adres, de gebruiker en het wachtwoord?');
+    if (!r.ok || !/^image\//.test(type)) throw nlErr('De camera gaf geen beeld' + (r.ok ? '' : ` (${r.status})`) + '. Klopt het IP-adres, de gebruiker en het wachtwoord?');
     return { type, data: Buffer.from(await r.arrayBuffer()) };
   }
   // vloeiend beeld (proef): MJPEG-stroom van Surveillance Station doorgeven
