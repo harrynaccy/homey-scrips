@@ -317,3 +317,13 @@ iframe.manual { flex: 1; width: 100%; border: 0; background: #0b1018; }
 .tile.fx-flash-tile { outline: 3px dashed transparent; outline-offset: 3px; animation: fxfl .9s ease; }
 .tile.fx-flash-face :is(.kb .face, .kb-mini, .badge) { outline: 3px dashed transparent; outline-offset: 3px; animation: fxfl .9s ease; }
 .tile.fx-flash-text .inner :is(.name, .kb-label, .kb-state, .state, .sub, .big, .clock, .txt) { border-radius: 4px; animation: fxtext .9s ease; }
+
+/* tegel Controle */
+.h-tile { display: flex; align-items: center; gap: 14px; height: 100%; padding: 4px 6px; }
+.h-tile .h-big { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; flex: none; background: rgba(255,255,255,.08); }
+.h-tile .h-big .ic { width: 26px; height: 26px; }
+.h-tile b { display: block; font-size: calc(15px * var(--tfs, 1)); } .h-tile small { color: var(--muted); font-size: calc(11.5px * var(--tfs, 1)); }
+.tile.h-ok .h-big { background: rgba(80,200,120,.18); color: #7be3a0; }
+.tile.h-warn .h-big { background: rgba(255,179,71,.2); color: #ffc070; }
+.tile.h-bad .h-big { background: rgba(255,93,77,.2); color: #ff8a7a; animation: hPulse 2s infinite; }
+@keyframes hPulse { 50% { box-shadow: 0 0 0 8px rgba(255,93,77,0); } 0% { box-shadow: 0 0 0 0 rgba(255,93,77,.45); } }

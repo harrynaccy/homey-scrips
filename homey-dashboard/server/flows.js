@@ -15,6 +15,7 @@ class FlowService {
     this.homey = homey;
     this.pinFile = path.join(dataDir, 'flowpin.json');
     this.batchFile = path.join(dataDir, 'flow-batches.json');
+    this.ownFile = path.join(dataDir, 'flow-eigen.json');
     this.fails = 0; this.lockUntil = 0;
   }
   supported() { return typeof this.homey.flowCards === 'function' && (this.homey.status.mode === 'demo' || this.homey.status.connected); }
@@ -99,20 +100,35 @@ class FlowService {
   // ---------- toepassen en terugdraaien ----------
   batches() { try { return JSON.parse(fs.readFileSync(this.batchFile, 'utf8')); } catch (e) { return []; } }
   saveBatches(b) { fs.writeFileSync(this.batchFile, JSON.stringify(b.slice(-30), null, 1)); }
+  // flows die de assistent zelf gemaakt heeft (die mag hij zonder pincode verwijderen)
+  own() {
+    try { return new Set(JSON.parse(fs.readFileSync(this.ownFile, 'utf8'))); }
+    catch (e) { return new Set(this.batches().flatMap(b => b.created || [])); } // van vóór deze versie
+  }
+  setOwn(set) { fs.writeFileSync(this.ownFile, JSON.stringify([...set])); }
+  needsPin(acties) {
+    const own = this.own();
+    return (acties || []).some(a => a && (a.actie === 'flow_aanpassen' || (a.actie === 'flow_verwijderen' && !own.has(a.flowId))));
+  }
   async apply(acties, pin) {
-    const list = (acties || []).filter(a => a && (a.actie === 'flow_maken' || a.actie === 'flow_aanpassen'));
-    if (list.some(a => a.actie === 'flow_aanpassen')) this.checkPin(pin);
-    const batch = { id: 'b' + Date.now().toString(36), at: new Date().toISOString(), created: [], updated: [] };
-    const keys = {}; const steps = [];
+    const list = (acties || []).filter(a => a && ['flow_maken', 'flow_aanpassen', 'flow_verwijderen'].includes(a.actie));
+    if (this.needsPin(list)) this.checkPin(pin);
+    const batch = { id: 'b' + Date.now().toString(36), at: new Date().toISOString(), created: [], updated: [], deleted: [] };
+    const keys = {}; const steps = []; const own = this.own();
     let folder = null;
     for (const a of list) {
       try {
+        if (a.actie === 'flow_verwijderen') {
+          const before = await this.homey.getFlowRaw(a.flowId);
+          await this.homey.deleteFlow(a.flowId); own.delete(a.flowId);
+          batch.deleted.push(before); steps.push({ ok: true, text: a.omschrijving, id: a.flowId }); continue;
+        }
         const { errs, out } = await this.check(a.flow);
         if (errs.length) throw new Error(errs.join('; '));
         if (a.actie === 'flow_maken') {
           folder = folder || await this.homey.flowFolder(FOLDER);
           const id = await this.homey.createFlow({ name: String(a.naam || 'Nieuwe flow').slice(0, 80), enabled: true, folder, ...out });
-          batch.created.push(id); if (a.sleutel) keys[a.sleutel] = id;
+          batch.created.push(id); own.add(id); if (a.sleutel) keys[a.sleutel] = id;
           steps.push({ ok: true, text: a.omschrijving, id });
         } else {
           const before = await this.homey.getFlowRaw(a.flowId);
@@ -123,17 +139,25 @@ class FlowService {
         }
       } catch (e) { steps.push({ ok: false, text: a.omschrijving, note: String(e.message || e) }); }
     }
-    if (batch.created.length || batch.updated.length) { const b = this.batches(); b.push(batch); this.saveBatches(b); }
+    this.setOwn(own);
+    const changed = batch.created.length || batch.updated.length || batch.deleted.length;
+    if (changed) { const b = this.batches(); b.push(batch); this.saveBatches(b); console.log(`[flows] ${batch.id}: ${batch.created.length} gemaakt, ${batch.updated.length} aangepast, ${batch.deleted.length} verwijderd`); }
     if (this.homey.refresh && this.homey.status.mode !== 'demo') await this.homey.refresh().catch(() => {});
-    return { batch: batch.created.length || batch.updated.length ? batch.id : null, keys, steps };
+    return { batch: changed ? batch.id : null, keys, steps };
   }
   async undo(batchId) {
     const all = this.batches(); const b = all.find(x => x.id === batchId);
     if (!b) throw new Error('Deze wijziging is niet meer terug te draaien');
-    const problems = [];
-    for (const id of b.created) await this.homey.deleteFlow(id).catch(e => problems.push(e.message));
+    const problems = []; const own = this.own();
+    for (const id of b.created) await this.homey.deleteFlow(id).then(() => own.delete(id)).catch(e => problems.push(e.message));
     for (const u of b.updated) await this.homey.updateFlow(u.id, u.before).catch(e => problems.push(e.message));
+    for (const f of b.deleted || []) {
+      const { id, ...rest } = f; void id;
+      await this.homey.createFlow(rest).then(nid => own.add(nid)).catch(e => problems.push(e.message));
+    }
+    this.setOwn(own);
     this.saveBatches(all.filter(x => x !== b));
+    console.log(`[flows] ${batchId} teruggedraaid${problems.length ? ' met problemen: ' + problems.join('; ') : ''}`);
     if (this.homey.refresh && this.homey.status.mode !== 'demo') await this.homey.refresh().catch(() => {});
     return { ok: !problems.length, problems };
   }

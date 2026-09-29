@@ -19,7 +19,9 @@ Het voorstel kan het dashboard aanpassen én flows in Homey maken of aanpassen:
 - Nieuwe flows ("flow_maken") komen aan te staan in de map "Dashboard" in Homey.
 - Bestaande flows aanpassen ("flow_aanpassen") mag alleen als de gebruiker daar duidelijk om vraagt; de gebruiker moet dan bij Toepassen een pincode invoeren. Lees de flow eerst met "lees_flow" en stuur de complete nieuwe versie (ALS, EN, DAN) mee.
 - Alleen gewone flows (ALS / EN / DAN). Geavanceerde flows (advanced flows) kun je niet maken of aanpassen; zeg dat eerlijk.
-- Flows verwijderen kan niet. Een flow uitzetten kan wel (flow_aanpassen met aan=false).
+- Flows verwijderen ("flow_verwijderen" met flowId): flows die jij zelf gemaakt hebt (in het overzicht gemarkeerd met "gemaakt door de assistent") mag je verwijderen als de gebruiker dat vraagt. Andere flows alleen als de gebruiker daar uitdrukkelijk om vraagt; dan is de pincode nodig. Uitzetten kan ook (flow_aanpassen met aan=false).
+
+Terugdraaien: eerdere voorstellen in dit gesprek hebben een nummer ("Voorstel #1", "Voorstel #2", ...). Vraagt de gebruiker om iets ongedaan te maken, gebruik dan de actie "voorstel_terugdraaien" met dat nummer in "nummer". Dat draait alles van dat voorstel terug: knoppen, tegels, tabbladen én flows. Maak geen losse verwijder-acties voor dingen die je met voorstel_terugdraaien kunt terugdraaien.
 
 Flows bouwen:
 - Zoek kaartjes met "zoek_flowkaart" (soort trigger = ALS, condition = EN, action = DAN). Zoek bij een apparaat met apparaatId voor de kaartjes van dat apparaat. Zoek bij tijd, melding, pushbericht, zon, enz. op trefwoorden (Engels werkt vaak het best: time, notification, push, sunset, dark).
@@ -100,10 +102,11 @@ const TOOLS = [
           items: {
             type: 'object',
             properties: {
-              actie: { type: 'string', enum: ['tabblad_maken', 'tabblad_aanpassen', 'knop_maken', 'tegel_maken', 'tegel_aanpassen', 'tegel_verwijderen', 'flow_maken', 'flow_aanpassen'] },
+              actie: { type: 'string', enum: ['tabblad_maken', 'tabblad_aanpassen', 'knop_maken', 'tegel_maken', 'tegel_aanpassen', 'tegel_verwijderen', 'flow_maken', 'flow_aanpassen', 'flow_verwijderen', 'voorstel_terugdraaien'] },
+              nummer: { type: 'integer', description: 'Alleen bij voorstel_terugdraaien: het nummer van het eerdere voorstel (Voorstel #n).' },
               omschrijving: { type: 'string', description: 'Korte Nederlandse omschrijving van deze ene stap, zoals de gebruiker hem in het lijstje ziet.' },
               sleutel: { type: 'string', description: 'Bij tabblad_maken of flow_maken: een eigen korte naam (bijv. "nieuw1") waarmee latere acties naar dit nieuwe tabblad verwijzen (tabblad) of een knop naar deze flow (koppeling id "nieuw:<sleutel>").' },
-              flowId: { type: 'string', description: 'Alleen bij flow_aanpassen: id van de bestaande flow.' },
+              flowId: { type: 'string', description: 'Bij flow_aanpassen / flow_verwijderen: id van de bestaande flow.' },
               aan: { type: 'boolean', description: 'Alleen bij flow_aanpassen: flow aan- of uitzetten.' },
               leesbaar: { type: 'string', description: 'Bij flow_maken / flow_aanpassen: de flow in gewone taal, regels ALS ..., EN ..., DAN ...' },
               flow: {
@@ -164,7 +167,7 @@ function capVal(id, c) {
   if (typeof v === 'number') return Math.round(v * 100) / 100 + (c.units ? ' ' + c.units : '');
   return String(v).slice(0, 20);
 }
-function describeLibrary(lib) {
+function describeLibrary(lib, own = new Set()) {
   const zones = new Map((lib.zones || []).map(z => [z.id, z.name]));
   const byZone = new Map();
   for (const d of lib.devices || []) {
@@ -176,7 +179,7 @@ function describeLibrary(lib) {
   let s = '## Apparaten (per zone)\n';
   for (const z of [...byZone.keys()].sort()) s += `${z}:\n${byZone.get(z).sort().join('\n')}\n`;
   const flows = [...(lib.flows || []), ...(lib.advancedFlows || [])];
-  s += '\n## Flows\n' + (flows.map(f => `  - ${f.name} | id ${f.id} | ${f.type === 'advancedflow' ? 'geavanceerd (niet aan te passen)' : 'gewoon'}${f.triggerable !== false ? ' | kan met een knop gestart worden' : ''}${f.enabled === false ? ' | staat uit' : ''}`).join('\n') || '  (geen)') + '\n';
+  s += '\n## Flows\n' + (flows.map(f => `  - ${f.name} | id ${f.id} | ${f.type === 'advancedflow' ? 'geavanceerd (niet aan te passen)' : 'gewoon'}${f.triggerable !== false ? ' | kan met een knop gestart worden' : ''}${f.enabled === false ? ' | staat uit' : ''}${own.has(f.id) ? ' | gemaakt door de assistent' : ''}`).join('\n') || '  (geen)') + '\n';
   s += '\n## Moods\n' + ((lib.moods || []).map(m => `  - ${m.name} | id ${m.id} | zone ${zones.get(m.zone) || '-'}`).join('\n') || '  (geen)') + '\n';
   return s;
 }
@@ -231,24 +234,26 @@ class Assistant {
   // Flows in een voorstel alvast controleren; tekst met fouten of null als alles klopt
   async checkFlows(plan) {
     const fl = ((plan && plan.acties) || []).filter(a => a && (a.actie === 'flow_maken' || a.actie === 'flow_aanpassen'));
-    if (!fl.length) return null;
+    if (!fl.length && !((plan && plan.acties) || []).some(x => x && x.actie === 'flow_verwijderen')) return null;
     if (!this.flows || !this.flows.supported()) return 'flows zijn nu niet beschikbaar (geen verbinding met Homey)';
     const errs = [];
     for (const a of fl) {
       if (a.actie === 'flow_aanpassen' && !a.flowId) errs.push(`"${a.omschrijving}": flowId ontbreekt`);
       const r = await this.flows.check(a.flow); for (const e of r.errs) errs.push(`"${a.omschrijving}": ${e}`);
     }
+    for (const a of ((plan && plan.acties) || []).filter(x => x && x.actie === 'flow_verwijderen')) if (!a.flowId) errs.push(`"${a.omschrijving}": flowId ontbreekt`);
     return errs.length ? errs.join('\n') : null;
   }
 
   // history: [{ role: 'user'|'assistant', text }], laatste is de nieuwe vraag van de gebruiker
-  async ask({ history, cfg, lib, currentTabId, model }) {
+  async ask({ history, cfg, lib, currentTabId, model, onProgress }) {
+    const progress = t => { try { if (onProgress) onProgress(t); } catch (e) { /* */ } };
     if (!this.enabled) throw new Error('De assistent staat uit: er is nog geen ANTHROPIC_API_KEY ingesteld op de NAS.');
     if (!MODELS[model]) model = DEFAULT_MODEL;
     const turns = (history || []).filter(h => h && h.text && (h.role === 'user' || h.role === 'assistant')).slice(-12);
     if (!turns.length || turns[turns.length - 1].role !== 'user') throw new Error('Geen vraag ontvangen');
     while (turns.length && turns[0].role !== 'user') turns.shift();
-    const overview = describeLibrary(lib) + '\n' + describeTiles(cfg, lib, currentTabId);
+    const overview = describeLibrary(lib, this.flows ? this.flows.own() : undefined) + '\n' + describeTiles(cfg, lib, currentTabId);
     const messages = turns.map((h, i) => (i === turns.length - 1
       ? { role: 'user', content: [{ type: 'text', text: `Huidige situatie van het dashboard en de Homey:\n\n${overview}` }, { type: 'text', text: h.text }] }
       : { role: h.role, content: String(h.text) }));
@@ -256,6 +261,7 @@ class Assistant {
     const usage = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
     let served = model;
     for (let round = 0; round < MAX_ROUNDS; round++) {
+      progress(round === 0 ? 'Claude denkt na…' : 'Claude verwerkt wat hij gevonden heeft…');
       const res = await this.client.beta.messages.create({
         model,
         max_tokens: 16000,
@@ -290,6 +296,7 @@ class Assistant {
         const inp = u.input || {};
         try {
           if (u.name === 'voorstel') return { type: 'tool_result', tool_use_id: u.id, is_error: true, content: 'Het voorstel is niet getoond, want er klopt iets niet aan de flows: ' + planErr + '\nVerbeter het en roep voorstel opnieuw aan.' };
+          progress({ zoek_pictogram: `Zoekt pictogrammen: ${inp.zoekterm || ''}`, zoek_flowkaart: `Zoekt flowkaartjes: ${inp.zoekterm || inp.soort || ''}`, zoek_keuze: `Zoekt keuzes voor ${inp.argument || ''}`, lees_flow: 'Leest een bestaande flow' }[u.name] || 'Bezig…');
           if (u.name === 'zoek_pictogram') return { type: 'tool_result', tool_use_id: u.id, content: iconSearch(this.icons, inp) };
           if (!this.flows || !this.flows.supported()) throw new Error('Flows zijn nu niet beschikbaar (geen verbinding met Homey).');
           if (u.name === 'zoek_flowkaart') return { type: 'tool_result', tool_use_id: u.id, content: await this.flows.searchCards(inp) };

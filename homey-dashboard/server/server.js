@@ -9,6 +9,7 @@ const { AppBridge } = require('./appbridge');
 const icons = require('./icons');
 const { Assistant, friendlyError } = require('./assistant');
 const { FlowService } = require('./flows');
+const { Health } = require('./health');
 
 const PORT = Number(process.env.PORT || 8095);
 const DATA = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
@@ -24,6 +25,7 @@ const homey = (isSet(process.env.HOMEY_ADDRESS) && isSet(process.env.HOMEY_TOKEN
 
 // Claude-assistent (alleen actief met ANTHROPIC_API_KEY; ASSISTANT_FAKE = testbestand zonder echte API)
 const flows = new FlowService(homey, DATA);
+const health = new Health(homey);
 const assistant = new Assistant({ icons, flows, client: process.env.ASSISTANT_FAKE ? require(path.resolve(process.env.ASSISTANT_FAKE)) : null });
 
 // ---------- configuratie ----------
@@ -102,13 +104,35 @@ app.get('/api/assistant', wrap(() => ({ ...assistant.status(), flows: flows.supp
 const fail = (res, err) => { console.error('[flows]', err.message || err); res.status(400).json({ error: String(err.message || err) }); };
 app.get('/api/flows/pin', wrap(() => ({ set: flows.pinSet() })));
 app.post('/api/flows/pin', (req, res) => { try { flows.setPin(req.body.old, req.body.pin); res.json({ ok: true }); } catch (e) { fail(res, e); } });
+// controle van apparaten en flows
+app.get('/api/health', async (req, res) => {
+  try { res.json(await health.run(req.query.force === '1')); }
+  catch (e) { console.error('[controle]', e.message || e); res.status(500).json({ error: 'Controleren lukt niet: ' + (e.message || e) + '. Heeft de Homey-sleutel het recht om flows en apps te bekijken?' }); }
+});
+app.post('/api/health/restart-app/:id', async (req, res) => { try { res.json(await health.restartApp(req.params.id)); } catch (e) { fail(res, e); } });
+app.post('/api/flows/needpin', wrap(req => ({ pin: flows.needsPin(req.body.acties) })));
 app.post('/api/flows/apply', async (req, res) => { try { res.json(await flows.apply(req.body.acties, req.body.pin)); } catch (e) { fail(res, e); } });
 app.post('/api/flows/undo/:id', async (req, res) => { try { res.json(await flows.undo(req.params.id)); } catch (e) { fail(res, e); } });
-app.post('/api/assistant', async (req, res) => {
-  try {
-    const b = req.body || {};
-    res.json(await assistant.ask({ history: b.history, cfg: readConfig() || { tabs: [] }, lib: homey.library() || {}, currentTabId: b.tabId, model: b.model }));
-  } catch (err) { console.error('[assistent]', err.message || err); res.status(500).json({ error: friendlyError(err) }); }
+// De assistent werkt op de achtergrond: POST start een taak, de browser vraagt de voortgang op.
+// Zo maakt een wegvallende verbinding niets uit (het antwoord blijft 30 minuten bewaard).
+const jobs = new Map();
+app.post('/api/assistant', wrap(req => {
+  const b = req.body || {};
+  const id = 'j' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const job = { status: 'busy', progress: 'Claude denkt na…', started: Date.now() };
+  jobs.set(id, job);
+  for (const [k, j] of jobs) if (Date.now() - j.started > 30 * 60 * 1000) jobs.delete(k);
+  const q = String(((b.history || []).slice(-1)[0] || {}).text || '').slice(0, 80).replace(/\s+/g, ' ');
+  console.log(`[assistent] ${id} gestart (${b.model || 'standaard'}): "${q}"`);
+  assistant.ask({ history: b.history, cfg: readConfig() || { tabs: [] }, lib: homey.library() || {}, currentTabId: b.tabId, model: b.model, onProgress: t => { job.progress = t; } })
+    .then(r => { job.status = 'done'; job.result = r; console.log(`[assistent] ${id} klaar in ${Math.round((Date.now() - job.started) / 1000)} s, ≈ $${((r.usage && r.usage.usd) || 0).toFixed(3)}${r.plan ? ', met voorstel' : ''}`); })
+    .catch(err => { job.status = 'error'; job.error = friendlyError(err); console.error(`[assistent] ${id} fout:`, err.message || err); });
+  return { job: id };
+}));
+app.get('/api/assistant/job/:id', (req, res) => {
+  const j = jobs.get(req.params.id);
+  if (!j) return res.status(404).json({ error: 'Deze vraag is niet meer bekend (is het dashboard op de NAS opnieuw gestart?). Probeer het opnieuw.' });
+  res.json({ status: j.status, progress: j.progress, seconds: Math.round((Date.now() - j.started) / 1000), result: j.result, error: j.error });
 });
 
 app.get('/api/appwidgets', wrap(() => ({ widgets: bridge.list(), status: bridge.status(), demo: homey.status.mode === 'demo' })));

@@ -14,7 +14,8 @@ function slimDevice(d) {
   }
   return {
     id: d.id, name: d.name, zone: d.zone, class: d.class, virtualClass: d.virtualClass || null,
-    icon: d.iconObj ? d.iconObj.url : null, available: d.available !== false,
+    icon: d.iconObj ? d.iconObj.url : null, available: d.available !== false, unavailableMessage: d.unavailableMessage || null,
+    driver: d.driverId || d.driverUri || null,
     capabilities: d.capabilities || Object.keys(caps), caps, ui: d.ui || null,
   };
 }
@@ -73,7 +74,7 @@ class HomeyAdapter extends EventEmitter {
       folders: Object.values(folders).map(f => ({ id: f.id, name: f.name, parent: f.parent })),
       variables: Object.values(variables).map(v => ({ id: v.id, name: v.name, type: v.type, value: v.value })),
       moods: Object.values(moods).map(m => ({ id: m.id, name: m.name, zone: m.zone })),
-      insights: Object.values(logs).map(l => ({ id: l.id, uri: l.uri, ownerUri: l.ownerUri, ownerId: l.ownerId, ownerName: l.ownerName, title: l.title, type: l.type, units: l.units, decimals: l.decimals })),
+      insights: Object.values(logs).map(l => ({ id: l.id, uri: l.uri, ownerUri: l.ownerUri, ownerId: l.ownerId, ownerName: ownerLabel(l.ownerUri || l.uri, devices, apps), title: l.title, type: l.type, units: l.units, decimals: l.decimals })),
       apps: Object.values(apps).map(p => ({ id: p.id, name: p.name, version: p.version, state: p.state, enabled: p.enabled, ready: p.ready, crashed: p.crashed, origin: p.origin })),
       users: Object.values(users).map(u => ({ id: u.id, name: u.name, present: u.present, asleep: u.asleep, avatar: u.avatar || null, role: u.role })),
       alarms: Object.values(alarms).map(x => ({ id: x.id, name: x.name, time: x.time, enabled: x.enabled, repetition: x.repetition, nextOccurrence: x.nextOccurrence })),
@@ -192,12 +193,37 @@ class HomeyAdapter extends EventEmitter {
     if (f) return f.id;
     return (await this.api.flow.createFlowFolder({ flowfolder: { name } })).id;
   }
+  // ---------- controle ----------
+  async healthData() {
+    const [flows, adv, apps] = await Promise.all([
+      this.api.flow.getFlows(), this.api.flow.getAdvancedFlows(), this.safe(() => this.api.apps.getApps(), null),
+    ]);
+    const appList = apps ? Object.values(apps).map(p => ({ id: p.id, name: p.name, state: p.state, enabled: p.enabled, ready: p.ready, crashed: p.crashed })) : this.cache.apps;
+    return {
+      devices: this.cache.devices, apps: appList,
+      flows: Object.values(flows).map(f => ({ id: f.id, name: f.name, enabled: f.enabled, broken: !!f.broken, trigger: f.trigger, conditions: f.conditions || [], actions: f.actions || [] })),
+      advancedFlows: Object.values(adv).map(f => ({ id: f.id, name: f.name, enabled: f.enabled, broken: !!f.broken, cards: f.cards || {} })),
+    };
+  }
+  async restartApp(id) {
+    await this.api.apps.restartApp({ id });
+    setTimeout(() => this.refresh().catch(() => {}), 15000);
+  }
+
   deviceName(id) { const d = this.cache.devices.find(x => x.id === id); return d ? d.name : null; }
   appName(id) { const a = this.cache.apps.find(x => x.id === id); return a ? a.name : null; }
 
   async location() {
     return this.safe(() => this.api.geolocation.getOptionLocation(), null);
   }
+}
+
+// Naam van de eigenaar van een Insights-log (Log.ownerName van Homey is verouderd en spamt het logboek)
+function ownerLabel(uri, devices, apps) {
+  const [, type, id] = String(uri || '').split(':');
+  if (type === 'device') return (devices[id] && devices[id].name) || '';
+  if (type === 'app') return (apps[id] && apps[id].name) || id;
+  return id ? id.charAt(0).toUpperCase() + id.slice(1) : '';
 }
 
 function debounce(fn, ms) { let t; return () => { clearTimeout(t); t = setTimeout(fn, ms); }; }

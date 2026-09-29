@@ -188,7 +188,7 @@
   <ol>
     <li>Open de achterkant en kies <b class="m">Assistent</b>.</li>
     <li>Typ je opdracht en tik op <b>Vraag</b> (of druk op Enter). Een voorbeeld aantikken mag ook.</li>
-    <li>Na 10 tot 30 seconden zie je het voorstel als lijstje. Stappen die niet kunnen (bijvoorbeeld een apparaat dat niet bestaat) staan in het rood en worden overgeslagen.</li>
+    <li>Terwijl Claude werkt, zie je wat hij doet (bijvoorbeeld <i>Zoekt flowkaartjes…</i>). Valt de wifi even weg, dan gaat hij gewoon door. Na 10 seconden tot een paar minuten zie je het voorstel als lijstje. Stappen die niet kunnen (bijvoorbeeld een apparaat dat niet bestaat) staan in het rood en worden overgeslagen.</li>
     <li>Tik op <b>Toepassen</b>. Er verandert pas iets als je dat doet. Liever niet? Tik op <b>Annuleren</b> of typ wat er anders moet.</li>
   </ol>
   <p>Weet Claude niet precies wat je bedoelt, dan stelt hij eerst een vraag. Antwoord gewoon in het tekstvak.</p>
@@ -206,7 +206,7 @@
     <li>Na <b>Toepassen</b> staat de flow in Homey in de map <b>Dashboard</b> en staat hij meteen <b>aan</b>.</li>
     <li>Ook een knop die de flow start? Vraag het er gewoon bij.</li>
     <li>Alleen gewone flows (ALS / EN / DAN). Geavanceerde flows kan de assistent niet maken of aanpassen.</li>
-    <li>Flows verwijderen doet de assistent niet. Uitzetten kan wel.</li>
+    <li>Flows die de assistent zelf gemaakt heeft, mag hij verwijderen als je daarom vraagt. Andere flows verwijderen kan alleen met je pincode. Uitzetten kan ook.</li>
   </ul>
   <h3>Bestaande flows aanpassen (met pincode)</h3>
   <ol>
@@ -217,7 +217,8 @@
   <p>Pincode vergeten? Verwijder op de NAS het bestand <code>data/flowpin.json</code> en stel daarna een nieuwe in.</p>
   <h3>Terugdraaien</h3>
   <p>Een toegepast voorstel is één stap: het pijltje <b>ongedaan maken</b> bovenin draait alles in één keer terug. Het staat ook in <b>Laatste wijzigingen</b> (klokje bovenin), met de knop <b>Terugzetten</b>.</p>
-  <p>Flows in Homey draai je terug met de knop <b>Flows terugdraaien</b> onder het voorstel. Nieuwe flows worden dan verwijderd en aangepaste flows krijgen hun oude versie terug. Een knop die bij zo'n flow hoorde, draai je apart terug met het pijltje.</p>
+  <p>Elk voorstel heeft een nummer (<b>Voorstel #1</b>, <b>#2</b>, …). Onder een toegepast voorstel staat <b>Dit voorstel ongedaan maken</b>: dat draait alles van dat voorstel terug, dus knoppen, tegels, tabbladen én flows in Homey. Wijzigingen die je daarna zelf maakte, blijven staan.</p>
+  <p>Je kunt het ook gewoon vragen: <i>"Maak de laatste twee opdrachten ongedaan."</i> Claude stelt dan voor om die voorstellen terug te draaien; tik op <b>Toepassen</b>.</p>
   <h3>Model en kosten</h3>
   <ul>
     <li>Onder de chat kies je het <b>Model</b>: <b>Claude Opus 5.5</b> (slimst, standaard) of <b>Claude Sonnet 5.5</b> (ongeveer de helft goedkoper, prima voor eenvoudige opdrachten).</li>
@@ -231,6 +232,29 @@
     <li>Start het project opnieuw in Container Manager (<b>Project → homey-dashboard → Stoppen</b>, daarna <b>Bouwen</b> of <b>Starten</b>). Bij de eerste start wordt het onderdeel voor Claude gedownload.</li>
   </ol>
   <div class="let">De sleutel blijft op de NAS. Hij gaat nooit naar de tablet of de browser. Bij een vraag stuurt het dashboard de namen van je apparaten, zones, flows en tegels naar Claude, zodat hij weet wat er is. Je Homey-sleutel gaat niet mee.</div>
+</section>
+
+<section id="controle" data-title="Controle: apparaten en flows nakijken">
+  <h2>Controle: apparaten en flows nakijken</h2>
+  <p>Onder <b class="m">Controle</b> kijkt het dashboard je hele Homey na. Dat kost niets (Claude komt er niet aan te pas) en verandert niets.</p>
+  <h3>Wat wordt er gecontroleerd?</h3>
+  <table>
+    <tr><th>Wat</th><th>Wanneer is het een probleem</th><th>Repareren</th></tr>
+    <tr><td>Apps</td><td>Vastgelopen of gestopt (terwijl ze aan staan)</td><td><b>App herstarten</b></td></tr>
+    <tr><td>Apparaten</td><td>Niet bereikbaar</td><td>Staat de app erachter stil: <b>App herstarten</b>. Zigbee/Z-Wave: stroom eraf en erop, dichter bij Homey, of opnieuw koppelen</td></tr>
+    <tr><td>Batterijen</td><td>Onder 20% (of batterij-alarm)</td><td>Batterij vervangen</td></tr>
+    <tr><td>Sensoren</td><td>24 uur niets gemeld</td><td>Batterij en bereik controleren; eventueel app herstarten</td></tr>
+    <tr><td>Gewone flows</td><td>Kapot volgens Homey, apparaat bestaat niet meer, apparaat offline, app werkt niet, geen DAN-kaart</td><td><b>Laat Claude repareren</b></td></tr>
+    <tr><td>Geavanceerde flows</td><td>Idem</td><td>Zelf in de Homey-app: vervang de kaartjes met een rood uitroepteken</td></tr>
+  </table>
+  <p>Rood = probleem, oranje = waarschuwing. Flows die uitstaan, worden alleen geteld.</p>
+  <h3>Repareren</h3>
+  <ul>
+    <li><b>App herstarten</b>: vraagt eerst om bevestiging. Na 20 seconden wordt opnieuw gecontroleerd. Apparaten van die app zijn tijdens het herstarten even niet te bedienen.</li>
+    <li><b>Laat Claude repareren</b>: opent de <b class="m">Assistent</b> met de vraag al ingevuld. Tik op <b>Vraag</b>. Claude leest de flow, zoekt het juiste apparaat en doet een voorstel. Omdat het een bestaande flow is, vraagt <b>Toepassen</b> je pincode.</li>
+  </ul>
+  <h3>Tegel op het dashboard</h3>
+  <p><b class="m">Toevoegen</b> → <b>Overig</b> → <b>Controle</b>. De tegel toont een groen vinkje of het aantal problemen en controleert elke 10 minuten opnieuw. Tik erop voor de lijst; apps herstarten kan daar ook. Flows repareren met Claude doe je op de achterkant.</p>
 </section>
 
 <section id="pictogrammen" data-title="Pictogrammen">
@@ -480,6 +504,7 @@
     <li><i>Sleutel wordt niet geaccepteerd</i>: controleer of de sleutel helemaal en zonder spaties of aanhalingstekens is geplakt. Maak anders een nieuwe sleutel.</li>
     <li><i>Tegoed is op</i>: waardeer op via platform.claude.com → <b>Billing</b>.</li>
     <li><i>Geen verbinding met Claude</i>: de NAS heeft geen internet.</li>
+    <li><i>Kan het dashboard op de NAS niet bereiken</i>: de wifi of de NAS was even weg. Tik op <b>Opnieuw proberen</b>.</li>
     <li><i>Flows maken mislukt</i>: de Homey-sleutel (<code>HOMEY_TOKEN</code>) moet het recht <b>Flows</b> hebben (het hoofdvinkje, niet alleen <i>Flows starten</i>).</li>
   </ul>
   <h3>Kan ik veilig terug naar de browser?</h3>

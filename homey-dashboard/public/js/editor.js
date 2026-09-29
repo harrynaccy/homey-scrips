@@ -4,7 +4,7 @@
   const E = D.editor = { sel: null, section: 'bibliotheek', undo: [], redo: [], libCat: 'devices', libQ: '', bgScope: 'all', folds: { kleuren: true } };
 
   const SECTIONS = [
-    ['bibliotheek', 'book', 'Toevoegen'], ['assistent', 'sparkles', 'Assistent'], ['knoppen', 'knob', 'Knoppen'], ['pictogrammen', 'shapes', 'Pictogrammen'], ['tegel', 'sliders', 'Tegel'], ['tabs', 'layers', 'Tabbladen'],
+    ['bibliotheek', 'book', 'Toevoegen'], ['assistent', 'sparkles', 'Assistent'], ['controle', 'activity', 'Controle'], ['knoppen', 'knob', 'Knoppen'], ['pictogrammen', 'shapes', 'Pictogrammen'], ['tegel', 'sliders', 'Tegel'], ['tabs', 'layers', 'Tabbladen'],
     ['scherm', 'sun', 'Scherm'], ['uiterlijk', 'palette', 'Uiterlijk'], ['raster', 'grid', 'Raster'], ['systeem', 'server', 'Systeem'],
   ];
 
@@ -413,7 +413,7 @@
   // Bibliotheek
   const CATS = [['devices', 'Apparaten'], ['zones', 'Zones'], ['flows', 'Flows'], ['moods', 'Moods'], ['variables', 'Variabelen'], ['insights', 'Grafieken'], ['appw', 'Eigen apps'], ['extra', 'Overig']];
   E.loadAppWidgets = async () => { try { E._aw = await D.api('GET', '/api/appwidgets'); } catch (e) { E._aw = { widgets: [], status: [] }; } return E._aw; };
-  const EXTRA = [['clock', 'Klok', 'Tijd en datum'], ['text', 'Tekst', 'Eigen tekst of label'], ['web', 'Webpagina', 'Andere pagina of eigen widget'], ['energy', 'Energie', 'Live verbruik'], ['presence', 'Wie is thuis', 'Aanwezigheid gebruikers'], ['alarms', 'Wekkers', 'Homey-wekkers aan/uit'], ['notifications', 'Meldingen', 'Tijdlijn van Homey'], ['apps', 'Apps', 'Status van Homey-apps']];
+  const EXTRA = [['clock', 'Klok', 'Tijd en datum'], ['text', 'Tekst', 'Eigen tekst of label'], ['web', 'Webpagina', 'Andere pagina of eigen widget'], ['energy', 'Energie', 'Live verbruik'], ['presence', 'Wie is thuis', 'Aanwezigheid gebruikers'], ['alarms', 'Wekkers', 'Homey-wekkers aan/uit'], ['notifications', 'Meldingen', 'Tijdlijn van Homey'], ['apps', 'Apps', 'Status van Homey-apps'], ['health', 'Controle', 'Problemen met apparaten en flows']];
   const capSummary = d => { const k = D.devKind(d); return { switch: d.caps.dim ? 'Dimbaar' : 'Aan/uit', thermostat: 'Thermostaat', cover: 'Zonwering', lock: 'Slot', button: 'Knop', sensor: D.measures(d).map(m => (d.caps[m].title || m)).slice(0, 2).join(', ') || 'Sensor' }[k]; };
   const placedIds = () => new Set(D.currentTab().tiles.map(t => (t.ref && (t.ref.deviceId || t.ref.zoneId || t.ref.id)) || null));
   E.render.bibliotheek = () => {

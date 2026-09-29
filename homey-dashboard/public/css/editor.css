@@ -318,3 +318,23 @@ button.info:hover { border-color: var(--accent); color: var(--accent); }
 .linkbtn { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; }
 .ai-flow { white-space: pre-line; font-size: 12.5px; color: #cfd6e0; background: rgba(255,255,255,.05); border-left: 3px solid var(--accent); border-radius: 6px; padding: 6px 9px; margin: 4px 0 2px; }
 .pin-in { width: 100%; box-sizing: border-box; margin: 4px 0 14px; padding: 12px; font-size: 22px; letter-spacing: .4em; text-align: center; border-radius: 12px; border: 1px solid rgba(255,255,255,.15); background: rgba(255,255,255,.06); color: #fff; }
+.ai-num { display: block; color: #7d8697; font-size: 11px; margin-bottom: 2px; }
+
+/* ---------- Controle ---------- */
+.h-sum { display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 14px; margin: 6px 0 12px; }
+.h-sum .ic { width: 26px; height: 26px; flex: none; }
+.h-sum b { display: block; font-size: 15px; } .h-sum small { color: #8a93a3; font-size: 11.5px; }
+.h-sum.ok { background: rgba(80,200,120,.12); color: #8fe3a8; }
+.h-sum.warn { background: rgba(255,179,71,.12); color: #ffc98a; }
+.h-sum.bad { background: rgba(255,93,77,.13); color: #ffb3aa; }
+.h-h { margin: 14px 0 6px; font-size: 11.5px; text-transform: uppercase; letter-spacing: .08em; color: #7d8697; font-weight: 600; }
+.h-row { display: flex; gap: 10px; padding: 9px 4px; border-bottom: 1px solid rgba(255,255,255,.05); }
+.h-dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 5px; flex: none; background: #ffb347; }
+.h-row.error .h-dot { background: #ff5d4d; box-shadow: 0 0 8px rgba(255,93,77,.6); }
+.h-t { min-width: 0; flex: 1; font-size: 13px; color: #dfe4ec; }
+.h-t b { display: block; } .h-t span { display: block; color: #cfd6e0; }
+.h-t small { display: block; color: #8a93a3; font-size: 11.5px; margin-top: 2px; }
+.h-fix { margin-top: 6px; } .h-adv { color: #9fb4d6 !important; }
+.h-err { color: #ff8a7a; }
+.h-list .note { margin: 4px 0; }
+#sheet .h-list { max-height: 70vh; overflow-y: auto; }
