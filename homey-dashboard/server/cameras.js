@@ -262,6 +262,69 @@ class Cameras {
     }
     throw nlErr(`Geen video van de camera. ${[...new Set(tried)].join('; ')}.`);
   }
+  // ---------- draaien, kantelen, zoomen (Reolink) ----------
+  // Eén opdracht naar de camera sturen, met tijdelijke code (bij verlopen code één keer opnieuw inloggen).
+  async reolinkCmd(c, cmd, param, action) {
+    const host = reolinkHost(c); const tried = [];
+    for (const proto of this.reolinkProtos(c)) {
+      try {
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const t = await this.reolinkToken(c, proto, host, attempt > 0);
+          if (t.err) throw nlErr(`De camera wil niet: ${t.err}.`);
+          const body = [{ cmd, ...(action != null ? { action } : {}), param }];
+          const r = await this.reolinkReq(proto, host, `/cgi-bin/api.cgi?cmd=${cmd}&token=${encodeURIComponent(t.name)}`, body);
+          let j = null; try { j = JSON.parse(r.data.toString('utf8')); j = Array.isArray(j) ? j[0] : j; } catch (e) { /* */ }
+          if (j && j.code === 0) { this.okProto = this.okProto || new Map(); this.okProto.set(c.id, proto); return j.value || {}; }
+          const d = this.reolinkError(r);
+          if (attempt === 0 && /login|-6$/.test(`${d.detail} ${d.rsp}`)) continue;
+          const e = nlErr(/ability|-26$|-9$|not support/i.test(`${d.detail} ${d.rsp}`)
+            ? (cmd === 'PtzCtrl' ? 'De camera laat deze gebruiker niet draaien. Geef de gebruiker in de Reolink-app het type Beheerder.' : 'Dit kan deze camera niet, of deze gebruiker mag het niet (type Beheerder nodig).')
+            : `De camera weigert: ${reolinkWhy(d)}.`); e.rsp = d.rsp; throw e;
+        }
+      } catch (e) { if (e.nl) throw e; tried.push(`${proto.toUpperCase()}: ${reolinkConn(e)}`); }
+    }
+    throw nlErr(`De camera is niet bereikbaar. ${tried.join('; ')}.`);
+  }
+  // wat kan deze camera? (draaien, zoomen, vaste standen, zelf volgen)
+  async ptzInfo(id) {
+    const c = this.get(id);
+    if (c.source !== 'reolink') return { pan: false };
+    const ch = Number(c.channel || 0);
+    const out = { pan: false, zoom: false, presets: [], track: null };
+    const ab = await this.reolinkCmd(c, 'GetAbility', { User: { userName: c.user || 'admin' } }).catch(e => { if (/inloggen mislukt|niet bereikbaar/.test(e.message)) throw e; return null; });
+    const chn = ab && ab.Ability && ab.Ability.abilityChn && ab.Ability.abilityChn[ch];
+    const permit = k => !!(chn && chn[k] && chn[k].permit);
+    out.pan = chn ? permit('ptzCtrl') || permit('ptzDirection') || (chn.ptzType && chn.ptzType.ver > 0) : true;
+    out.canMove = chn ? permit('ptzCtrl') : true;   // 0 = mag niet bedienen (gewone gebruiker)
+    if (!out.pan) return out;
+    const [pre, zf, ai] = await Promise.all([
+      this.reolinkCmd(c, 'GetPtzPreset', { channel: ch }, 0).catch(() => null),
+      this.reolinkCmd(c, 'GetZoomFocus', { channel: ch }, 0).catch(() => null),
+      this.reolinkCmd(c, 'GetAiCfg', { channel: ch }, 0).catch(() => null),
+    ]);
+    out.presets = ((pre && pre.PtzPreset) || []).filter(p => p.enable).map(p => ({ id: p.id, name: p.name || `Stand ${p.id}` }));
+    out.zoom = !!(zf && zf.ZoomFocus && zf.ZoomFocus.zoom) || !!(chn && chn.ptzType && chn.ptzType.ver === 2);
+    if (ai) { const k = 'bSmartTrack' in ai ? 'bSmartTrack' : 'aiTrack' in ai ? 'aiTrack' : null; if (k) { out.track = !!ai[k]; this.trackKey = this.trackKey || new Map(); this.trackKey.set(c.id, k); } }
+    return out;
+  }
+  // bewegen zolang de knop is ingedrukt: de browser herhaalt de opdracht; komt er niets meer
+  // (knop los, verbinding weg), dan stopt de camera vanzelf
+  async ptz(id, { op, speed, preset }) {
+    const c = this.get(id); const ch = Number(c.channel || 0);
+    this.ptzTimers = this.ptzTimers || new Map(); clearTimeout(this.ptzTimers.get(id));
+    if (preset != null) return this.reolinkCmd(c, 'PtzCtrl', { channel: ch, op: 'ToPos', id: Number(preset), speed: 32 }).then(() => ({ ok: true }));
+    const OPS = ['Left', 'Right', 'Up', 'Down', 'ZoomInc', 'ZoomDec', 'Stop'];
+    if (!OPS.includes(op)) throw nlErr('Onbekende opdracht');
+    const sp = Math.max(1, Math.min(64, Math.round(Number(speed) || 32)));
+    await this.reolinkCmd(c, 'PtzCtrl', { channel: ch, op, speed: sp });
+    if (op !== 'Stop') this.ptzTimers.set(id, setTimeout(() => this.reolinkCmd(c, 'PtzCtrl', { channel: ch, op: 'Stop' }).catch(() => {}), 1500));
+    return { ok: true };
+  }
+  async track(id, on) {
+    const c = this.get(id); const k = (this.trackKey && this.trackKey.get(id)) || 'bSmartTrack';
+    await this.reolinkCmd(c, 'SetAiCfg', { channel: Number(c.channel || 0), [k]: on ? 1 : 0 });
+    return { ok: true, track: !!on };
+  }
   // vloeiend beeld (proef): MJPEG-stroom van Surveillance Station doorgeven
   async live(id, req, res) {
     const c = this.get(id);

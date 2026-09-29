@@ -140,6 +140,9 @@ app.get('/api/camera/:id/snapshot', async (req, res) => {
   catch (e) { res.status(502).json({ error: nl(e) }); }
 });
 app.get('/api/camera/:id/video', async (req, res) => { try { await cameras.reolinkVideo(req.params.id, req.query.q, req, res); } catch (e) { if (!res.headersSent) res.status(502).json({ error: nl(e) }); } });
+app.get('/api/camera/:id/ptz', async (req, res) => { try { res.json(await cameras.ptzInfo(req.params.id)); } catch (e) { fail(res, e); } });
+app.post('/api/camera/:id/ptz', async (req, res) => { try { res.json(await cameras.ptz(req.params.id, req.body || {})); } catch (e) { fail(res, e); } });
+app.post('/api/camera/:id/track', async (req, res) => { try { res.json(await cameras.track(req.params.id, !!(req.body || {}).on)); } catch (e) { fail(res, e); } });
 app.get('/api/camera/:id/live', async (req, res) => { try { await cameras.live(req.params.id, req, res); } catch (e) { if (!res.headersSent) res.status(502).json({ error: nl(e) }); } });
 
 // automatische controle met melding

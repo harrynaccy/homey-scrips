@@ -132,17 +132,66 @@
     const c = C.find(id); if (!c) return;
     C.close();
     const ov = document.createElement('div'); ov.id = 'camfull'; ov.className = opt.popup ? 'popup' : '';
+    const recUrl = C.ss && C.ss.url && (c.source === 'ss' || c.source === 'reolink') ? C.ss.url : '';
     ov.innerHTML = `<div class="cf-top"><b>${esc(c.name)}</b>${opt.popup ? `<span class="cf-why">${esc(opt.popup)}</span>` : ''}<span class="cf-sp"></span>
-      ${c.source === 'ss' && C.ss && C.ss.url ? `<a class="btn sm" href="${esc(C.ss.url)}" target="_blank" rel="noopener">${icon('play')}Opnames</a>` : ''}
-      <button class="xbtn" data-close>${icon('x')}</button></div><div class="cf-img"><img alt=""><div class="cam-err" hidden></div></div>`;
+      <button class="btn sm cf-track" data-track hidden>Volgen</button>
+      ${recUrl ? `<a class="btn sm" href="${esc(recUrl)}" target="_blank" rel="noopener">${icon('play')}Opnames</a>` : ''}
+      <button class="xbtn" data-close>${icon('x')}</button></div><div class="cf-img"><img alt=""><div class="cam-err" hidden></div><div class="cf-ptz" hidden></div></div>`;
     document.body.appendChild(ov);
     const img = ov.querySelector('img'); const err = ov.querySelector('.cam-err');
     fullStop = C.stream(img, id, { live: false, video: C.hasVideo(c) ? 'main' : null, speed: 'snel', onError: m => { err.hidden = false; err.textContent = m; }, onOk: () => { err.hidden = true; } });
     ov.querySelector('[data-close]').onclick = e => { e.stopPropagation(); C.close(); };
-    ov.addEventListener('pointerdown', e => { e.stopPropagation(); if (D.poke) D.poke(); });
+    // knoppen verdwijnen na een paar seconden niets doen; tikken op het beeld haalt ze terug
+    let idleT = null;
+    const awake = () => { ov.classList.remove('idle'); clearTimeout(idleT); idleT = setTimeout(() => ov.classList.add('idle'), 6000); };
+    ov.addEventListener('pointerdown', e => { e.stopPropagation(); if (D.poke) D.poke(); awake(); });
+    awake();
     if (opt.seconds) popTimer = setTimeout(C.close, opt.seconds * 1000);
+    if (c.source === 'reolink') C.ptzPanel(ov, c, () => { clearTimeout(popTimer); popTimer = null; });   // zelf bedienen: pop-up blijft open
   };
-  C.close = () => { clearTimeout(popTimer); if (fullStop) fullStop(); fullStop = null; const ov = $('#camfull'); if (ov) ov.remove(); };
+  C.close = () => { clearTimeout(popTimer); if (fullStop) fullStop(); fullStop = null; const ov = $('#camfull'); if (ov) { if (ov._ptzStop) ov._ptzStop(); ov.remove(); } };
+
+  // ---------- draaien, kantelen, zoomen ----------
+  C.ptzPanel = async (ov, c, used) => {
+    const box = ov.querySelector('.cf-ptz'); const trackBtn = ov.querySelector('[data-track]');
+    const url = `/api/camera/${encodeURIComponent(c.id)}`;
+    let info;
+    try { info = await D.api('GET', url + '/ptz'); } catch (e) { return; }
+    if (!ov.isConnected || !info.pan) return;
+    let speed = Number((() => { try { return localStorage.getItem('hd-ptz-speed'); } catch (e) { return null; } })()) || 32;
+    const arrow = (op, ic, cls) => `<button class="pz ${cls}" data-op="${op}" aria-label="${op}">${icon(ic)}</button>`;
+    box.innerHTML = `${info.presets.length ? `<div class="pz-pre">${info.presets.map(p => `<button class="btn sm" data-pre="${esc(p.id)}">${esc(p.name)}</button>`).join('')}</div>` : ''}
+      <div class="pz-pad">${arrow('Up', 'up', 'u')}${arrow('Left', 'left', 'l')}<span class="pz-mid"></span>${arrow('Right', 'right', 'r')}${arrow('Down', 'down', 'd')}</div>
+      ${info.zoom ? `<div class="pz-zoom">${arrow('ZoomInc', 'plus', '')}${arrow('ZoomDec', 'minus', '')}</div>` : ''}
+      <label class="pz-speed">Snelheid<input type="range" min="4" max="64" step="1" value="${speed}"></label>
+      ${info.canMove === false ? '<div class="pz-note">Deze gebruiker mag de camera niet draaien. Geef hem in de Reolink-app het type Beheerder.</div>' : ''}`;
+    box.hidden = false;
+    const bad = e => D.toast(e.message || String(e), true);
+    const send = body => D.api('POST', url + '/ptz', body);
+    // ingedrukt houden = bewegen; de opdracht wordt herhaald, bij loslaten (of als de verbinding wegvalt) stopt de camera
+    let held = null;
+    const release = () => { if (!held) return; clearInterval(held.t); held.b.classList.remove('on'); held = null; send({ op: 'Stop' }).catch(() => {}); };
+    box.querySelectorAll('[data-op]').forEach(b => {
+      b.addEventListener('pointerdown', e => {
+        e.preventDefault(); release(); used();
+        try { b.setPointerCapture(e.pointerId); } catch (x) { /* */ }
+        const op = b.dataset.op; b.classList.add('on');
+        const go = () => send({ op, speed }).catch(x => { bad(x); release(); });
+        held = { b, t: setInterval(go, 700) }; go();
+      });
+      ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => b.addEventListener(ev, release));
+      b.addEventListener('contextmenu', e => e.preventDefault());
+    });
+    ov._ptzStop = release;
+    box.querySelectorAll('[data-pre]').forEach(b => b.onclick = () => { used(); send({ preset: b.dataset.pre }).then(() => D.toast(`Naar ${b.textContent}`), bad); });
+    const rng = box.querySelector('.pz-speed input');
+    rng.oninput = () => { speed = Number(rng.value); try { localStorage.setItem('hd-ptz-speed', speed); } catch (e) { /* */ } };
+    if (info.track !== null && info.track !== undefined) {
+      const show = on => { trackBtn.hidden = false; trackBtn.classList.toggle('on', on); trackBtn.textContent = on ? 'Volgen: aan' : 'Volgen: uit'; trackBtn.dataset.on = on ? '1' : ''; };
+      show(info.track);
+      trackBtn.onclick = e => { e.stopPropagation(); used(); const on = !trackBtn.dataset.on; D.api('POST', url + '/track', { on }).then(() => { show(on); D.toast(on ? 'Camera volgt nu zelf personen en auto\'s' : 'Zelf volgen staat uit'); }, bad); };
+    }
+  };
 
   // ---------- pop-up bij beweging ----------
   const inWindow = (from, to) => {
