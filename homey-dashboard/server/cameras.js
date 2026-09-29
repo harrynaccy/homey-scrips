@@ -7,7 +7,9 @@ const { Readable } = require('stream');
 
 const DEFAULT_SS = process.env.SURVEILLANCE_URL || 'http://192.168.178.79:5000';
 const withTimeout = (ms, p) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('ETIMEDOUT')), ms))]);
-const SS_ERR = { 100: 'onbekende fout', 102: 'Surveillance Station is niet gevonden', 105: 'geen toegang', 400: 'verkeerde gebruikersnaam of wachtwoord', 401: 'gebruiker is uitgeschakeld', 402: 'geen rechten', 403: 'deze gebruiker heeft tweestapsverificatie; maak een aparte gebruiker zonder', 407: 'te veel pogingen, IP tijdelijk geblokkeerd', 117: 'geen rechten voor deze camera' };
+// foutcodes bij het inloggen (auth.cgi) en bij de camera-functies (entry.cgi) betekenen iets anders
+const AUTH_ERR = { 400: 'verkeerde gebruikersnaam of wachtwoord', 401: 'gebruiker is uitgeschakeld', 402: 'geen rechten', 403: 'deze gebruiker heeft tweestapsverificatie; maak een aparte gebruiker zonder', 404: 'tweestapsverificatie mislukt', 407: 'te veel pogingen, IP tijdelijk geblokkeerd' };
+const SS_ERR = { 100: 'onbekende fout', 101: 'ongeldige vraag', 102: 'Surveillance Station is niet gevonden', 103: 'deze functie bestaat niet in jouw versie', 104: 'deze versie wordt niet ondersteund', 105: 'geen toegang (rechten van de gebruiker)', 117: 'geen rechten voor deze camera', 400: 'het ophalen lukte niet', 401: 'ongeldige gegevens', 402: 'de camera staat uit of is niet verbonden', 403: 'onbekende camera', 407: 'te veel pogingen, IP tijdelijk geblokkeerd' };
 
 class Cameras {
   constructor({ homey, dataDir }) {
@@ -49,7 +51,7 @@ class Cameras {
       if (!this.sid) {
         const q = new URLSearchParams({ api: 'SYNO.API.Auth', method: 'login', version: '6', account: ss.user, passwd: ss.pass, session: 'SurveillanceStation', format: 'sid' });
         const j = await withTimeout(8000, fetch(`${ss.url}/webapi/auth.cgi?${q}`).then(r => r.json()));
-        if (!j.success) throw new Error('Inloggen bij Surveillance Station lukt niet: ' + (SS_ERR[j.error && j.error.code] || 'fout ' + (j.error && j.error.code)));
+        if (!j.success) throw new Error('Inloggen bij Surveillance Station lukt niet: ' + (AUTH_ERR[j.error && j.error.code] || 'fout ' + (j.error && j.error.code)));
         this.sid = j.data.sid;
       }
       const r = await withTimeout(10000, fetch(`${ss.url}/webapi/entry.cgi?${new URLSearchParams({ ...params, _sid: this.sid })}`));
@@ -59,9 +61,25 @@ class Cameras {
       if (j.success) return j;
       const code = j.error && j.error.code;
       if ([105, 106, 107, 119].includes(code) && attempt === 0) { this.sid = null; continue; }
-      throw new Error('Surveillance Station: ' + (SS_ERR[code] || 'fout ' + code));
+      const e = new Error('Surveillance Station: ' + (SS_ERR[code] || 'fout') + ` (code ${code})`); e.code = code; throw e;
     }
     throw new Error('Surveillance Station: geen toegang');
+  }
+  // Niet elke versie van Surveillance Station kent dezelfde vraag: probeer ze op volgorde en onthoud wat werkt.
+  async ssSnapshot(ssId) {
+    const base = { api: 'SYNO.SurveillanceStation.Camera', method: 'GetSnapshot' };
+    const ways = [{ version: '9', id: ssId, profileType: '1' }, { version: '9', id: ssId }, { version: '8', cameraId: ssId }, { version: '1', cameraId: ssId }, { version: '9', cameraId: ssId }];
+    const order = this.snapWay != null ? [ways[this.snapWay], ...ways.filter((_, i) => i !== this.snapWay)] : ways;
+    let last = null;
+    for (const w of order) {
+      try {
+        const r = await this.ssCall({ ...base, ...w }, true);
+        if (r && r.headers && /^image\//.test(r.headers.get('content-type') || '')) { this.snapWay = ways.indexOf(w); return r; }
+        last = new Error('Surveillance Station gaf geen afbeelding terug');
+      } catch (e) { last = e; if (e.code === 105 || e.code === 117) break; }
+    }
+    if (last && (last.code === 105 || last.code === 117 || last.code === 400)) last.message += '. Controleer in Surveillance Station → Gebruiker dat "Dashboard" het profiel Toeschouwer heeft en dat live beeld en momentopnamen voor deze camera zijn toegestaan.';
+    throw last || new Error('Geen beeld van Surveillance Station');
   }
   async ssCameras() {
     const j = await this.ssCall({ api: 'SYNO.SurveillanceStation.Camera', method: 'List', version: '9' });
@@ -82,7 +100,7 @@ class Cameras {
     let r;
     if (c.source === 'ss') {
       if (!c.ssId) throw new Error('Kies eerst welke camera uit Surveillance Station');
-      r = await this.ssCall({ api: 'SYNO.SurveillanceStation.Camera', method: 'GetSnapshot', version: '9', id: c.ssId, profileType: '1' }, true);
+      r = await this.ssSnapshot(c.ssId);
     } else if (c.source === 'homey') {
       if (!c.deviceId) throw new Error('Kies eerst het camera-apparaat uit Homey');
       return withTimeout(10000, this.homey.cameraImage(c.deviceId, c.imageId));
