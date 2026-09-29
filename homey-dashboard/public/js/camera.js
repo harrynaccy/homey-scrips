@@ -121,7 +121,7 @@
       if (el._camStop) el._camStop();
       inner.innerHTML = `<div class="camview${o.fit === 'contain' ? ' contain' : ''}"><img alt=""><div class="cam-err" hidden></div><div class="cam-name">${esc(c.name)}</div></div>`;
       const img = inner.querySelector('img'); const err = inner.querySelector('.cam-err');
-      el._camStop = C.stream(img, c.id, { live: !!o.live, video: C.hasVideo(c) && o.view !== 'foto' ? 'sub' : null, speed: o.speed, onError: m => { err.hidden = false; err.textContent = m; }, onOk: () => { err.hidden = true; } });
+      el._camStop = C.stream(img, c.id, { live: !!o.live, video: C.hasVideo(c) && o.view !== 'foto' ? (o.quality === 'sub' ? 'sub' : 'main') : null, speed: o.speed, onError: m => { err.hidden = false; err.textContent = m; }, onOk: () => { err.hidden = true; } });
       D.pressable(el, { tap: () => C.full(c.id) });
     },
   };
@@ -170,6 +170,7 @@
       F.row('Beeld vullen', F.seg(`${P}.opts.fit`, t.opts.fit || 'cover', [['cover', 'Vullen'], ['contain', 'Helemaal']], 'tile')) +
       (c && c.source === 'ss' ? F.row('Vloeiend beeld (proef)', F.toggle(`${P}.opts.live`, !!t.opts.live, 'tilepanel'), 'Werkt niet op elke NAS; anders losse beelden') : '') +
       (C.hasVideo(c) ? F.row('Beeld', F.seg(`${P}.opts.view`, t.opts.view || 'video', [['video', 'Video'], ['foto', 'Losse beelden']], 'tilepanel'), 'Video is vloeiend; lukt het niet, dan worden vanzelf losse beelden getoond') : '') +
+      (C.hasVideo(c) && (t.opts.view || 'video') === 'video' ? F.row('Kwaliteit', F.seg(`${P}.opts.quality`, t.opts.quality || 'main', [['main', 'Scherp'], ['sub', 'Licht']], 'tile'), 'Scherp: zelfde als groot beeld, meestal ook vloeiender. Licht: minder beelden per seconde, voor een trage tablet') : '') +
       (c && !(C.hasVideo(c) && (t.opts.view || 'video') === 'video') && !(c.source === 'ss' && t.opts.live)
         ? F.row('Snelheid', F.seg(`${P}.opts.speed`, t.opts.speed || 'normaal', [['rustig', 'Rustig'], ['normaal', 'Normaal'], ['snel', 'Snel']], 'tile'), c.source === 'homey' ? 'Via Homey hooguit elke 3 seconden' : 'Rustig: elke 3 s · Normaal: elke seconde · Snel: ± 3 per seconde') : '');
   };
