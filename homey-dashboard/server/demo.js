@@ -52,6 +52,9 @@ class DemoAdapter extends EventEmitter {
       dev('d13', 'Achterdeur sensor', Z.huis, 'sensor', [cap('alarm_contact', false), cap('measure_battery', 91)]),
       dev('d14', 'P1-meter', Z.huis, 'sensor', [cap('measure_power', 612), cap('meter_power', 10432.5)]),
       dev('d15', 'Garagedeur', Z.gar, 'garagedoor', [cap('onoff', false)]),
+      dev('d16', 'Raam woonkamer', Z.wk, 'sensor', [cap('alarm_contact', true), cap('measure_battery', 77)]),
+      dev('d17', 'Raam keuken', Z.kk, 'sensor', [cap('alarm_contact', false), cap('measure_battery', 93)]),
+      dev('d18', 'Raam slaapkamer', Z.sk, 'sensor', [cap('alarm_contact', true), cap('measure_battery', 58)]),
     ];
     this.cache = {
       devices,

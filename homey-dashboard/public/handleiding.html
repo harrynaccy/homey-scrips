@@ -181,6 +181,42 @@
   <p>Onder <b class="m">Tegel</b> → <i>Stijl</i> zet <b>Stijl naar alle knoppen op dit tabblad</b> dezelfde kleuren, vorm, rand, schaduw, gloed, tekst, diepte en geluid op alle andere knoppen van het tabblad.</p>
 </section>
 
+<section id="assistent" data-title="Assistent (Claude)">
+  <h2>Assistent: Claude het dashboard laten inrichten</h2>
+  <p>Onder <b class="m">Assistent</b> vertel je in gewone woorden wat je wilt, bijvoorbeeld <i>"Maak 3 knoppen voor de ramen die oranje oplichten als ze open staan"</i>. Claude kijkt welke apparaten, flows en moods er in je Homey zijn en doet een voorstel.</p>
+  <h3>Zo werkt het</h3>
+  <ol>
+    <li>Open de achterkant en kies <b class="m">Assistent</b>.</li>
+    <li>Typ je opdracht en tik op <b>Vraag</b> (of druk op Enter). Een voorbeeld aantikken mag ook.</li>
+    <li>Na 10 tot 30 seconden zie je het voorstel als lijstje. Stappen die niet kunnen (bijvoorbeeld een apparaat dat niet bestaat) staan in het rood en worden overgeslagen.</li>
+    <li>Tik op <b>Toepassen</b>. Er verandert pas iets als je dat doet. Liever niet? Tik op <b>Annuleren</b> of typ wat er anders moet.</li>
+  </ol>
+  <p>Weet Claude niet precies wat je bedoelt, dan stelt hij eerst een vraag. Antwoord gewoon in het tekstvak.</p>
+  <h3>Wat kan de assistent?</h3>
+  <ul>
+    <li>Knoppen maken in elke knopstijl, gekoppeld aan een apparaat, flow of mood, met pictogram (ook aan/uit-paren), kleuren en gloed.</li>
+    <li>Apparaat-, tekst-, klok-, flow- en mood-tegels maken.</li>
+    <li>Tabbladen maken en hernoemen.</li>
+    <li>Bestaande tegels aanpassen (naam, stijl, kleuren, pictogram, plek) of verwijderen.</li>
+  </ul>
+  <p>De assistent bedient <b>geen</b> apparaten en verandert <b>niets</b> in je Homey (geen flows maken). Hij past alleen het dashboard aan.</p>
+  <h3>Terugdraaien</h3>
+  <p>Een toegepast voorstel is één stap: het pijltje <b>ongedaan maken</b> bovenin draait alles in één keer terug. Het staat ook in <b>Laatste wijzigingen</b> (klokje bovenin), met de knop <b>Terugzetten</b>.</p>
+  <h3>Model en kosten</h3>
+  <ul>
+    <li>Onder de chat kies je het <b>Model</b>: <b>Claude Opus 5.5</b> (slimst, standaard) of <b>Claude Sonnet 5.5</b> (ongeveer de helft goedkoper, prima voor eenvoudige opdrachten).</li>
+    <li>Onder elk antwoord staat wat het ongeveer kostte, en onderaan het totaal van deze sessie. Een gewone opdracht kost een paar cent.</li>
+    <li>Je betaalt met tegoed op <b>platform.claude.com</b> (los van een Claude-abonnement). Staat automatisch bijladen uit, dan stopt de assistent gewoon als het tegoed op is.</li>
+  </ul>
+  <h3>Instellen (eenmalig)</h3>
+  <ol>
+    <li>Maak op <b>platform.claude.com</b> → <b>API keys</b> een sleutel aan. Kopieer hem meteen: hij wordt maar één keer getoond.</li>
+    <li>Zet hem in <code>docker-compose.yml</code> op de NAS, direct onder <code>HOMEY_TOKEN</code>, op dezelfde manier geschreven: <code>- ANTHROPIC_API_KEY=sk-ant-…</code></li>
+    <li>Start het project opnieuw in Container Manager (<b>Project → homey-dashboard → Stoppen</b>, daarna <b>Bouwen</b> of <b>Starten</b>). Bij de eerste start wordt het onderdeel voor Claude gedownload.</li>
+  </ol>
+  <div class="let">De sleutel blijft op de NAS. Hij gaat nooit naar de tablet of de browser. Bij een vraag stuurt het dashboard de namen van je apparaten, zones, flows en tegels naar Claude, zodat hij weet wat er is. Je Homey-sleutel gaat niet mee.</div>
+</section>
+
 <section id="pictogrammen" data-title="Pictogrammen">
   <h2>Pictogrammen</h2>
   <p>Onder <b class="m">Pictogrammen</b> staan ruim 14.000 pictogrammen in zes sets. Alles staat op de NAS en werkt zonder internet.</p>
@@ -422,6 +458,13 @@
   <p>Zet het mediavolume van de tablet of pc aan en controleer of het geluid onder Stijl → Bediening niet op <i>Geen</i> staat. Het eerste geluid klinkt pas na je eerste tik.</p>
   <h3>Iets per ongeluk verwijderd of verpest</h3>
   <p>Direct: pijltje <b>ongedaan maken</b> linksboven. Later: <b class="m">Systeem</b> → <b>Back-ups</b> → terugzetten.</p>
+  <h3>De assistent zegt "staat uit" of geeft een fout</h3>
+  <ul>
+    <li><i>Staat uit</i>: de regel <code>ANTHROPIC_API_KEY</code> ontbreekt in <code>docker-compose.yml</code>, of het project is daarna niet opnieuw gestart.</li>
+    <li><i>Sleutel wordt niet geaccepteerd</i>: controleer of de sleutel helemaal en zonder spaties of aanhalingstekens is geplakt. Maak anders een nieuwe sleutel.</li>
+    <li><i>Tegoed is op</i>: waardeer op via platform.claude.com → <b>Billing</b>.</li>
+    <li><i>Geen verbinding met Claude</i>: de NAS heeft geen internet.</li>
+  </ul>
   <h3>Kan ik veilig terug naar de browser?</h3>
   <p>Ja. Browser, snelkoppeling, tablet en Windows-programma tonen allemaal hetzelfde dashboard van de NAS.</p>
 </section>

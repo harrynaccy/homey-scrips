@@ -4,7 +4,7 @@
   const E = D.editor = { sel: null, section: 'bibliotheek', undo: [], redo: [], libCat: 'devices', libQ: '', bgScope: 'all', folds: { kleuren: true } };
 
   const SECTIONS = [
-    ['bibliotheek', 'book', 'Toevoegen'], ['knoppen', 'knob', 'Knoppen'], ['pictogrammen', 'shapes', 'Pictogrammen'], ['tegel', 'sliders', 'Tegel'], ['tabs', 'layers', 'Tabbladen'],
+    ['bibliotheek', 'book', 'Toevoegen'], ['assistent', 'sparkles', 'Assistent'], ['knoppen', 'knob', 'Knoppen'], ['pictogrammen', 'shapes', 'Pictogrammen'], ['tegel', 'sliders', 'Tegel'], ['tabs', 'layers', 'Tabbladen'],
     ['scherm', 'sun', 'Scherm'], ['uiterlijk', 'palette', 'Uiterlijk'], ['raster', 'grid', 'Raster'], ['systeem', 'server', 'Systeem'],
   ];
 
@@ -179,6 +179,8 @@
     icon: (cur, custom, which = 'on') => `<span class="icctl"><span class="icprev${which === 'off' ? ' off' : ''}">${anyIcon(cur)}</span><button class="btn sm" data-pickicon="${which}">${icon('shapes')}Kiezen</button>${custom ? `<button class="ib sm" data-clearicon="${which}" title="${which === 'off' ? 'Zelfde als aan' : 'Standaard pictogram'}">${icon('refresh')}</button>` : ''}</span>`,
     seg: (k, v, opts, fx) => `<div class="seg">${opts.map(([val, l]) => `<button data-segk="${k}" data-fx="${fx}" data-v="${esc(val)}" class="${String(val) === String(v) ? 'act' : ''}">${l}</button>`).join('')}</div>`,
   };
+  E.F = F;
+
   E.fmtOut = (v, f) => f === '%' ? Math.round(v * 100) + '%' : f === 'p' ? v + '%' : f === 'px' ? v + 'px' : f === 'x' ? Number(v).toFixed(2) + '×' : f === 'b' ? Math.round(v / 255 * 100) + '%' : f === 'min' ? v + ' min' : f === 's' ? v + ' s' : f === 'deg' ? v + '°' : v;
 
   // effecten na een wijziging

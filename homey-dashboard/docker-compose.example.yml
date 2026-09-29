@@ -15,6 +15,8 @@ services:
       # Vul deze twee in (zie LEESMIJ.md, stap 1). Laat ze leeg voor de demo-modus.
       - HOMEY_ADDRESS=http://192.168.178.XX
       - HOMEY_TOKEN=plak-hier-je-sleutel
+      # Optioneel: API-sleutel van platform.claude.com voor de Assistent (Claude richt het dashboard in)
+      - ANTHROPIC_API_KEY=plak-hier-je-sleutel
       # Adres van je Spotify-widgets op de NAS (tabblad 3)
       - SPOTIFY_BASE=http://192.168.178.79:8090
     restart: unless-stopped

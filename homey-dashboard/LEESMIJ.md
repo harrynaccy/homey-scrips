@@ -33,6 +33,9 @@ De API-sleutel van Homey blijft op de NAS en komt nooit in de browser van de tab
 4. Open `docker-compose.yml` met de Teksteditor van DSM en vul in:
    - `HOMEY_ADDRESS=http://192.168.178.XX`: het IP-adres van je Homey
    - `HOMEY_TOKEN=...`: de sleutel uit stap 1
+   - `ANTHROPIC_API_KEY=...` (optioneel): een API-sleutel van platform.claude.com voor de
+     **Assistent**, waarmee Claude het dashboard voor je inricht. Zonder deze regel staat de
+     assistent uit; de rest werkt gewoon.
 
    Laat je de voorbeeldwaarden staan, dan start het dashboard in **demo-modus** met nepapparaten.
    Handig om eerst te proberen.

@@ -7,6 +7,7 @@ const { DemoAdapter } = require('./demo');
 const { defaultConfig } = require('./default-config');
 const { AppBridge } = require('./appbridge');
 const icons = require('./icons');
+const { Assistant, friendlyError } = require('./assistant');
 
 const PORT = Number(process.env.PORT || 8095);
 const DATA = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
@@ -19,6 +20,9 @@ const isSet = v => v && !/XX|plak-hier/i.test(v);
 const homey = (isSet(process.env.HOMEY_ADDRESS) && isSet(process.env.HOMEY_TOKEN))
   ? new HomeyAdapter({ address: process.env.HOMEY_ADDRESS, token: process.env.HOMEY_TOKEN })
   : new DemoAdapter();
+
+// Claude-assistent (alleen actief met ANTHROPIC_API_KEY; ASSISTANT_FAKE = testbestand zonder echte API)
+const assistant = new Assistant({ icons, client: process.env.ASSISTANT_FAKE ? require(path.resolve(process.env.ASSISTANT_FAKE)) : null });
 
 // ---------- configuratie ----------
 function readConfig() {
@@ -90,6 +94,14 @@ app.post('/api/flow/:type/:id', wrap(req => homey.triggerFlow(req.params.id, req
 app.post('/api/mood/:id', wrap(req => homey.setMood(req.params.id)));
 app.post('/api/variable/:id', wrap(req => homey.setVariable(req.params.id, req.body.value)));
 app.post('/api/alarm/:id', wrap(req => homey.setAlarm(req.params.id, !!req.body.enabled)));
+
+app.get('/api/assistant', wrap(() => assistant.status()));
+app.post('/api/assistant', async (req, res) => {
+  try {
+    const b = req.body || {};
+    res.json(await assistant.ask({ history: b.history, cfg: readConfig() || { tabs: [] }, lib: homey.library() || {}, currentTabId: b.tabId, model: b.model }));
+  } catch (err) { console.error('[assistent]', err.message || err); res.status(500).json({ error: friendlyError(err) }); }
+});
 
 app.get('/api/appwidgets', wrap(() => ({ widgets: bridge.list(), status: bridge.status(), demo: homey.status.mode === 'demo' })));
 app.post('/api/aw/call', async (req, res) => {
