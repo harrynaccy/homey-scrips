@@ -125,12 +125,40 @@ class Cameras {
       return withTimeout(10000, this.homey.cameraImage(c.deviceId, c.imageId));
     } else {
       if (!c.ip) throw new Error('Vul het IP-adres van de camera in');
-      const q = new URLSearchParams({ cmd: 'Snap', channel: String(c.channel || 0), rs: Math.random().toString(36).slice(2), user: c.user || 'admin', password: c.pass || '' });
-      r = await withTimeout(10000, fetch(`http://${c.ip}/cgi-bin/api.cgi?${q}`));
+      return this.reolinkSnap(c);
     }
     const type = r.headers.get('content-type') || '';
     if (!r.ok || !/^image\//.test(type)) throw nlErr('De camera gaf geen beeld' + (r.ok ? '' : ` (${r.status})`) + '. Klopt het IP-adres, de gebruiker en het wachtwoord?');
     return { type, data: Buffer.from(await r.arrayBuffer()) };
+  }
+  // Reolink: eerst via HTTP, lukt dat niet dan via HTTPS (nieuwere camera's hebben HTTP standaard uit).
+  // Het eigen certificaat van de camera wordt geaccepteerd; het verkeer blijft in je thuisnetwerk.
+  async reolinkSnap(c) {
+    const q = new URLSearchParams({ cmd: 'Snap', channel: String(c.channel || 0), rs: Math.random().toString(36).slice(2), user: c.user || 'admin', password: c.pass || '' });
+    const host = String(c.ip).replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    const get = proto => new Promise((resolve, reject) => {
+      const mod = require(proto);
+      const req = mod.get(`${proto}://${host}/cgi-bin/api.cgi?${q}`, { rejectUnauthorized: false, timeout: 8000 }, res => {
+        const chunks = []; res.on('data', d => chunks.push(d));
+        res.on('end', () => resolve({ status: res.statusCode, type: res.headers['content-type'] || '', data: Buffer.concat(chunks) }));
+      });
+      req.on('timeout', () => req.destroy(new Error('ETIMEDOUT')));
+      req.on('error', reject);
+    });
+    const tried = [];
+    for (const proto of ['http', 'https']) {
+      let r;
+      try { r = await get(proto); }
+      catch (e) { tried.push(`${proto.toUpperCase()}: ${/ECONNREFUSED/.test(e.code || e.message) ? 'staat uit' : /ETIMEDOUT/.test(e.message) ? 'geen antwoord' : /EHOSTUNREACH|ENETUNREACH/.test(e.code || '') ? 'camera niet gevonden op dit adres' : e.code || e.message}`); continue; }
+      if (r.status === 200 && /^image\//.test(r.type)) return { type: r.type, data: r.data };
+      // Reolink antwoordt met JSON als er iets mis is
+      let detail = ''; try { const j = JSON.parse(r.data.toString('utf8')); const e = (Array.isArray(j) ? j[0] : j).error || {}; detail = `${e.detail || ''} ${e.rspCode != null ? '(' + e.rspCode + ')' : ''}`.trim(); } catch (e) { detail = `status ${r.status}`; }
+      const why = /login failed|password|-7\b|-6\b/.test(detail) ? 'inloggen mislukt: gebruiker of wachtwoord klopt niet (gebruik de gebruiker van de camera zelf, meestal "admin")'
+        : /ability|-9\b|-26\b/.test(detail) ? 'deze gebruiker mag geen momentopnamen maken' : /max session|-5\b/.test(detail) ? 'te veel verbindingen met de camera, probeer het zo opnieuw' : `antwoord van de camera: ${detail}`;
+      tried.push(`${proto.toUpperCase()}: ${why}`);
+      if (/inloggen mislukt|mag geen/.test(why)) break;
+    }
+    throw nlErr(`De camera gaf geen beeld. ${tried.join('; ')}.`);
   }
   // vloeiend beeld (proef): MJPEG-stroom van Surveillance Station doorgeven
   async live(id, req, res) {
