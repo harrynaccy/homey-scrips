@@ -139,6 +139,7 @@ app.get('/api/camera/:id/snapshot', async (req, res) => {
   try { const s = await cameras.snapshot(req.params.id); res.set({ 'Content-Type': s.type, 'Cache-Control': 'no-store' }); res.end(s.data); }
   catch (e) { res.status(502).json({ error: nl(e) }); }
 });
+app.get('/api/camera/:id/video', async (req, res) => { try { await cameras.reolinkVideo(req.params.id, req.query.q, req, res); } catch (e) { if (!res.headersSent) res.status(502).json({ error: nl(e) }); } });
 app.get('/api/camera/:id/live', async (req, res) => { try { await cameras.live(req.params.id, req, res); } catch (e) { if (!res.headersSent) res.status(502).json({ error: nl(e) }); } });
 
 // automatische controle met melding

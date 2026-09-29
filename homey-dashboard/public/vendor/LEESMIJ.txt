@@ -1,0 +1,3 @@
+mpegts.js 1.8.2 (https://github.com/xqq/mpegts.js), Apache License 2.0.
+Speelt de video van een Reolink-camera af in de browser (FLV via Media Source Extensions).
+Wordt alleen geladen als er een camera-tegel met video op het scherm staat.

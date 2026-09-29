@@ -7,33 +7,106 @@
 
   C.load = async () => { try { const r = await D.api('GET', '/api/cameras'); C.list = r.cams; C.ss = r.ss; } catch (e) { C.list = C.list || []; } return C.list; };
   C.find = id => (C.list || []).find(c => c.id === id);
-  const speed = c => (c && c.source === 'homey' ? 3000 : 1000);
+  // losse beelden: hoe vaak per seconde (Homey levert zelf niet sneller dan elke 3 s)
+  const SPEEDS = { rustig: 3000, normaal: 1000, snel: 300 };
+  const speed = (c, s) => Math.max(c && c.source === 'homey' ? 3000 : 0, SPEEDS[s] || SPEEDS.normaal);
+
+  // mpegts.js (video in de browser) pas laden als er echt video getoond wordt
+  let libP = null;
+  C.lib = () => libP || (libP = new Promise(res => {
+    if (window.mpegts) return res(window.mpegts);
+    const s = document.createElement('script'); s.src = 'vendor/mpegts.js';
+    s.onload = () => res(window.mpegts || null); s.onerror = () => { libP = null; res(null); };
+    document.head.appendChild(s);
+  }));
+  const canVideo = m => { try { return !!(m && m.isSupported() && m.getFeatureList().mseLivePlayback); } catch (e) { return false; } };
+  C.hasVideo = c => !!(c && c.source === 'reolink');
 
   // Een beeld dat zichzelf ververst zolang het zichtbaar is. Geeft een stop-functie terug.
+  // opt.video = 'sub' (tegel) of 'main' (groot beeld): echte video van een Reolink; lukt dat niet,
+  // dan vanzelf losse beelden. Het laatste losse beeld blijft onder de video staan tot die speelt.
   C.stream = (img, camId, opt = {}) => {
     let stop = false, url = null, timer = null, fails = 0;
-    const c = C.find(camId);
+    const c = C.find(camId); const id = encodeURIComponent(camId);
     const onErr = opt.onError || (() => {}); const onOk = opt.onOk || (() => {});
     if (opt.live && c && c.source === 'ss') {
       img.onerror = () => { img.onerror = null; if (!stop) { onErr('Vloeiend beeld lukt niet, losse beelden worden getoond'); loop(); } };
       img.onload = () => onOk();
-      img.src = `/api/camera/${encodeURIComponent(camId)}/live?t=${Date.now()}`;
+      img.src = `/api/camera/${id}/live?t=${Date.now()}`;
       return () => { stop = true; img.removeAttribute('src'); };
     }
+    // één los beeld ophalen; het nieuwe beeld wordt pas getoond als het helemaal klaar is (geen flikkeren)
+    const grab = async () => {
+      const r = await fetch(`/api/camera/${id}/snapshot?t=${Date.now()}`, { cache: 'no-store' });
+      if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || 'Geen beeld'); }
+      const b = await r.blob(); if (stop) return;
+      const nu = URL.createObjectURL(b);
+      const pre = new Image(); pre.src = nu; await pre.decode().catch(() => {});
+      if (stop) { URL.revokeObjectURL(nu); return; }
+      img.src = nu; if (url) URL.revokeObjectURL(url); url = nu;
+    };
     const loop = async () => {
       if (stop) return;
       if (!img.isConnected) { stop = true; return; }
       if (document.hidden) { timer = setTimeout(loop, 2000); return; }
-      try {
-        const r = await fetch(`/api/camera/${encodeURIComponent(camId)}/snapshot?t=${Date.now()}`, { cache: 'no-store' });
-        if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || 'Geen beeld'); }
-        const b = await r.blob(); if (stop) return;
-        const nu = URL.createObjectURL(b); img.src = nu; if (url) URL.revokeObjectURL(url); url = nu; fails = 0; onOk();
-      } catch (e) { fails++; onErr(e.message === 'Failed to fetch' ? D.NO_NAS : e.message); }
-      timer = setTimeout(loop, fails ? Math.min(15000, 2000 * fails) : speed(C.find(camId)));
+      try { await grab(); fails = 0; onOk(); } catch (e) { fails++; onErr(e.message === 'Failed to fetch' ? D.NO_NAS : e.message); }
+      if (!stop) timer = setTimeout(loop, fails ? Math.min(15000, 2000 * fails) : speed(C.find(camId), opt.speed));
     };
-    loop();
-    return () => { stop = true; clearTimeout(timer); if (url) URL.revokeObjectURL(url); };
+
+    if (!(opt.video && C.hasVideo(c))) { loop(); return () => { stop = true; clearTimeout(timer); if (url) URL.revokeObjectURL(url); }; }
+
+    // ---------- echte video ----------
+    const qs = opt.video === 'main' ? ['main', 'sub'] : ['sub'];
+    let m = null, player = null, video = null, wd = null, played = false, retries = 0, qi = 0, startedAt = 0, lastT = -1, still = 0;
+    const kill = () => { if (player) { try { player.destroy(); } catch (e) { /* */ } player = null; } };
+    const toPhotos = msg => {
+      kill(); clearInterval(wd); wd = null; if (video) video.remove(); video = null;
+      if (msg) { onErr(msg); console.warn('[camera]', msg); }
+      loop();
+    };
+    const start = () => {
+      if (stop) return;
+      if (!video) {
+        video = document.createElement('video');
+        video.muted = true; video.autoplay = true; video.playsInline = true; video.setAttribute('playsinline', ''); video.setAttribute('muted', '');
+        video.className = 'cam-video';
+        video.addEventListener('playing', () => { played = true; retries = 0; onOk(); });
+        img.after(video);
+      }
+      kill();
+      player = m.createPlayer({ type: 'flv', isLive: true, hasAudio: false, url: `${location.origin}/api/camera/${id}/video?q=${qs[qi]}` },
+        { enableWorker: false, enableStashBuffer: false, stashInitialSize: 128, lazyLoad: false, autoCleanupSourceBuffer: true,
+          liveBufferLatencyChasing: true, liveBufferLatencyMaxLatency: 1.5, liveBufferLatencyMinRemain: 0.3 });
+      player.on(m.Events.ERROR, () => failed());
+      player.attachMediaElement(video); player.load();
+      const p = player.play(); if (p && p.catch) p.catch(() => {});
+      startedAt = Date.now(); lastT = -1; still = 0;
+    };
+    const failed = () => {
+      if (stop || !player) return;
+      kill();
+      if (played && retries < 5) { retries++; setTimeout(start, 2000); return; }   // werkte al: opnieuw verbinden
+      if (!played && qi < qs.length - 1) { qi++; start(); return; }               // scherpe stroom lukt niet (bijv. H.265): lichte stroom
+      toPhotos('Video lukt niet, losse beelden worden getoond');
+    };
+    const watch = () => {
+      if (stop) return;
+      if (!img.isConnected) { stopAll(); return; }
+      if (document.hidden) { kill(); return; }       // scherm uit of ander tabblad: niets binnenhalen
+      if (!player) { start(); return; }
+      if (!played) { if (Date.now() - startedAt > 15000) failed(); return; }
+      const t = video.currentTime;
+      if (t === lastT) { still += 3; if (still >= 12) failed(); } else still = 0;   // beeld staat stil: opnieuw verbinden
+      lastT = t;
+    };
+    const stopAll = () => { stop = true; clearTimeout(timer); clearInterval(wd); kill(); if (video) video.remove(); if (url) URL.revokeObjectURL(url); };
+    grab().then(onOk, () => {});                      // meteen een los beeld tot de video speelt
+    C.lib().then(lib => {
+      if (stop) return;
+      if (!canVideo(lib)) { toPhotos(); return; }     // dit apparaat kan geen video: gewoon losse beelden
+      m = lib; start(); wd = setInterval(watch, 3000);
+    });
+    return stopAll;
   };
 
   // ---------- tegel ----------
@@ -48,7 +121,7 @@
       if (el._camStop) el._camStop();
       inner.innerHTML = `<div class="camview${o.fit === 'contain' ? ' contain' : ''}"><img alt=""><div class="cam-err" hidden></div><div class="cam-name">${esc(c.name)}</div></div>`;
       const img = inner.querySelector('img'); const err = inner.querySelector('.cam-err');
-      el._camStop = C.stream(img, c.id, { live: !!o.live, onError: m => { err.hidden = false; err.textContent = m; }, onOk: () => { err.hidden = true; } });
+      el._camStop = C.stream(img, c.id, { live: !!o.live, video: C.hasVideo(c) && o.view !== 'foto' ? 'sub' : null, speed: o.speed, onError: m => { err.hidden = false; err.textContent = m; }, onOk: () => { err.hidden = true; } });
       D.pressable(el, { tap: () => C.full(c.id) });
     },
   };
@@ -64,7 +137,7 @@
       <button class="xbtn" data-close>${icon('x')}</button></div><div class="cf-img"><img alt=""><div class="cam-err" hidden></div></div>`;
     document.body.appendChild(ov);
     const img = ov.querySelector('img'); const err = ov.querySelector('.cam-err');
-    fullStop = C.stream(img, id, { live: false, onError: m => { err.hidden = false; err.textContent = m; }, onOk: () => { err.hidden = true; } });
+    fullStop = C.stream(img, id, { live: false, video: C.hasVideo(c) ? 'main' : null, speed: 'snel', onError: m => { err.hidden = false; err.textContent = m; }, onOk: () => { err.hidden = true; } });
     ov.querySelector('[data-close]').onclick = e => { e.stopPropagation(); C.close(); };
     ov.addEventListener('pointerdown', e => { e.stopPropagation(); if (D.poke) D.poke(); });
     if (opt.seconds) popTimer = setTimeout(C.close, opt.seconds * 1000);
@@ -95,7 +168,10 @@
     const c = C.find(t.opts.cameraId);
     return F.row('Camera', F.select(`${P}.opts.cameraId`, t.opts.cameraId || '', opts, 'tilepanel')) +
       F.row('Beeld vullen', F.seg(`${P}.opts.fit`, t.opts.fit || 'cover', [['cover', 'Vullen'], ['contain', 'Helemaal']], 'tile')) +
-      (c && c.source === 'ss' ? F.row('Vloeiend beeld (proef)', F.toggle(`${P}.opts.live`, !!t.opts.live, 'tile'), 'Werkt niet op elke NAS; anders losse beelden') : '');
+      (c && c.source === 'ss' ? F.row('Vloeiend beeld (proef)', F.toggle(`${P}.opts.live`, !!t.opts.live, 'tilepanel'), 'Werkt niet op elke NAS; anders losse beelden') : '') +
+      (C.hasVideo(c) ? F.row('Beeld', F.seg(`${P}.opts.view`, t.opts.view || 'video', [['video', 'Video'], ['foto', 'Losse beelden']], 'tilepanel'), 'Video is vloeiend; lukt het niet, dan worden vanzelf losse beelden getoond') : '') +
+      (c && !(C.hasVideo(c) && (t.opts.view || 'video') === 'video') && !(c.source === 'ss' && t.opts.live)
+        ? F.row('Snelheid', F.seg(`${P}.opts.speed`, t.opts.speed || 'normaal', [['rustig', 'Rustig'], ['normaal', 'Normaal'], ['snel', 'Snel']], 'tile'), c.source === 'homey' ? 'Via Homey hooguit elke 3 seconden' : 'Rustig: elke 3 s · Normaal: elke seconde · Snel: ± 3 per seconde') : '');
   };
 
   // ---------- Systeem → Camera's ----------

@@ -12,6 +12,14 @@ const withTimeout = (ms, p) => Promise.race([p, new Promise((_, rej) => setTimeo
 const AUTH_ERR = { 400: 'verkeerde gebruikersnaam of wachtwoord', 401: 'gebruiker is uitgeschakeld', 402: 'geen rechten', 403: 'deze gebruiker heeft tweestapsverificatie; maak een aparte gebruiker zonder', 404: 'tweestapsverificatie mislukt', 407: 'te veel pogingen, IP tijdelijk geblokkeerd' };
 const SS_ERR = { 100: 'onbekende fout', 101: 'ongeldige vraag', 102: 'Surveillance Station is niet gevonden', 103: 'deze functie bestaat niet in jouw versie', 104: 'deze versie wordt niet ondersteund', 105: 'geen toegang (rechten van de gebruiker)', 117: 'geen rechten voor deze camera', 400: 'het ophalen lukte niet', 401: 'ongeldige gegevens', 402: 'de camera staat uit of is niet verbonden', 403: 'onbekende camera', 407: 'te veel pogingen, IP tijdelijk geblokkeerd' };
 
+const reolinkHost = c => String(c.ip).replace(/^https?:\/\//, '').replace(/\/+$/, '');
+// gebruiker en wachtwoord in het adres, zonder ze om te zetten (zoals een browser dat doet)
+const raw = v => String(v || '').replace(/[&#%+ ?]/g, ch => encodeURIComponent(ch));
+const reolinkConn = e => (/EPROTO|SSL|certificate/i.test(e.code || e.message) ? 'geen beveiligde verbinding mogelijk' : /ECONNREFUSED/.test(e.code || e.message) ? 'staat uit' : /ETIMEDOUT/.test(e.message) ? 'geen antwoord' : /EHOSTUNREACH|ENETUNREACH/.test(e.code || '') ? 'camera niet gevonden op dit adres' : e.code || e.message);
+const reolinkWhy = d => (/login|password|-6$|-7$/.test(`${d.detail} ${d.rsp}`) ? 'inloggen mislukt: gebruiker of wachtwoord klopt niet'
+  : /ability|-9$|-26$/.test(`${d.detail} ${d.rsp}`) ? 'deze gebruiker mag geen momentopnamen maken (geef hem in de Reolink-app de rol Gebruiker of Beheerder)'
+    : /max session|-5$/.test(`${d.detail} ${d.rsp}`) ? 'te veel verbindingen met de camera, probeer het zo opnieuw' : `antwoord van de camera: ${d.detail || 'onbekend'}${d.rsp != null ? ' (' + d.rsp + ')' : ''}`);
+
 class Cameras {
   constructor({ homey, dataDir }) {
     this.homey = homey; this.file = path.join(dataDir, 'cameras.json');
@@ -108,7 +116,7 @@ class Cameras {
   // ---------- beeld ----------
   async snapshot(id) {
     const hit = this.cache.get(id);
-    if (hit && Date.now() - hit.at < 700) return hit;
+    if (hit && Date.now() - hit.at < 250) return hit;
     if (hit && hit.pending) return hit.pending;
     const pending = this.fetchSnapshot(this.get(id)).then(v => { const e = { ...v, at: Date.now() }; this.cache.set(id, e); return e; })
       .catch(e => { this.cache.delete(id); throw e; });
@@ -154,43 +162,105 @@ class Cameras {
     try { const j = JSON.parse(r.data.toString('utf8')); const x = Array.isArray(j) ? j[0] : j; const e = x.error || {}; return { code: x.code, detail: String(e.detail || ''), rsp: e.rspCode }; }
     catch (e) { return { detail: `status ${r.status}` }; }
   }
-  async reolinkSnap(c) {
-    const host = String(c.ip).replace(/^https?:\/\//, '').replace(/\/+$/, '');
+  // tijdelijke code van de Reolink ophalen (of hergebruiken zolang hij geldig is)
+  async reolinkToken(c, proto, host, fresh) {
     this.tokens = this.tokens || new Map();
-    const conn = e => (/EPROTO|SSL|certificate/i.test(e.code || e.message) ? 'geen beveiligde verbinding mogelijk' : /ECONNREFUSED/.test(e.code || e.message) ? 'staat uit' : /ETIMEDOUT/.test(e.message) ? 'geen antwoord' : /EHOSTUNREACH|ENETUNREACH/.test(e.code || '') ? 'camera niet gevonden op dit adres' : e.code || e.message);
-    const why = d => (/login|password|-6$|-7$/.test(`${d.detail} ${d.rsp}`) ? 'inloggen mislukt: gebruiker of wachtwoord klopt niet'
-      : /ability|-9$|-26$/.test(`${d.detail} ${d.rsp}`) ? 'deze gebruiker mag geen momentopnamen maken (geef hem in de Reolink-app de rol Gebruiker of Beheerder)'
-        : /max session|-5$/.test(`${d.detail} ${d.rsp}`) ? 'te veel verbindingen met de camera, probeer het zo opnieuw' : `antwoord van de camera: ${d.detail || 'onbekend'}${d.rsp != null ? ' (' + d.rsp + ')' : ''}`);
+    const key = `${c.id}|${proto}`;
+    let t = this.tokens.get(key);
+    if (fresh || !t || Date.now() > t.until) {
+      this.tokens.delete(key);
+      const lr = await this.reolinkReq(proto, host, '/cgi-bin/api.cgi?cmd=Login', [{ cmd: 'Login', param: { User: { Version: '0', userName: c.user || 'admin', password: c.pass || '' } } }]);
+      let tok = null; try { const j = JSON.parse(lr.data.toString('utf8')); tok = (Array.isArray(j) ? j[0] : j).value.Token; } catch (e) { /* */ }
+      if (!tok) return { err: reolinkWhy(this.reolinkError(lr)) };
+      t = { name: tok.name, until: Date.now() + Math.max(60, (tok.leaseTime || 3600) - 60) * 1000 };
+      this.tokens.set(key, t);
+    }
+    return t;
+  }
+  // eerst de manier (http/https) die de vorige keer werkte
+  reolinkProtos(c) { const ok = this.okProto && this.okProto.get(c.id); return ok === 'https' ? ['https', 'http'] : ['http', 'https']; }
+  async reolinkSnap(c) {
+    const host = reolinkHost(c);
+    this.okProto = this.okProto || new Map();
     const snapPath = extra => `/cgi-bin/api.cgi?cmd=Snap&channel=${Number(c.channel || 0)}&rs=${Math.random().toString(36).slice(2)}&${extra}`;
     const tried = [];
-    for (const proto of ['http', 'https']) {
-      const key = `${c.id}|${proto}`;
+    for (const proto of this.reolinkProtos(c)) {
       try {
         // 1. met tijdelijke code (hergebruikt zolang hij geldig is)
         for (let attempt = 0; attempt < 2; attempt++) {
-          let t = this.tokens.get(key);
-          if (!t || Date.now() > t.until) {
-            const lr = await this.reolinkReq(proto, host, '/cgi-bin/api.cgi?cmd=Login', [{ cmd: 'Login', param: { User: { Version: '0', userName: c.user || 'admin', password: c.pass || '' } } }]);
-            const d = this.reolinkError(lr);
-            let tok = null; try { const j = JSON.parse(lr.data.toString('utf8')); tok = (Array.isArray(j) ? j[0] : j).value.Token; } catch (e) { /* */ }
-            if (!tok) { tried.push(`${proto.toUpperCase()}: ${why(d)}`); break; }
-            t = { name: tok.name, until: Date.now() + Math.max(60, (tok.leaseTime || 3600) - 60) * 1000 };
-            this.tokens.set(key, t);
-          }
+          const t = await this.reolinkToken(c, proto, host);
+          if (t.err) { tried.push(`${proto.toUpperCase()}: ${t.err}`); break; }
           const r = await this.reolinkReq(proto, host, snapPath(`token=${encodeURIComponent(t.name)}`));
-          if (r.status === 200 && /^image\//.test(r.type)) return { type: r.type, data: r.data };
-          this.tokens.delete(key);
+          if (r.status === 200 && /^image\//.test(r.type)) { this.okProto.set(c.id, proto); return { type: r.type, data: r.data }; }
+          this.tokens.delete(`${c.id}|${proto}`);
           const d = this.reolinkError(r);
-          if (attempt === 1 || !/login|-6$/.test(`${d.detail} ${d.rsp}`)) { tried.push(`${proto.toUpperCase()}: ${why(d)}`); break; }
+          if (attempt === 1 || !/login|-6$/.test(`${d.detail} ${d.rsp}`)) { tried.push(`${proto.toUpperCase()}: ${reolinkWhy(d)}`); break; }
         }
         // 2. reserve: gebruiker en wachtwoord in het adres, zonder ze om te zetten (zoals een browser dat doet)
-        const raw = v => String(v || '').replace(/[&#%+ ?]/g, ch => encodeURIComponent(ch));
         const r2 = await this.reolinkReq(proto, host, snapPath(`user=${raw(c.user || 'admin')}&password=${raw(c.pass)}`));
-        if (r2.status === 200 && /^image\//.test(r2.type)) return { type: r2.type, data: r2.data };
-      } catch (e) { tried.push(`${proto.toUpperCase()}: ${conn(e)}`); }
+        if (r2.status === 200 && /^image\//.test(r2.type)) { this.okProto.set(c.id, proto); return { type: r2.type, data: r2.data }; }
+      } catch (e) { tried.push(`${proto.toUpperCase()}: ${reolinkConn(e)}`); }
       if (tried.some(t => /inloggen mislukt|mag geen/.test(t))) break; // zelfde gegevens werken via HTTPS ook niet
     }
     throw nlErr(`De camera gaf geen beeld. ${[...new Set(tried)].join('; ')}.`);
+  }
+  // Een FLV-videostroom openen. Geeft { ok, up, first } als er echt video komt, anders { ok:false, why }.
+  flvOpen(proto, host, p) {
+    return new Promise((resolve, reject) => {
+      const mod = require(proto); let done = false;
+      const req = mod.get(`${proto}://${host}${p}`, { rejectUnauthorized: false, timeout: 7000 }, up => {
+        let buf = Buffer.alloc(0);
+        const onData = d => {
+          buf = Buffer.concat([buf, d]);
+          if (buf.length < 3 || done) return;
+          done = true; up.off('data', onData);
+          if (buf.slice(0, 3).toString('latin1') === 'FLV') { up.pause(); resolve({ ok: true, req, up, first: buf }); return; }
+          req.destroy(); resolve({ ok: false, why: up.statusCode !== 200 ? `status ${up.statusCode}` : 'de camera stuurt geen video terug' });
+        };
+        up.on('data', onData);
+        up.on('end', () => { if (!done) { done = true; resolve({ ok: false, why: up.statusCode === 200 ? 'de camera stuurt geen video terug' : `status ${up.statusCode}` }); } });
+        up.on('error', e => { if (!done) { done = true; reject(e); } });
+      });
+      req.on('timeout', () => req.destroy(new Error('ETIMEDOUT')));
+      req.on('error', e => { if (!done) { done = true; reject(e); } });
+    });
+  }
+  // echte video van de Reolink doorgeven (sub = lichte stroom voor de tegel, main = scherp voor groot beeld).
+  // De browser ziet alleen /api/camera/<id>/video; gebruiker en wachtwoord blijven op de NAS.
+  async reolinkVideo(id, q, req, res) {
+    const c = this.get(id);
+    if (c.source !== 'reolink') throw nlErr('Video kan alleen bij een camera met bron Rechtstreeks (Reolink)');
+    if (!c.ip) throw nlErr('Vul het IP-adres van de camera in');
+    const host = reolinkHost(c);
+    const base = `/flv?port=1935&app=bcs&stream=channel${Number(c.channel || 0)}_${q === 'main' ? 'main' : 'sub'}.bcs`;
+    this.flvWay = this.flvWay || new Map();
+    const tried = [];
+    for (const proto of this.reolinkProtos(c)) {
+      try {
+        const t = await this.reolinkToken(c, proto, host);
+        const ways = [];
+        if (!t.err) ways.push(['token', () => `${base}&token=${encodeURIComponent(t.name)}`]);
+        ways.push(['wachtwoord', () => `${base}&user=${raw(c.user || 'admin')}&password=${raw(c.pass)}`]);
+        if (this.flvWay.get(c.id) === 'wachtwoord') ways.reverse();
+        for (const [way, mk] of ways) {
+          if (req.destroyed) return;
+          const o = await this.flvOpen(proto, host, mk());
+          if (!o.ok) { tried.push(`${proto.toUpperCase()} (${way}): ${o.why}`); continue; }
+          this.flvWay.set(c.id, way);
+          res.writeHead(200, { 'Content-Type': 'video/x-flv', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' });
+          res.write(o.first);
+          o.up.pipe(res);
+          // stroom blijft hangen (geen data meer)? dan afbreken, de browser maakt zelf opnieuw verbinding
+          o.req.setTimeout(15000, () => o.req.destroy());
+          const end = () => { o.req.destroy(); if (!res.writableEnded) res.end(); };
+          o.up.on('end', end); o.up.on('error', end); o.req.on('error', end);
+          res.on('close', () => o.req.destroy());
+          return;
+        }
+        if (t.err && /inloggen mislukt|mag geen/.test(t.err)) { tried.push(`${proto.toUpperCase()}: ${t.err}`); break; }
+      } catch (e) { tried.push(`${proto.toUpperCase()}: ${reolinkConn(e)}`); }
+    }
+    throw nlErr(`Geen video van de camera. ${[...new Set(tried)].join('; ')}.`);
   }
   // vloeiend beeld (proef): MJPEG-stroom van Surveillance Station doorgeven
   async live(id, req, res) {

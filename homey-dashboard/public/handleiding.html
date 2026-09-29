@@ -369,7 +369,7 @@
     <tr><th>Bron</th><th>Wat je invult</th><th>Beeld</th></tr>
     <tr><td><b>Surveillance Station</b> (aanbevolen)</td><td>Eén keer een gebruiker voor Surveillance Station; daarna de camera kiezen uit de lijst</td><td>Bijna live (elke seconde)</td></tr>
     <tr><td>Via Homey</td><td>Alleen het camera-apparaat kiezen (bijv. "Reolink Camera")</td><td>Elke 3 seconden; werkt alleen als de app het beeld aan Homey doorgeeft</td></tr>
-    <tr><td>Rechtstreeks (Reolink)</td><td>IP-adres, gebruiker en wachtwoord van de camera</td><td>Bijna live (elke seconde)</td></tr>
+    <tr><td>Rechtstreeks (Reolink)</td><td>IP-adres, gebruiker en wachtwoord van de camera</td><td><b>Echte video</b> (vloeiend); anders losse beelden</td></tr>
   </table>
   <h3>Surveillance Station: een aparte gebruiker maken (eenmalig)</h3>
   <ol>
@@ -383,6 +383,12 @@
     <li><b>Camera toevoegen</b> → kies de bron → kies de camera, geef een naam → <b>Opslaan en testen</b>. Je ziet meteen een voorbeeldbeeld.</li>
     <li><b class="m">Toevoegen</b> → <b>Overig</b> → <b>Camera</b>. Tik op de tegel → <b class="m">Tegel</b> → kies de camera. Bij <i>Beeld vullen</i> kies je of het beeld de tegel vult of helemaal zichtbaar is.</li>
   </ol>
+  <h3>Vloeiend beeld of losse beelden</h3>
+  <ul>
+    <li><b>Rechtstreeks (Reolink)</b>: bij <b class="m">Tegel</b> → <i>Beeld</i> kies je <b>Video</b> (standaard) of <b>Losse beelden</b>. De tegel gebruikt de lichte videostroom van de camera; groot beeld de scherpe. Lukt video niet, dan toont het dashboard vanzelf losse beelden. Blijft het beeld hangen, dan maakt het dashboard zelf opnieuw verbinding. Staat het scherm uit, dan wordt er geen video binnengehaald.</li>
+    <li><b>Groot beeld wordt niet scherp?</b> Dan staat de camera waarschijnlijk op <b>H.265</b>; dat kan een browser niet afspelen, dus krijg je de lichte stroom. Zet in de Reolink-app bij de camera → <i>Weergave / Codering</i> de hoofdstroom op <b>H.264</b>.</li>
+    <li><b>Losse beelden</b>: kies bij <i>Snelheid</i> <b>Rustig</b> (elke 3 s), <b>Normaal</b> (elke seconde) of <b>Snel</b> (± 3 per seconde). Een nieuw beeld wordt pas getoond als het helemaal binnen is, dus zonder flikkeren.</li>
+  </ul>
   <p><b>Vloeiend beeld (proef)</b>: bij Surveillance Station kun je in de tegel echt bewegend beeld proberen. Werkt het niet op jouw NAS, dan valt de tegel vanzelf terug op losse beelden.</p>
   <h3>Groot beeld en opnames</h3>
   <p>Tik op de camera-tegel voor beeld over het hele scherm. Bij Surveillance Station staat daar ook <b>Opnames</b>: dat opent Surveillance Station in een nieuw venster.</p>
@@ -393,6 +399,7 @@
     <li><i>Inloggen bij Surveillance Station lukt niet</i>: controleer gebruiker en wachtwoord; tweestapsverificatie moet uit staan voor deze gebruiker.</li>
     <li><i>Dit apparaat geeft geen camerabeeld door aan Homey</i>: gebruik Surveillance Station of het IP-adres.</li>
     <li>De <b class="m">Controle</b> meldt een camera die geen beeld geeft.</li>
+    <li><i>Video lukt niet, losse beelden worden getoond</i>: de camera geeft geen videostroom door (bijv. H.265 of een ouder model). Het dashboard blijft gewoon werken met losse beelden; kies bij <i>Snelheid</i> <b>Snel</b> voor vloeiender beeld.</li>
   </ul>
 </section>
 
