@@ -165,6 +165,36 @@ class HomeyAdapter extends EventEmitter {
     return this.api.subscribe(`homey:app:${appId}`, { onEvent: (event, data) => onEvent(event, data) });
   }
 
+  // ---------- flows maken en aanpassen (voor de assistent) ----------
+  async flowCards(kind) {
+    this._cards = this._cards || {};
+    const c = this._cards[kind];
+    if (c && Date.now() - c.at < 5 * 60 * 1000) return c.list;
+    const fn = { trigger: 'getFlowCardTriggers', condition: 'getFlowCardConditions', action: 'getFlowCardActions' }[kind];
+    const raw = await this.api.flow[fn]();
+    const list = Object.values(raw).map(x => ({ id: x.id, ownerUri: x.ownerUri, title: x.title, titleFormatted: x.titleFormatted || null, hint: x.hint || null, args: x.args || [], droptoken: x.droptoken || null, duration: !!x.duration, deprecated: !!x.deprecated }));
+    this._cards[kind] = { at: Date.now(), list };
+    return list;
+  }
+  async flowAutocomplete(kind, id, name, query, args) {
+    return this.api.flow.getFlowCardAutocomplete({ type: 'flowcard' + kind, id, name, query: query || '', args: args || {} });
+  }
+  async getFlowRaw(id) {
+    const f = await this.api.flow.getFlow({ id });
+    return { id: f.id, name: f.name, folder: f.folder || null, enabled: f.enabled, trigger: f.trigger, conditions: f.conditions || [], actions: f.actions || [] };
+  }
+  async createFlow(flow) { const f = await this.api.flow.createFlow({ flow }); return f.id; }
+  async updateFlow(id, flow) { await this.api.flow.updateFlow({ id, flow }); }
+  async deleteFlow(id) { await this.api.flow.deleteFlow({ id }); }
+  async flowFolder(name) {
+    const all = Object.values(await this.api.flow.getFlowFolders());
+    const f = all.find(x => x.name === name);
+    if (f) return f.id;
+    return (await this.api.flow.createFlowFolder({ flowfolder: { name } })).id;
+  }
+  deviceName(id) { const d = this.cache.devices.find(x => x.id === id); return d ? d.name : null; }
+  appName(id) { const a = this.cache.apps.find(x => x.id === id); return a ? a.name : null; }
+
   async location() {
     return this.safe(() => this.api.geolocation.getOptionLocation(), null);
   }

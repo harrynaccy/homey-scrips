@@ -8,6 +8,7 @@ const { defaultConfig } = require('./default-config');
 const { AppBridge } = require('./appbridge');
 const icons = require('./icons');
 const { Assistant, friendlyError } = require('./assistant');
+const { FlowService } = require('./flows');
 
 const PORT = Number(process.env.PORT || 8095);
 const DATA = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
@@ -22,7 +23,8 @@ const homey = (isSet(process.env.HOMEY_ADDRESS) && isSet(process.env.HOMEY_TOKEN
   : new DemoAdapter();
 
 // Claude-assistent (alleen actief met ANTHROPIC_API_KEY; ASSISTANT_FAKE = testbestand zonder echte API)
-const assistant = new Assistant({ icons, client: process.env.ASSISTANT_FAKE ? require(path.resolve(process.env.ASSISTANT_FAKE)) : null });
+const flows = new FlowService(homey, DATA);
+const assistant = new Assistant({ icons, flows, client: process.env.ASSISTANT_FAKE ? require(path.resolve(process.env.ASSISTANT_FAKE)) : null });
 
 // ---------- configuratie ----------
 function readConfig() {
@@ -95,7 +97,13 @@ app.post('/api/mood/:id', wrap(req => homey.setMood(req.params.id)));
 app.post('/api/variable/:id', wrap(req => homey.setVariable(req.params.id, req.body.value)));
 app.post('/api/alarm/:id', wrap(req => homey.setAlarm(req.params.id, !!req.body.enabled)));
 
-app.get('/api/assistant', wrap(() => assistant.status()));
+app.get('/api/assistant', wrap(() => ({ ...assistant.status(), flows: flows.supported(), pinSet: flows.pinSet() })));
+// flows in Homey (alleen via een voorstel van de assistent; aanpassen van bestaande flows vraagt de pincode)
+const fail = (res, err) => { console.error('[flows]', err.message || err); res.status(400).json({ error: String(err.message || err) }); };
+app.get('/api/flows/pin', wrap(() => ({ set: flows.pinSet() })));
+app.post('/api/flows/pin', (req, res) => { try { flows.setPin(req.body.old, req.body.pin); res.json({ ok: true }); } catch (e) { fail(res, e); } });
+app.post('/api/flows/apply', async (req, res) => { try { res.json(await flows.apply(req.body.acties, req.body.pin)); } catch (e) { fail(res, e); } });
+app.post('/api/flows/undo/:id', async (req, res) => { try { res.json(await flows.undo(req.params.id)); } catch (e) { fail(res, e); } });
 app.post('/api/assistant', async (req, res) => {
   try {
     const b = req.body || {};

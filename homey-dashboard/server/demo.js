@@ -146,6 +146,56 @@ class DemoAdapter extends EventEmitter {
   }
   async location() { return { latitude: 52.27, longitude: 6.89 }; }
 
+  // ---- flows (nep-versie met dezelfde vorm als Homey Pro 2023) ----
+  async flowCards(kind) {
+    if (!this._cards) {
+      const C = { trigger: [], condition: [], action: [] };
+      const add = (k, uri, id, title, titleFormatted, args = []) => C[k].push({ id: `${uri}:${id}`, ownerUri: uri, title, titleFormatted, hint: null, args, droptoken: null, duration: false, deprecated: false });
+      for (const d of this.cache.devices) {
+        const u = 'homey:device:' + d.id;
+        if (d.caps.onoff) { add('trigger', u, 'turned_on', 'Is aangezet', null); add('trigger', u, 'turned_off', 'Is uitgezet', null); add('condition', u, 'on', 'Is aan', null); add('action', u, 'on', 'Aanzetten', null); add('action', u, 'off', 'Uitzetten', null); add('action', u, 'toggle', 'Aan- of uitzetten', null); }
+        if (d.caps.dim) add('action', u, 'dim', 'Dimmen', 'Dimmen naar [[dim]]', [{ name: 'dim', type: 'range', title: 'Helderheid', min: 0, max: 1, step: 0.01, label: '%', labelMultiplier: 100 }]);
+        if (d.caps.alarm_contact) { add('trigger', u, 'alarm_contact_true', 'Het contact-alarm is aangegaan', null); add('trigger', u, 'alarm_contact_false', 'Het contact-alarm is uitgegaan', null); add('condition', u, 'alarm_contact', 'Het contact-alarm is aan', null); }
+        if (d.caps.alarm_motion) { add('trigger', u, 'alarm_motion_true', 'Het bewegingsalarm is aangegaan', null); add('condition', u, 'alarm_motion', 'Het bewegingsalarm is aan', null); }
+      }
+      add('trigger', 'homey:manager:cron', 'time_exactly', 'Het is een bepaalde tijd', 'Het is [[time]]', [{ name: 'time', type: 'time', title: 'Tijd' }]);
+      add('condition', 'homey:manager:cron', 'time_between', 'Tijd is tussen', 'De tijd is tussen [[time_start]] en [[time_end]]', [{ name: 'time_start', type: 'time' }, { name: 'time_end', type: 'time' }]);
+      add('condition', 'homey:manager:sun', 'is_dark', 'Het is donker', null);
+      add('action', 'homey:manager:notifications', 'create_notification', 'Maak een melding', 'Maak een melding met [[text]]', [{ name: 'text', type: 'text', title: 'Tekst' }]);
+      add('action', 'homey:manager:mobile', 'push_text', 'Stuur een pushbericht', 'Stuur [[text]] naar [[user]]', [{ name: 'text', type: 'text' }, { name: 'user', type: 'autocomplete', title: 'Gebruiker' }]);
+      this._cards = C;
+    }
+    return this._cards[kind];
+  }
+  async flowAutocomplete(kind, id, name, query) {
+    if (name !== 'user') return [];
+    return this.cache.users.filter(u => !query || u.name.toLowerCase().includes(query.toLowerCase())).map(u => ({ id: u.id, name: u.name, athomId: 'demo-' + u.id }));
+  }
+  _flows() { if (!this._fl) { this._fl = new Map(); this._folders = [{ id: 'fo1', name: 'Spotify' }]; } return this._fl; }
+  async getFlowRaw(id) {
+    const f = this._flows().get(id);
+    if (f) return JSON.parse(JSON.stringify(f));
+    const c = [...this.cache.flows].find(x => x.id === id);
+    if (!c) throw new Error('Flow niet gevonden');
+    return { id, name: c.name, folder: null, enabled: true, trigger: { id: 'homey:manager:flow:programmatic_trigger', args: {} }, conditions: [], actions: [{ id: 'homey:device:d1:on', group: 'then', args: {} }] };
+  }
+  async createFlow(flow) {
+    const id = 'demo-' + Math.random().toString(36).slice(2, 10);
+    this._flows().set(id, { id, ...JSON.parse(JSON.stringify(flow)) });
+    this.cache.flows.push({ id, name: flow.name, enabled: flow.enabled !== false, folder: flow.folder || null, triggerable: flow.trigger.id.endsWith('programmatic_trigger'), type: 'flow' });
+    this.emit('library', this.cache); return id;
+  }
+  async updateFlow(id, flow) {
+    const cur = await this.getFlowRaw(id); const next = { ...cur, ...JSON.parse(JSON.stringify(flow)), id };
+    this._flows().set(id, next);
+    const c = this.cache.flows.find(x => x.id === id); if (c) { c.name = next.name; c.enabled = next.enabled; }
+    this.emit('library', this.cache);
+  }
+  async deleteFlow(id) { this._flows().delete(id); this.cache.flows = this.cache.flows.filter(x => x.id !== id); this.emit('library', this.cache); }
+  async flowFolder(name) { this._flows(); let f = this._folders.find(x => x.name === name); if (!f) { f = { id: 'fo' + (this._folders.length + 1), name }; this._folders.push(f); } return f.id; }
+  deviceName(id) { const d = this.find(id); return d ? d.name : null; }
+  appName(id) { return id; }
+
   // ---- Nep-versie van de Homey-app "Spotify Dashboard" (alleen voor de demo) ----
   demoApp() {
     if (this._app) return this._app;

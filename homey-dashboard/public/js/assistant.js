@@ -1,11 +1,12 @@
 /* Achterkant: Claude-assistent. Claude doet een voorstel; pas na "Toepassen" verandert er iets (in één stap ongedaan te maken). */
 (function () {
-  const D = window.D; const E = D.editor; const esc = D.esc; const F = E.F;
+  const D = window.D; const E = D.editor; const esc = D.esc; const F = E.F; const $ = D.$;
   const A = E.ai = { history: [], busy: false, total: 0, status: null, draft: '' };
   const EXAMPLES = [
     'Maak 3 knoppen voor de ramen die oranje oplichten als ze open staan',
     'Zet alle lampen van de woonkamer als wandschakelaar op een nieuw tabblad Woonkamer',
     'Maak een knop die de flow Alles uit start',
+    'Maak een flow: als het raam in de slaapkamer open gaat, stuur een melding',
   ];
   const DEFAULT_MODEL = 'claude-opus-5-5';
   const model = () => (D.cfg.settings.assistant && D.cfg.settings.assistant.model) || (A.status && A.status.defaultModel) || DEFAULT_MODEL;
@@ -14,8 +15,13 @@
   const HEX = /^#[0-9a-f]{6}$/i;
 
   // ---------- voorstel uitvoeren (op een willekeurige config: echt of een proefkopie) ----------
+  let flowKeys = null; // bij toepassen: sleutel van een nieuwe flow -> id in Homey
   const refOf = k => {
     if (!k || !k.soort || k.soort === 'geen') return { target: 'none' };
+    if (k.soort === 'flow' && /^nieuw:/.test(k.id || '')) {
+      if (!flowKeys) return { target: 'flow', id: k.id, flowType: 'flow' };
+      const id = flowKeys[k.id.slice(6)]; if (!id) throw new Error('de nieuwe flow is niet gemaakt'); return { target: 'flow', id, flowType: 'flow' };
+    }
     if (k.soort === 'apparaat') { const d = D.dev(k.id); if (!d) throw new Error('apparaat niet gevonden'); return { target: 'device', deviceId: d.id }; }
     if (k.soort === 'flow') { const f = [...D.lib.flows, ...D.lib.advancedFlows].find(x => x.id === k.id); if (!f) throw new Error('flow niet gevonden'); return { target: 'flow', id: f.id, flowType: f.type || 'flow' }; }
     if (k.soort === 'mood') { const m = D.lib.moods.find(x => x.id === k.id); if (!m) throw new Error('mood niet gevonden'); return { target: 'mood', id: m.id }; }
@@ -46,7 +52,9 @@
     return [r, Number.isInteger(a.x) ? 'op een andere vrije plek gezet' : ''];
   };
 
-  const runPlan = (plan, cfg, curTabId, icons = {}, pairs = {}) => {
+  const isFlow = a => a && (a.actie === 'flow_maken' || a.actie === 'flow_aanpassen');
+  const runPlan = (plan, cfg, curTabId, icons = {}, pairs = {}, flowSteps = null) => {
+    let fi = 0;
     const keys = {}; const out = []; const touched = [];
     const tabOf = ref => {
       if (!ref) return cfg.tabs.find(t => t.id === curTabId) || cfg.tabs[0];
@@ -98,13 +106,18 @@
           }
           touched.push(t.id); return '';
         }
+        case 'flow_maken': case 'flow_aanpassen': {
+          if (flowSteps) { const r = flowSteps[fi++] || { ok: false, note: 'niet uitgevoerd' }; if (!r.ok) throw new Error(r.note || 'mislukt'); return a.actie === 'flow_maken' ? 'aangemaakt in Homey, map Dashboard' : 'aangepast in Homey'; }
+          return a.actie === 'flow_maken' ? 'komt in Homey in de map Dashboard en staat meteen aan' : 'bestaande flow: vraagt je pincode';
+        }
         case 'tegel_verwijderen': { const { tab, t } = tileOf(a.tegel); tab.tiles.splice(tab.tiles.indexOf(t), 1); return ''; }
         default: throw new Error('onbekende stap');
       }
     };
     for (const a of (plan && plan.acties) || []) {
-      try { const note = step(a); out.push({ ok: true, text: a.omschrijving || a.actie, note }); }
-      catch (e) { out.push({ ok: false, text: a.omschrijving || a.actie, note: e.message }); }
+      const extra = isFlow(a) && a.leesbaar ? { flow: a.leesbaar } : {};
+      try { const note = step(a); out.push({ ok: true, text: a.omschrijving || a.actie, note, ...extra }); }
+      catch (e) { out.push({ ok: false, text: a.omschrijving || a.actie, note: e.message, ...extra }); }
     }
     return { steps: out, touched };
   };
@@ -125,20 +138,55 @@
     return { icons, pairs };
   };
 
+  // pincode vragen (voor het aanpassen van bestaande flows)
+  const askPin = text => new Promise(resolve => {
+    D.openSheet(`<div class="confirm"><p>${esc(text)}</p><input type="password" inputmode="numeric" autocomplete="off" class="pin-in" maxlength="8" placeholder="Pincode"><div class="row"><button class="btn ghost" data-a="no">Annuleren</button><button class="btn primary" data-a="yes">Doorgaan</button></div></div>`, 'small');
+    const inp = $('#sheet .pin-in'); setTimeout(() => inp.focus(), 50);
+    const done = v => { D._sheetCancel = null; D.closeSheet(); resolve(v); };
+    inp.onkeydown = e => { if (e.key === 'Enter') done(inp.value); };
+    $('#sheet').onclick = e => { const a = e.target.closest('[data-a]'); if (a) done(a.dataset.a === 'yes' ? inp.value : null); };
+    D._sheetCancel = () => resolve(null);
+  });
+  A.askPin = askPin;
+
   const apply = async msg => {
-    const plan = msg.plan; const { icons, pairs } = await prefetch(plan);
+    const plan = msg.plan; const acts = plan.acties || [];
+    let flowSteps = null; flowKeys = null;
+    if (acts.some(isFlow)) {
+      let pin;
+      if (acts.some(a => a.actie === 'flow_aanpassen')) {
+        const st = await D.api('GET', '/api/flows/pin');
+        if (!st.set) { D.toast('Stel eerst een pincode in: Assistent → Instellingen → Pincode voor flows', true); E.refreshPanel(); return; }
+        pin = await askPin('Er worden bestaande flows aangepast. Voer je pincode in.'); if (pin === null) { E.refreshPanel(); return; }
+      }
+      D.toast('Flows maken in Homey…');
+      const r = await D.api('POST', '/api/flows/apply', { acties: acts.filter(isFlow), pin });
+      flowSteps = r.steps; flowKeys = r.keys || {}; msg.flowBatch = r.batch;
+      await D.loadLibrary(); D.renderAll();
+    }
+    const { icons, pairs } = await prefetch(plan);
+    const hasDash = acts.some(a => !isFlow(a));
     const snaps = [E.snapPath('tabs')]; let res;
-    E.commit(null, () => { res = runPlan(plan, D.cfg, D.currentTab().id, icons, pairs); }, () => {
+    if (!hasDash) { res = runPlan(plan, D.clone(D.cfg), D.currentTab().id, icons, pairs, flowSteps); }
+    else E.commit(null, () => { res = runPlan(plan, D.cfg, D.currentTab().id, icons, pairs, flowSteps); }, () => {
       const first = res.touched.map(id => D.cfg.tabs.find(t => t.id === id) || (D.findTile(id) || {}).tab).find(Boolean);
       if (first && first.id !== D.currentTab().id) D.activeTab = first.id;
       D.applyAll();
       for (const id of res.touched) { const el = D.tileEls.get(id); if (el) el.classList.add('flash-ok'); }
     });
+    flowKeys = null;
     E.breakMerge();
     const ok = res.steps.filter(s => s.ok).length;
-    E.logAction('Assistent: ' + String(plan.samenvatting || 'voorstel').slice(0, 60), snaps, `${ok} van ${res.steps.length} stappen`);
+    if (hasDash) E.logAction('Assistent: ' + String(plan.samenvatting || 'voorstel').slice(0, 60), snaps, `${ok} van ${res.steps.length} stappen`);
     msg.state = 'applied'; msg.result = res.steps;
     D.toast(ok === res.steps.length ? 'Voorstel toegepast' : `Toegepast: ${ok} van ${res.steps.length} stappen`, ok === 0);
+    E.refreshPanel();
+  };
+
+  const undoFlows = async msg => {
+    if (!(await D.confirm('De flows uit dit voorstel terugdraaien? Nieuwe flows worden verwijderd, aangepaste flows krijgen hun oude versie terug.', 'Terugdraaien'))) return;
+    try { const r = await D.api('POST', '/api/flows/undo/' + encodeURIComponent(msg.flowBatch)); msg.flowUndone = true; await D.loadLibrary(); D.renderAll(); D.toast(r.ok ? 'Flows teruggedraaid' : 'Deels teruggedraaid: ' + r.problems.join(', '), !r.ok); }
+    catch (e) { D.toast('Terugdraaien mislukt: ' + e.message, true); }
     E.refreshPanel();
   };
 
@@ -171,9 +219,10 @@
     let h = m.text ? `<div class="ai-txt">${esc(m.text).replace(/\n/g, '<br>')}</div>` : '';
     if (m.plan) {
       const steps = m.result || m.check || [];
-      h += `<div class="ai-plan"><b>${esc(m.plan.samenvatting || 'Voorstel')}</b><ol>${steps.map(s => `<li class="${s.ok ? '' : 'bad'}">${esc(s.text)}${s.note ? `<small>${s.ok ? '' : 'Lukt niet: '}${esc(s.note)}</small>` : ''}</li>`).join('')}</ol>` +
+      h += `<div class="ai-plan"><b>${esc(m.plan.samenvatting || 'Voorstel')}</b><ol>${steps.map(s => `<li class="${s.ok ? '' : 'bad'}">${esc(s.text)}${s.flow ? `<div class="ai-flow">${esc(s.flow)}</div>` : ''}${s.note ? `<small>${s.ok ? '' : 'Lukt niet: '}${esc(s.note)}</small>` : ''}</li>`).join('')}</ol>` +
         (m.state === 'open' ? `<div class="acts"><button class="btn sm primary" data-aiapply="${i}" ${steps.some(s => s.ok) ? '' : 'disabled'}>${icon('check')}Toepassen</button><button class="btn sm" data-aicancel="${i}">${icon('x')}Annuleren</button></div>`
-          : m.state === 'applied' ? `<div class="ai-done">${icon('check')}Toegepast. Terugdraaien kan met ${icon('undo')} bovenin of via Laatste wijzigingen.</div>`
+          : m.state === 'applied' ? `<div class="ai-done">${icon('check')}Toegepast.${m.plan.acties.some(a => !isFlow(a)) ? ` Het dashboard terugdraaien kan met ${icon('undo')} bovenin of via Laatste wijzigingen.` : ''}</div>` +
+            (m.flowBatch ? (m.flowUndone ? '<div class="ai-done muted">Flows teruggedraaid</div>' : `<div class="acts"><button class="btn sm" data-aiflowundo="${i}">${icon('undo')}Flows terugdraaien</button></div>`) : '')
           : '<div class="ai-done muted">Niet toegepast</div>') + '</div>';
     }
     const cost = m.usage ? `<div class="ai-cost">≈ ${usd(m.usage.usd || 0)} · ${esc((A.status && (A.status.models.find(x => m.model && m.model.startsWith(x.id)) || {}).name) || m.model || '')}</div>` : '';
@@ -189,6 +238,7 @@
       ${A.busy ? `<div class="ai-msg claude busy"><span class="ai-dots"><i></i><i></i><i></i></span>Claude denkt na… (kan een halve minuut duren)</div>` : ''}</div>
       <div class="ai-in"><textarea id="ai-q" rows="3" placeholder="Bijv. maak een knop voor de tuinverlichting" ${A.busy ? 'disabled' : ''}>${esc(A.draft)}</textarea><button class="btn primary" data-aisend ${A.busy ? 'disabled' : ''}>${icon('play')}Vraag</button></div>
       ${F.group('Instellingen', F.row('Model', F.select('settings.assistant.model', model(), st.models.map(x => [x.id, x.name]), 'none'), 'Opus = slimst, Sonnet = ongeveer de helft goedkoper') +
+        F.row('Pincode voor flows', `<button class="btn sm" data-aipin>${icon('lock')}${st.pinSet ? 'Wijzigen' : 'Instellen'}</button>`, st.pinSet ? 'Nodig om bestaande flows aan te passen' : 'Nog niet ingesteld') +
         `<p class="note">Deze sessie: ≈ ${usd(A.total)}${A.history.length ? ` · <button class="linkbtn" data-aiclear>Nieuw gesprek</button>` : ''}</p>`)}</div>`;
   };
   E.wire.assistent = async root => {
@@ -207,6 +257,16 @@
     const sb = root.querySelector('[data-aisend]'); if (sb) sb.onclick = () => send(q.value);
     root.querySelectorAll('[data-aiapply]').forEach(b => b.onclick = async () => { b.disabled = true; try { await apply(A.history[Number(b.dataset.aiapply)]); } catch (e) { D.toast('Toepassen mislukt: ' + e.message, true); E.refreshPanel(); } });
     root.querySelectorAll('[data-aicancel]').forEach(b => b.onclick = () => { A.history[Number(b.dataset.aicancel)].state = 'cancelled'; E.refreshPanel(); });
+    root.querySelectorAll('[data-aiflowundo]').forEach(b => b.onclick = () => undoFlows(A.history[Number(b.dataset.aiflowundo)]));
+    const pb = root.querySelector('[data-aipin]'); if (pb) pb.onclick = async () => {
+      let old;
+      if (A.status.pinSet) { old = await askPin('Voer je huidige pincode in.'); if (old === null) return; }
+      const p1 = await askPin('Kies een nieuwe pincode (4 tot 8 cijfers).'); if (p1 === null) return;
+      const p2 = await askPin('Voer de nieuwe pincode nog een keer in.'); if (p2 === null) return;
+      if (p1 !== p2) { D.toast('De twee pincodes zijn niet gelijk', true); return; }
+      try { await D.api('POST', '/api/flows/pin', { old, pin: p1 }); A.status.pinSet = true; D.toast('Pincode opgeslagen'); } catch (e) { D.toast(e.message, true); }
+      E.refreshPanel();
+    };
     const cl = root.querySelector('[data-aiclear]'); if (cl) cl.onclick = () => { A.history = []; E.refreshPanel(); };
   };
 })();
