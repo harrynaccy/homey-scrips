@@ -96,7 +96,7 @@
   <p>Het dashboard heeft een <b>voorkant</b> (wat je normaal ziet en bedient) en een <b>achterkant</b> (waar je alles instelt). Alles wat je instelt wordt automatisch opgeslagen op de NAS en is meteen zichtbaar op de tablet, op de laptop en in het Windows-programma.</p>
   <h3>De achterkant openen</h3>
   <ul>
-    <li><b>Tablet:</b> tik <b>4× snel</b> op een lege plek of op de tabbalk onderaan.</li>
+    <li><b>Tablet:</b> tik <b>4× snel</b> op een lege plek of op de tabbalk onderaan. Staat de achterkant op slot, dan vraagt hij eerst je pincode.</li>
     <li><b>Laptop of pc:</b> klik 4× snel op een lege plek, of druk in het Windows-programma op <kbd>Ctrl</kbd>+<kbd>E</kbd>.</li>
   </ul>
   <p>Het dashboard wordt dan kleiner getoond, met rechts het menu. Links in het menu staan de onderdelen: <b class="m">Toevoegen</b>, <b class="m">Assistent</b>, <b class="m">Controle</b>, <b class="m">Knoppen</b>, <b class="m">Pictogrammen</b>, <b class="m">Tegel</b>, <b class="m">Tabbladen</b>, <b class="m">Scherm</b>, <b class="m">Uiterlijk</b>, <b class="m">Raster</b> en <b class="m">Systeem</b>.</p>
@@ -349,8 +349,51 @@
     <li><b>Apparaat verwijderen</b>: alleen bij apparaten die niet bereikbaar zijn. Je ziet eerst in welke flows en tegels het gebruikt wordt, daarna volgen twee bevestigingen en je pincode. <b>Dit is niet terug te draaien</b>: wil je het apparaat terug, dan moet je het opnieuw koppelen in de Homey-app, en flows en tegels opnieuw instellen.</li>
     <li><b>Laat Claude repareren</b>: opent de <b class="m">Assistent</b> met de vraag al ingevuld. Tik op <b>Vraag</b>. Claude leest de flow, zoekt het juiste apparaat en doet een voorstel. Omdat het een bestaande flow is, vraagt <b>Toepassen</b> je pincode.</li>
   </ul>
+  <h3>Automatisch controleren met een melding</h3>
+  <p>Onder <b class="m">Controle</b> → <i>Automatisch controleren</i>:</p>
+  <ul>
+    <li><b>Hoe vaak</b>: uit, elk uur (standaard), elke 3 uur of één keer per dag.</li>
+    <li><b>Melding</b>: in de <b>tijdlijn van de Homey-app</b>, als <b>pushbericht naar een telefoon</b> (kies dan <i>Naar</i>: welke gebruiker) of geen melding.</li>
+    <li>Je krijgt alleen een melding bij <b>nieuwe</b> problemen. Een probleem dat blijft, meldt hij niet elk uur opnieuw.</li>
+    <li><b>Testmelding sturen</b> om te zien of het aankomt; <b>Nu automatisch controleren</b> om het meteen te doen.</li>
+  </ul>
   <h3>Tegel op het dashboard</h3>
   <p><b class="m">Toevoegen</b> → <b>Overig</b> → <b>Controle</b>. De tegel toont een groen vinkje of het aantal problemen en controleert elke 10 minuten opnieuw. Tik erop voor de lijst; apps herstarten kan daar ook. Flows repareren met Claude doe je op de achterkant.</p>
+</section>
+
+<section id="camera" data-title="Camera">
+  <h2>Camera</h2>
+  <p>Het dashboard toont het beeld van je camera's in een tegel, groot over het hele scherm, en als pop-up bij beweging. Het beeld komt altijd via de NAS; wachtwoorden blijven op de NAS (<code>data/cameras.json</code>) en komen nooit op de tablet.</p>
+  <h3>Drie manieren om beeld te krijgen</h3>
+  <table>
+    <tr><th>Bron</th><th>Wat je invult</th><th>Beeld</th></tr>
+    <tr><td><b>Surveillance Station</b> (aanbevolen)</td><td>Eén keer een gebruiker voor Surveillance Station; daarna de camera kiezen uit de lijst</td><td>Bijna live (elke seconde)</td></tr>
+    <tr><td>Via Homey</td><td>Alleen het camera-apparaat kiezen (bijv. "Reolink Camera")</td><td>Elke 3 seconden; werkt alleen als de app het beeld aan Homey doorgeeft</td></tr>
+    <tr><td>Rechtstreeks (Reolink)</td><td>IP-adres, gebruiker en wachtwoord van de camera</td><td>Bijna live (elke seconde)</td></tr>
+  </table>
+  <h3>Surveillance Station: een aparte gebruiker maken (eenmalig)</h3>
+  <ol>
+    <li>DSM → <b>Configuratiescherm</b> → <b>Gebruiker en groep</b> → <b>Maken</b>. Naam bijv. <code>dashboard</code>, een sterk wachtwoord. Geen beheerder, <b>geen tweestapsverificatie</b>.</li>
+    <li>Bij <b>Toepassingen</b>: alleen <b>Surveillance Station</b> toestaan.</li>
+    <li>Open <b>Surveillance Station</b> → <b>Gebruiker</b> (of <i>Privilege-profiel</i>) en geef de gebruiker een profiel dat alleen mag <b>kijken</b> (bijv. <i>Spectator/Toeschouwer</i>).</li>
+  </ol>
+  <h3>Camera toevoegen</h3>
+  <ol>
+    <li>Achterkant → <b class="m">Systeem</b> → <i>Camera's</i> → <b>Surveillance Station instellen</b>: adres (<code>http://192.168.178.79:5000</code>), gebruiker en wachtwoord → <b>Opslaan en testen</b>. Je ziet hoeveel camera's er gevonden zijn.</li>
+    <li><b>Camera toevoegen</b> → kies de bron → kies de camera, geef een naam → <b>Opslaan en testen</b>. Je ziet meteen een voorbeeldbeeld.</li>
+    <li><b class="m">Toevoegen</b> → <b>Overig</b> → <b>Camera</b>. Tik op de tegel → <b class="m">Tegel</b> → kies de camera. Bij <i>Beeld vullen</i> kies je of het beeld de tegel vult of helemaal zichtbaar is.</li>
+  </ol>
+  <p><b>Vloeiend beeld (proef)</b>: bij Surveillance Station kun je in de tegel echt bewegend beeld proberen. Werkt het niet op jouw NAS, dan valt de tegel vanzelf terug op losse beelden.</p>
+  <h3>Groot beeld en opnames</h3>
+  <p>Tik op de camera-tegel voor beeld over het hele scherm. Bij Surveillance Station staat daar ook <b>Opnames</b>: dat opent Surveillance Station in een nieuw venster.</p>
+  <h3>Pop-up bij beweging</h3>
+  <p><b class="m">Systeem</b> → <i>Camera's</i> → <i>Pop-up bij beweging</i>: zet <b>Aan</b>, kies de <b>camera</b> en <b>bij melding van</b> welk apparaat (bijv. de bewegingsmelder van de Reolink, of later een deurbel). Kies hoe lang (15 s, 30 s, 1 min) en eventueel <b>alleen tussen</b> bepaalde tijden. Bij beweging springt het beeld naar voren en gaat het scherm aan. <b>Pop-up proberen</b> laat zien hoe het eruitziet.</p>
+  <h3>Problemen</h3>
+  <ul>
+    <li><i>Inloggen bij Surveillance Station lukt niet</i>: controleer gebruiker en wachtwoord; tweestapsverificatie moet uit staan voor deze gebruiker.</li>
+    <li><i>Dit apparaat geeft geen camerabeeld door aan Homey</i>: gebruik Surveillance Station of het IP-adres.</li>
+    <li>De <b class="m">Controle</b> meldt een camera die geen beeld geeft.</li>
+  </ul>
 </section>
 
 <section id="pictogrammen" data-title="Pictogrammen">
@@ -522,9 +565,35 @@
     <li><b>Adressen invullen</b>: standaardbegin en snelknoppen van het adresveld.</li>
     <li><b>Back-ups</b>: elke dag automatisch (14 dagen bewaard). Ook <b>Back-up maken</b>, <b>Exporteren</b> (bestand naar je pc) en <b>Importeren</b>. Bij elke back-up: terugzetten, downloaden, verwijderen.</li>
     <li><b>Achterkant openen</b>: aantal tikken en binnen hoeveel tijd.</li>
+    <li><b>Camera's</b>: camera's toevoegen en de pop-up bij beweging (zie <a href="#camera">Camera</a>).</li>
+    <li><b>Pincode</b>: zie hieronder.</li>
+    <li><b>Bijwerken</b>: zie hieronder.</li>
+    <li><b>Volledige back-up</b>: zie <a href="#voorbereiding">Voorbereiding</a>.</li>
     <li><b>Opnieuw beginnen</b>: alles terug naar het begin (back-ups blijven bewaard).</li>
   </ul>
   <div class="tip">Maak een back-up voordat je grote dingen verandert. Terugzetten kan altijd.</div>
+  <h3>Pincode</h3>
+  <p>Eén pincode voor alles wat je niet per ongeluk wilt laten gebeuren: de achterkant openen, flows aanpassen of verwijderen, en apparaten verwijderen.</p>
+  <ul>
+    <li><b>Pincode instellen / wijzigen</b>: <b class="m">Systeem</b> → <i>Pincode</i>. Bij wijzigen vraagt hij eerst de huidige pincode.</li>
+    <li><b>Achterkant op slot</b>: na 4× tikken vraagt het dashboard eerst de pincode. Na het sluiten mag je de achterkant 5 minuten zonder pincode opnieuw openen.</li>
+    <li><b>Dit apparaat vertrouwen</b>: op dít scherm (bijvoorbeeld je pc) wordt nooit om de pincode gevraagd. Doe dit niet op de tablet aan de muur.</li>
+    <li>Na 5 keer een verkeerde pincode moet je 5 minuten wachten.</li>
+    <li>Pincode vergeten? Verwijder op de NAS het bestand <code>data/flowpin.json</code> en stel een nieuwe in.</li>
+  </ul>
+  <h3>Bijwerken met één knop</h3>
+  <p><b class="m">Systeem</b> → <i>Bijwerken</i> laat zien welke versie er draait en of er een nieuwere is.</p>
+  <ol>
+    <li>Tik op <b>Bijwerken</b> en bevestig.</li>
+    <li>Het dashboard maakt eerst een <b>volledige back-up</b> (op de NAS in <code>data/backups</code>, de laatste 3 blijven bewaard), haalt de nieuwe versie op, controleert die, bewaart de oude bestanden en zet de nieuwe neer.</li>
+    <li>Daarna start het dashboard opnieuw (ongeveer een minuut). Alle schermen — tablet, pc, browser — laden de nieuwe versie vanzelf.</li>
+  </ol>
+  <ul>
+    <li>Start de nieuwe versie niet goed op, dan zet het dashboard <b>vanzelf</b> de vorige versie terug.</li>
+    <li>Toch niet tevreden? <b>Vorige versie terugzetten</b>.</li>
+    <li>Je indeling, sleutels, <code>docker-compose.yml</code> en de map <code>data</code> worden nooit aangeraakt.</li>
+    <li>De NAS moet internet hebben (de nieuwe versie komt van GitHub).</li>
+  </ul>
 </section>
 
 <section id="tablet" data-title="Tablet met Fully Kiosk">
@@ -569,6 +638,7 @@
 
 <section id="nas" data-title="Bijwerken op de NAS">
   <h2>Bijwerken op de NAS</h2>
+  <p><b>Makkelijkst:</b> achterkant → <b class="m">Systeem</b> → <b>Bijwerken</b> (zie <a href="#systeem">Systeem</a>). Alleen als dat niet kan (bijvoorbeeld zonder internet op de NAS) doe je het met de hand:</p>
   <ol>
     <li>Pak de nieuwe zip uit en kopieer alles <b>over de oude bestanden heen</b> in <code>docker/Homey Dashboard</code>.</li>
     <li>Start het project opnieuw: <b>Container Manager → Project → homey-dashboard → Stoppen</b>, daarna <b>Starten</b>. (Alleen de container herstarten is genoeg bij gewone updates, maar niet als je <code>docker-compose.yml</code> hebt veranderd.)</li>

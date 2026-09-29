@@ -92,6 +92,12 @@ class Health {
     const data = await this.homey.healthData();
     this.apps = data.apps; this.data = data;
     const devices = checkDevices(data);
+    if (this.cameras) {
+      const cams = this.cameras.load().cams;
+      await Promise.all(cams.map(c => this.cameras.snapshot(c.id).catch(e => {
+        devices.push({ sev: 'error', kind: 'camera', id: c.id, title: `Camera ${c.name}`, problem: 'Geeft geen beeld', detail: String(e.message || e), fix: null });
+      })));
+    }
     const flows = checkFlows(data);
     const sevOrder = { error: 0, warn: 1 };
     const sort = l => l.sort((a, b) => sevOrder[a.sev] - sevOrder[b.sev] || a.title.localeCompare(b.title));

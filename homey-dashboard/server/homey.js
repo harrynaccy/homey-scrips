@@ -16,6 +16,7 @@ function slimDevice(d) {
     id: d.id, name: d.name, zone: d.zone, class: d.class, virtualClass: d.virtualClass || null,
     icon: d.iconObj ? d.iconObj.url : null, available: d.available !== false, unavailableMessage: d.unavailableMessage || null,
     driver: d.driverId || d.driverUri || null,
+    images: Array.isArray(d.images) ? d.images.map(i => ({ id: i.id, title: i.title || null })) : [],
     capabilities: d.capabilities || Object.keys(caps), caps, ui: d.ui || null,
   };
 }
@@ -199,6 +200,21 @@ class HomeyAdapter extends EventEmitter {
   async flowAutocomplete(kind, id, name, query, args) {
     return this.api.flow.getFlowCardAutocomplete({ type: 'flowcard' + kind, id, name, query: query || '', args: args || {} });
   }
+  // camerabeeld van een apparaat (bijv. Reolink-app) via de afbeeldingen van Homey
+  async cameraImage(deviceId, imageId) {
+    const d = (this.rawDevices || {})[deviceId];
+    if (!d) throw new Error('Het camera-apparaat is niet gevonden in Homey');
+    const imgs = d.images || [];
+    const img = imgs.find(i => i.id === imageId) || imgs[0];
+    const url = img && ((img.imageObj && img.imageObj.url) || img.url);
+    if (!url) throw new Error('Dit apparaat geeft geen camerabeeld door aan Homey. Gebruik Surveillance Station of het IP-adres van de camera.');
+    const full = /^https?:/.test(url) ? url : this.address + url;
+    const r = await fetch(full + (full.includes('?') ? '&' : '?') + 't=' + Date.now(), { headers: { Authorization: 'Bearer ' + this.token } });
+    const type = r.headers.get('content-type') || '';
+    if (!r.ok || !/^image\//.test(type)) throw new Error(`Homey gaf geen camerabeeld (${r.status})`);
+    return { type, data: Buffer.from(await r.arrayBuffer()) };
+  }
+  async runAction(id, args) { return this.api.flow.runFlowCardAction({ id, args: args || {} }); }
   async getFlowRaw(id) {
     const f = await this.api.flow.getFlow({ id });
     return { id: f.id, name: f.name, folder: f.folder || null, enabled: f.enabled, trigger: f.trigger, conditions: f.conditions || [], actions: f.actions || [] };

@@ -1,7 +1,15 @@
 'use strict';
 const path = require('path');
 const fs = require('fs');
+// Eerst de bewaking van "Bijwerken": start een nieuwe versie niet goed, dan komt de oude terug.
+const DATA = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
+fs.mkdirSync(DATA, { recursive: true });
+const { Updater } = require('./updater');
+const updater = new Updater(DATA, () => require('./backup').fullBackup({ dataDir: DATA, keys: true }));
+updater.guard();
 const express = require('express');
+// versie: verandert na Bijwerken; schermen herladen dan vanzelf
+const VERSION = (updater.state().installedAt || '') + '|' + (updater.state().sha || 'lokaal');
 const { HomeyAdapter } = require('./homey');
 const { DemoAdapter } = require('./demo');
 const { defaultConfig } = require('./default-config');
@@ -10,11 +18,12 @@ const icons = require('./icons');
 const { Assistant, friendlyError } = require('./assistant');
 const { FlowService } = require('./flows');
 const { Health } = require('./health');
+const { AutoCheck } = require('./autocheck');
+const { Cameras } = require('./cameras');
 const { nl } = require('./nl');
 const { fullBackup } = require('./backup');
 
 const PORT = Number(process.env.PORT || 8095);
-const DATA = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const BG_DIR = path.join(DATA, 'backgrounds');
 const BK_DIR = path.join(DATA, 'backups');
 const CFG = path.join(DATA, 'config.json');
@@ -28,6 +37,9 @@ const homey = (isSet(process.env.HOMEY_ADDRESS) && isSet(process.env.HOMEY_TOKEN
 // Claude-assistent (alleen actief met ANTHROPIC_API_KEY; ASSISTANT_FAKE = testbestand zonder echte API)
 const flows = new FlowService(homey, DATA);
 const health = new Health(homey);
+const cameras = new Cameras({ homey, dataDir: DATA });
+health.cameras = cameras;
+let autocheck = null; // na readConfig
 const assistant = new Assistant({ icons, flows, client: process.env.ASSISTANT_FAKE ? require(path.resolve(process.env.ASSISTANT_FAKE)) : null });
 
 // ---------- configuratie ----------
@@ -42,6 +54,7 @@ function writeConfig(cfg) {
   autoBackup();
 }
 if (!readConfig()) writeConfig(defaultConfig());
+autocheck = new AutoCheck({ health, homey, dataDir: DATA, readConfig });
 
 function autoBackup() {
   const day = new Date().toISOString().slice(0, 10);
@@ -107,6 +120,7 @@ app.get('/api/assistant', wrap(() => ({ ...assistant.status(), flows: flows.supp
 // flows in Homey (alleen via een voorstel van de assistent; aanpassen van bestaande flows vraagt de pincode)
 const fail = (res, err) => { console.error('[fout]', err.message || err); res.status(400).json({ error: nl(err) }); };
 app.get('/api/flows/pin', wrap(() => ({ set: flows.pinSet() })));
+app.post('/api/pin/check', (req, res) => { try { flows.checkPin(req.body.pin); res.json({ ok: true }); } catch (e) { fail(res, e); } });
 app.post('/api/flows/pin', (req, res) => { try { flows.setPin(req.body.old, req.body.pin); res.json({ ok: true }); } catch (e) { fail(res, e); } });
 // controle van apparaten en flows
 app.get('/api/health', async (req, res) => {
@@ -115,6 +129,23 @@ app.get('/api/health', async (req, res) => {
 });
 app.get('/api/health/usage/:id', async (req, res) => { try { res.json(await health.usage(req.params.id, readConfig())); } catch (e) { fail(res, e); } });
 app.post('/api/health/delete-device/:id', async (req, res) => { try { res.json(await health.deleteDevice(req.params.id, flows, req.body.pin)); } catch (e) { fail(res, e); } });
+// camera's (wachtwoorden blijven op de NAS)
+app.get('/api/cameras', wrap(() => cameras.list()));
+app.post('/api/cameras', (req, res) => { try { res.json(cameras.saveCam(req.body || {})); } catch (e) { fail(res, e); } });
+app.delete('/api/cameras/:id', (req, res) => { try { res.json(cameras.removeCam(req.params.id)); } catch (e) { fail(res, e); } });
+app.post('/api/cameras/ss', async (req, res) => { try { res.json(await cameras.saveSS(req.body || {})); } catch (e) { fail(res, e); } });
+app.get('/api/cameras/ss', async (req, res) => { try { res.json(await cameras.ssCameras()); } catch (e) { fail(res, e); } });
+app.get('/api/camera/:id/snapshot', async (req, res) => {
+  try { const s = await cameras.snapshot(req.params.id); res.set({ 'Content-Type': s.type, 'Cache-Control': 'no-store' }); res.end(s.data); }
+  catch (e) { res.status(502).json({ error: nl(e) }); }
+});
+app.get('/api/camera/:id/live', async (req, res) => { try { await cameras.live(req.params.id, req, res); } catch (e) { if (!res.headersSent) res.status(502).json({ error: nl(e) }); } });
+
+// automatische controle met melding
+app.get('/api/autocheck', wrap(() => ({ settings: autocheck.settings(), last: autocheck.last })));
+app.post('/api/autocheck/run', async (req, res) => { try { res.json(await autocheck.tick(true)); } catch (e) { fail(res, e); } });
+app.post('/api/autocheck/test', async (req, res) => { try { await autocheck.notify('Testmelding van Homey Dashboard: meldingen van de Controle komen goed aan.'); res.json({ ok: true }); } catch (e) { fail(res, e); } });
+app.get('/api/autocheck/users', async (req, res) => { try { res.json(await autocheck.users()); } catch (e) { fail(res, e); } });
 app.post('/api/health/restart-app/:id', async (req, res) => { try { res.json(await health.restartApp(req.params.id)); } catch (e) { fail(res, e); } });
 app.post('/api/flows/needpin', wrap(req => ({ pin: flows.needsPin(req.body.acties) })));
 app.post('/api/flows/apply', async (req, res) => { try { res.json(await flows.apply(req.body.acties, req.body.pin)); } catch (e) { fail(res, e); } });
@@ -166,6 +197,7 @@ app.get('/api/events', (req, res) => {
   res.flushHeaders();
   res.write(`event: status\ndata: ${JSON.stringify(homey.status)}\n\n`);
   if (homey.link) res.write(`event: link\ndata: ${JSON.stringify(homey.link)}\n\n`);
+  res.write(`event: hello\ndata: ${JSON.stringify({ version: VERSION })}\n\n`);
   clients.add(res);
   // hartslag: laat de browser weten dat de NAS er nog is (verbindingsbalk onderaan)
   const ping = setInterval(() => res.write(`event: hb\ndata: ${Date.now()}\n\n`), 10000);
@@ -209,6 +241,11 @@ app.get('/api/fullbackup', (req, res) => {
     res.end(buf);
   } catch (e) { console.error('[back-up]', e); res.status(500).json({ error: 'Back-up maken lukt niet. ' + nl(e) }); }
 });
+// bijwerken met één knop
+app.get('/api/update/check', async (req, res) => { try { res.json(await updater.check(req.query.force === '1')); } catch (e) { res.json({ error: 'Kan niet kijken of er een nieuwe versie is. ' + nl(e) }); } });
+app.get('/api/update/status', wrap(() => updater.status));
+app.post('/api/update/run', (req, res) => { try { res.json(updater.start()); } catch (e) { fail(res, e); } });
+app.post('/api/update/rollback', (req, res) => { try { res.json(updater.requestRollback()); } catch (e) { fail(res, e); } });
 app.get('/api/backups', wrap(() => fs.readdirSync(BK_DIR).filter(n => n.endsWith('.json')).sort().reverse()
   .map(n => ({ name: n, size: fs.statSync(path.join(BK_DIR, n)).size, date: fs.statSync(path.join(BK_DIR, n)).mtime }))));
 app.post('/api/backups', wrap(() => {

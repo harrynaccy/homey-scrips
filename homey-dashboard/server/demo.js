@@ -55,6 +55,7 @@ class DemoAdapter extends EventEmitter {
       dev('d16', 'Raam woonkamer', Z.wk, 'sensor', [cap('alarm_contact', true), cap('measure_battery', 77)]),
       dev('d17', 'Raam keuken', Z.kk, 'sensor', [cap('alarm_contact', false), cap('measure_battery', 93)]),
       dev('d18', 'Raam slaapkamer', Z.sk, 'sensor', [cap('alarm_contact', true), cap('measure_battery', 58)]),
+      dev('d19', 'Reolink Camera', Z.tuin, 'camera', [cap('alarm_motion', false), cap('alarm_tamper', false)]),
     ];
     this.cache = {
       devices,
@@ -141,9 +142,21 @@ class DemoAdapter extends EventEmitter {
     }
     return { values };
   }
+  async cameraImage(deviceId) {
+    if (deviceId !== 'd19') throw new Error('Dit apparaat geeft geen camerabeeld door aan Homey.');
+    const t = new Date().toLocaleTimeString('nl-NL');
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6d8fb5"/><stop offset=".6" stop-color="#b9c7d3"/><stop offset=".61" stop-color="#5b6b45"/><stop offset="1" stop-color="#3f4a30"/></linearGradient></defs><rect width="640" height="360" fill="url(#g)"/><rect x="40" y="150" width="200" height="120" fill="#8a6f55"/><rect x="420" y="120" width="30" height="160" fill="#4d3b2a"/><circle cx="435" cy="100" r="60" fill="#3e5a2f"/><text x="16" y="30" font-family="monospace" font-size="20" fill="#fff">Balkon (demo)</text><text x="624" y="344" text-anchor="end" font-family="monospace" font-size="20" fill="#fff">${t}</text></svg>`;
+    return { type: 'image/svg+xml', data: Buffer.from(svg) };
+  }
+  async runAction(id, args) {
+    this._notes = this._notes || [];
+    const n = { id: 'n' + Date.now(), excerpt: (id.includes('push') ? `[push naar ${(args.user && args.user.name) || '?'}] ` : '') + args.text, dateCreated: new Date().toISOString() };
+    this._notes.unshift(n); console.log('[demo] melding:', n.excerpt);
+    return true;
+  }
   async notifications() {
     const now = Date.now();
-    return [
+    return [...(this._notes || []),
       { id: 'n1', excerpt: 'Beweging gedetecteerd in de **keuken**', dateCreated: new Date(now - 6e5).toISOString() },
       { id: 'n2', excerpt: 'Vaatwasser is klaar', dateCreated: new Date(now - 3.6e6).toISOString() },
       { id: 'n3', excerpt: 'Batterij **Voordeur** is 64%', dateCreated: new Date(now - 8.6e7).toISOString() },

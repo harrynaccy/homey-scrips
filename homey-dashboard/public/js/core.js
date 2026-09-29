@@ -42,6 +42,7 @@
   })();
 
   // ---------- live updates ----------
+  D.capHooks = []; // extra reacties op live-waarden (bijv. camera-pop-up bij beweging)
   D.conn = { nasAt: 0, nasErr: false, nasSince: Date.now(), homey: null };
   D.connectEvents = () => {
     const es = new EventSource('/api/events');
@@ -51,6 +52,7 @@
       if (u.kind === 'cap') {
         const d = D.dev(u.deviceId);
         if (d && d.caps[u.cap]) { d.caps[u.cap].value = u.value; D.refreshDevice(u.deviceId); }
+        for (const f of D.capHooks) { try { f(u); } catch (e) { /* */ } }
       } else if (u.kind === 'var') {
         const v = D.lib.variables.find(x => x.id === u.id); if (v) v.value = u.value; D.refreshWhere(t => t.type === 'variable' && t.ref && t.ref.id === u.id);
       } else if (u.kind === 'user') {
@@ -68,6 +70,14 @@
     const seen = () => { D.conn.nasAt = Date.now(); D.conn.nasErr = false; D.connbar && D.connbar.update(); };
     es.onopen = seen;
     es.addEventListener('hb', seen);
+    es.addEventListener('hello', ev => {
+      const v = JSON.parse(ev.data).version;
+      if (D.version && D.version !== v) {
+        if (D.editing) D.toast('Er is een nieuwe versie geïnstalleerd. Sluit de achterkant om hem te laden.');
+        else location.reload();
+      }
+      D.version = v;
+    });
     es.addEventListener('link', ev => { D.conn.homey = JSON.parse(ev.data); seen(); });
     es.onerror = () => { D.conn.nasErr = true; D.connbar && D.connbar.update(); /* EventSource maakt zelf opnieuw verbinding */ };
   };

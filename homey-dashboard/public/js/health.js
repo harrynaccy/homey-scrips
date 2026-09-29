@@ -128,9 +128,30 @@
       <div class="acts"><button class="btn sm primary" data-hcheck ${H.loading ? 'disabled' : ''}>${icon('refresh')}${H.loading ? 'Bezig met controleren…' : d ? 'Opnieuw controleren' : 'Nu controleren'}</button></div>
       ${H.err ? `<p class="note h-err">${esc(H.err)}</p>` : ''}
       <div class="h-list">${d ? H.listHtml(d, true) : ''}</div>
+      ${autoGroup()}
       <p class="note">Batterij telt als bijna leeg onder 20%. Een sensor die 24 uur niets meldde, krijgt een waarschuwing. Zet de tegel <b>Controle</b> (Toevoegen → Overig) op het dashboard om de stand altijd te zien.</p>`;
   };
+  const autoGroup = () => {
+    const F = E.F; const ac = { every: 1, notify: 'timeline', ...(D.cfg.settings.autocheck || {}) };
+    return F.group('Automatisch controleren', `<p class="note">Het dashboard controleert op de achtergrond en stuurt alleen een melding bij <b>nieuwe</b> problemen.</p>` +
+      F.row('Hoe vaak', F.select('settings.autocheck.every', String(ac.every), [['0', 'Uit'], ['1', 'Elk uur'], ['3', 'Elke 3 uur'], ['24', 'Eén keer per dag']], 'panel')) +
+      F.row('Melding', F.select('settings.autocheck.notify', ac.notify, [['timeline', 'In de tijdlijn van de Homey-app'], ['push', 'Pushbericht naar een telefoon'], ['uit', 'Geen melding']], 'panel')) +
+      (ac.notify === 'push' ? F.row('Naar', '<select data-acuser><option>Laden…</option></select>') : '') +
+      `<div class="acts"><button class="btn sm" data-actest>${icon('bell')}Testmelding sturen</button><button class="btn sm" data-acrun>${icon('refresh')}Nu automatisch controleren</button></div><p class="note" id="aclast"></p>`);
+  };
+  const wireAuto = root => {
+    const t = root.querySelector('[data-actest]'); if (t) t.onclick = async () => { try { await E.saveNow(); await D.api('POST', '/api/autocheck/test'); D.toast('Testmelding verstuurd. Kijk in de Homey-app.'); } catch (e) { D.toast(e.message, true); } };
+    const r = root.querySelector('[data-acrun]'); if (r) r.onclick = async () => { try { await E.saveNow(); const x = await D.api('POST', '/api/autocheck/run'); D.toast(x ? `${x.total} problemen, waarvan ${x.fresh} nieuw${x.fresh ? ' (melding verstuurd)' : ''}` : 'Automatisch controleren staat uit'); H.load(true); } catch (e) { D.toast(e.message, true); } };
+    D.api('GET', '/api/autocheck').then(a => { const el = root.querySelector('#aclast'); if (el && a.last && a.last.at) el.textContent = `Laatste automatische controle: ${time(a.last.at)} · ${a.last.total} problemen, ${a.last.fresh} nieuw.`; }).catch(() => {});
+    const sel = root.querySelector('[data-acuser]');
+    if (sel) D.api('GET', '/api/autocheck/users').then(list => {
+      const cur = (D.cfg.settings.autocheck || {}).user;
+      sel.innerHTML = '<option value="">Kies een gebruiker…</option>' + list.map((u, i) => `<option value="${i}"${cur && cur.id === u.id ? ' selected' : ''}>${esc(u.name || u.title || u.id)}</option>`).join('');
+      sel.onchange = () => { const u = list[Number(sel.value)]; E.commit(null, () => { D.cfg.settings.autocheck = { ...(D.cfg.settings.autocheck || {}), user: u || null }; }); D.toast(u ? 'Pushberichten gaan naar ' + (u.name || u.id) : 'Geen gebruiker gekozen'); };
+    }).catch(e => { sel.innerHTML = `<option>${esc(e.message)}</option>`; });
+  };
   E.wire.controle = root => {
+    wireAuto(root);
     if (!H.data && !H.loading && !H.err) H.load(true);
     const b = root.querySelector('[data-hcheck]'); if (b) b.onclick = () => { H.load(true); E.refreshPanel(); };
     H.wire(root, () => E.refreshPanel());

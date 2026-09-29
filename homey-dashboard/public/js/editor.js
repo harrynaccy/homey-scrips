@@ -9,8 +9,25 @@
   ];
 
   // ---------- openen / sluiten ----------
-  E.open = () => {
-    if (D.editing) return;
+  // pincode voor de achterkant (als die aan staat en dit apparaat niet vertrouwd is)
+  const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { return null; } return null; };
+  E.trusted = v => (v === undefined ? store('hd-vertrouwd') === '1' : store('hd-vertrouwd', v ? '1' : null));
+  let unlockedAt = 0;
+  E.mayOpen = async () => {
+    const lock = D.cfg.settings.lock;
+    if (!lock || !lock.enabled || E.trusted() || Date.now() - unlockedAt < 5 * 60 * 1000) return true;
+    for (let i = 0; i < 3; i++) {
+      const pin = await E.ai.askPin(i ? 'Verkeerde pincode. Probeer het nog eens.' : 'Pincode voor de achterkant');
+      if (pin === null) return false;
+      try { await D.api('POST', '/api/pin/check', { pin }); unlockedAt = Date.now(); return true; }
+      catch (e) { if (!/Verkeerde/.test(e.message)) { D.toast(e.message, true); return false; } }
+    }
+    D.toast('Drie keer een verkeerde pincode', true); return false;
+  };
+  E.open = async () => {
+    if (D.editing || E._opening) return;
+    E._opening = true; const ok = await E.mayOpen().catch(() => false); E._opening = false;
+    if (!ok || D.editing) return;
     D.editing = true; document.body.classList.add('editing');
     E.undo = []; E.redo = []; E.sel = null; E.urls();
     E.layout(); D.renderTabbar(); D.renderGrid();
@@ -18,7 +35,7 @@
     window.addEventListener('resize', E.layout);
   };
   E.close = async () => {
-    await E.saveNow();
+    await E.saveNow(); unlockedAt = Date.now();
     D.editing = false; document.body.classList.remove('editing'); E.sel = null;
     $('#panel').hidden = true; $('#app').style.transform = '';
     window.removeEventListener('resize', E.layout);
@@ -413,7 +430,7 @@
   // Bibliotheek
   const CATS = [['devices', 'Apparaten'], ['zones', 'Zones'], ['flows', 'Flows'], ['moods', 'Moods'], ['variables', 'Variabelen'], ['insights', 'Grafieken'], ['appw', 'Eigen apps'], ['extra', 'Overig']];
   E.loadAppWidgets = async () => { try { E._aw = await D.api('GET', '/api/appwidgets'); } catch (e) { E._aw = { widgets: [], status: [] }; } return E._aw; };
-  const EXTRA = [['clock', 'Klok', 'Tijd en datum'], ['text', 'Tekst', 'Eigen tekst of label'], ['web', 'Webpagina', 'Andere pagina of eigen widget'], ['energy', 'Energie', 'Live verbruik'], ['presence', 'Wie is thuis', 'Aanwezigheid gebruikers'], ['alarms', 'Wekkers', 'Homey-wekkers aan/uit'], ['notifications', 'Meldingen', 'Tijdlijn van Homey'], ['apps', 'Apps', 'Status van Homey-apps'], ['health', 'Controle', 'Problemen met apparaten en flows']];
+  const EXTRA = [['clock', 'Klok', 'Tijd en datum'], ['text', 'Tekst', 'Eigen tekst of label'], ['web', 'Webpagina', 'Andere pagina of eigen widget'], ['energy', 'Energie', 'Live verbruik'], ['presence', 'Wie is thuis', 'Aanwezigheid gebruikers'], ['alarms', 'Wekkers', 'Homey-wekkers aan/uit'], ['notifications', 'Meldingen', 'Tijdlijn van Homey'], ['apps', 'Apps', 'Status van Homey-apps'], ['health', 'Controle', 'Problemen met apparaten en flows'], ['camera', 'Camera', 'Beeld van een camera (Surveillance Station, Homey of Reolink)']];
   const capSummary = d => { const k = D.devKind(d); return { switch: d.caps.dim ? 'Dimbaar' : 'Aan/uit', thermostat: 'Thermostaat', cover: 'Zonwering', lock: 'Slot', button: 'Knop', sensor: D.measures(d).map(m => (d.caps[m].title || m)).slice(0, 2).join(', ') || 'Sensor' }[k]; };
   const placedIds = () => new Set(D.currentTab().tiles.map(t => (t.ref && (t.ref.deviceId || t.ref.zoneId || t.ref.id)) || null));
   E.render.bibliotheek = () => {
@@ -447,7 +464,7 @@
         body += `<p class="note">De gegevens komen van de app op je Homey. Of dat werkt, zie je bij Systeem → Eigen apps.</p>`;
       }
     }
-    else body = EXTRA.filter(x => m(x[1])).map(([k, n, s]) => item('extra:' + k, D.tiles[k].icon, n, s)).join('') + `<div class="lib-it disabled"><span class="lib-ic">${icon('eye')}</span><span class="lib-t"><b>Camera</b><small>Voegen we later samen toe</small></span></div>`;
+    else body = EXTRA.filter(x => m(x[1])).map(([k, n, s]) => item('extra:' + k, D.tiles[k].icon, n, s)).join('');
     const counts = { appw: E._aw ? E._aw.widgets.length : '…', devices: L.devices.length, zones: L.zones.length, flows: L.flows.length + L.advancedFlows.length, moods: L.moods.length, variables: L.variables.length, insights: L.insights.length, extra: EXTRA.length };
     return `<div class="lib-top"><input type="search" id="libq" placeholder="Zoeken in Homey…" value="${esc(E.libQ)}"><div class="chips-row">${CATS.map(([k, l]) => `<button data-cat="${k}" class="${k === c ? 'act' : ''}">${l}<i>${counts[k]}</i></button>`).join('')}</div></div>
       <p class="note">Tik op <b>+</b> om iets op <b>${esc(D.currentTab().name)}</b> te zetten. Daarna kun je het slepen en groter of kleiner maken.</p>
@@ -842,6 +859,7 @@
       spec += `<p class="note">${o.kind === 'panic' ? 'Deze knop vraagt altijd eerst om bevestiging.' : 'Op het dashboard: tik = bedienen, lang drukken = alle bediening van het apparaat.'}</p>`;
     }
     else if (t.type === 'variable') { const v = D.lib.variables.find(x => x.id === t.ref.id); if (v && v.type === 'number') spec += F.row('Stapgrootte', F.text(`${P}.opts.step`, t.opts.step || 1, 'tile')) + F.row('Eenheid', F.text(`${P}.opts.unit`, t.opts.unit || '', 'tile', 'bijv. °C')); }
+    else if (t.type === 'camera') spec += D.cam.tileOptions(t, P, F);
     else if (t.type === 'insight') spec += F.row('Periode', F.seg(`${P}.opts.resolution`, t.opts.resolution || 'last24Hours', Object.entries(D.RES).map(([k, l]) => [k, l.replace('Laatste ', '')]), 'tile')) + F.row('Lijnkleur', F.colorOpt(`${P}.opts.color`, t.opts.color, th.accent, 'tilepanel'));
     else if (t.type === 'energy') spec += F.row('Totaal van', F.select(`${P}.opts.mainDeviceId`, t.opts.mainDeviceId || '', [['', 'Som van alle apparaten'], ...D.lib.devices.filter(d => d.caps.measure_power).map(d => [d.id, d.name])], 'tile'), 'Kies je P1-meter voor het echte huisverbruik');
     else if (t.type === 'apps') spec += F.row('Alleen problemen', F.toggle(`${P}.opts.onlyProblems`, t.opts.onlyProblems, 'tile'));
@@ -1107,6 +1125,9 @@
         <div class="acts"><button class="btn sm primary" data-manual>${icon('book')}Gebruiksaanwijzing</button><button class="btn sm" data-relib>${icon('refresh')}Bibliotheek vernieuwen</button><button class="btn sm" data-reload>${icon('refresh')}Dashboard herladen</button></div>`) +
       F.group('Eigen apps', '<div id="awstat"><div class="muted">Laden…</div></div>') +
       F.group('Back-ups', `<p class="note">Elke dag wordt automatisch een back-up gemaakt (14 dagen bewaard).</p><div class="acts"><button class="btn sm" data-bk>${icon('download')}Back-up maken</button><button class="btn sm" data-export>${icon('download')}Exporteren</button><label class="btn sm">${icon('upload')}Importeren<input type="file" accept=".json" id="impfile" hidden></label></div><div id="bklist" class="bklist"><div class="muted">Laden…</div></div>`) +
+      F.group('Camera\'s', '<div id="cambox"><div class="muted">Laden…</div></div>') +
+      F.group('Pincode', '<div id="pinbox"><div class="muted">Laden…</div></div>') +
+      F.group('Bijwerken', '<div id="updbox"><div class="muted">Kijken of er een nieuwe versie is…</div></div>') +
       F.group('Volledige back-up (voor een nieuwe NAS)', `<p class="note">Eén zip met alles om het dashboard op een andere NAS weer op te zetten: de hele map uit <b>docker</b>, je indeling, achtergronden, back-ups, pincode, <b>docker-compose.yml</b> en de projectgegevens voor Container Manager. Uitleg: handleiding, hoofdstuk <b>Voorbereiding</b>.</p>` +
         F.row('Met sleutels', F.toggle('settings.backup.keys', fullKeys(), 'panel'), fullKeys() ? 'Sneller terugzetten; bewaar de zip veilig' : 'Sleutels vul je bij het terugzetten zelf in') +
         `<div class="acts"><a class="btn sm primary" href="/api/fullbackup?keys=${fullKeys() ? 1 : 0}" download>${icon('download')}Volledige back-up downloaden</a></div>`) +
@@ -1117,7 +1138,64 @@
       F.group('Opnieuw beginnen', `<button class="btn sm danger" data-reset>${icon('trash')}Alles terugzetten naar begin</button>`) +
       `<p class="note center">Homey Dashboard · ${D.hasFully() ? 'Fully Kiosk' : 'browser'} · ${window.innerWidth}×${window.innerHeight}</p>`;
   };
+  // ---------- bijwerken met één knop ----------
+  const dt = d => d ? new Date(d).toLocaleString('nl-NL', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }) : '';
+  E.updateBox = async (box, force) => {
+    let u;
+    try { u = await D.api('GET', '/api/update/check' + (force ? '?force=1' : '')); if (u.error) throw new Error(u.error); }
+    catch (e) { box.innerHTML = `<p class="note">${esc(e.message)}</p><div class="acts"><button class="btn sm" data-updcheck>${icon('refresh')}Opnieuw kijken</button></div>`; box.querySelector('[data-updcheck]').onclick = () => E.updateBox(box, true); return; }
+    const cur = u.current;
+    box.innerHTML = `<p class="note">${cur ? `Geïnstalleerd: <b>${esc(dt(cur.date))}</b> – ${esc(cur.message || '')}${cur.rolledBackAt ? `<br><b>Let op:</b> de vorige update is teruggezet (${esc(cur.reason || '')}).` : ''}` : 'Deze versie is nog niet via deze knop geïnstalleerd.'}</p>
+      <p class="note">${u.upToDate ? '<b>Je hebt de nieuwste versie.</b>' : `Nieuwste versie: <b>${esc(dt(u.latest.date))}</b> – ${esc(u.latest.message)}`}</p>
+      <div class="acts"><button class="btn sm ${u.upToDate ? '' : 'primary'}" data-updrun>${icon('download')}${u.upToDate ? 'Opnieuw installeren' : 'Bijwerken'}</button>
+      <button class="btn sm" data-updcheck>${icon('refresh')}Opnieuw kijken</button>
+      ${u.canRollback ? `<button class="btn sm ghost" data-updback>${icon('undo')}Vorige versie terugzetten</button>` : ''}</div>
+      <p class="note">Bij bijwerken wordt eerst een volledige back-up gemaakt (op de NAS, map data/backups). Start de nieuwe versie niet goed op, dan komt de vorige vanzelf terug. Je indeling, sleutels en docker-compose.yml blijven altijd staan.</p>`;
+    box.querySelector('[data-updcheck]').onclick = () => { box.innerHTML = '<div class="muted">Kijken…</div>'; E.updateBox(box, true); };
+    box.querySelector('[data-updrun]').onclick = async () => {
+      if (!(await D.confirm('Het dashboard nu bijwerken? Eerst wordt een back-up gemaakt; daarna start het dashboard opnieuw (ongeveer 1 minuut). Alle schermen herladen vanzelf.', 'Bijwerken'))) return;
+      try { await E.saveNow(); await D.api('POST', '/api/update/run'); E.updateProgress(); } catch (e) { D.toast(e.message, true); }
+    };
+    const bb = box.querySelector('[data-updback]'); if (bb) bb.onclick = async () => {
+      if (!(await D.confirm('De vorige versie terugzetten? Het dashboard start daarna opnieuw.', 'Terugzetten'))) return;
+      try { await D.api('POST', '/api/update/rollback'); E.updateProgress(); } catch (e) { D.toast(e.message, true); }
+    };
+  };
+  // voortgang tonen, en na de herstart de pagina herladen
+  E.updateProgress = () => {
+    D.openSheet(`<div class="confirm"><p><b>Bijwerken</b></p><p class="upd-step">Bezig…</p><div class="ai-dots"><i></i><i></i><i></i></div></div>`, 'small');
+    D._sheetCancel = null;
+    const stepEl = () => document.querySelector('#sheet .upd-step');
+    let down = false; const started = Date.now();
+    const tick = async () => {
+      try {
+        const r = await fetch(down ? '/api/status' : '/api/update/status', { cache: 'no-store' });
+        if (!r.ok) throw new Error();
+        const j = await r.json();
+        if (down) { if (stepEl()) stepEl().textContent = 'Klaar! Het dashboard wordt herladen…'; setTimeout(() => location.reload(), 1200); return; }
+        if (j.error) { D.closeSheet(); D.toast('Bijwerken mislukt: ' + j.error, true); E.refreshPanel(); return; }
+        if (stepEl()) stepEl().textContent = j.step || 'Bezig…';
+      } catch (e) { down = true; if (stepEl()) stepEl().textContent = 'Het dashboard start opnieuw… (kan 1 à 2 minuten duren)'; }
+      if (Date.now() - started > 6 * 60 * 1000) { if (stepEl()) stepEl().textContent = 'Dit duurt lang. Kijk in Container Manager of het project draait, en herlaad daarna deze pagina.'; return; }
+      setTimeout(tick, 2000);
+    };
+    setTimeout(tick, 1000);
+  };
+
   E.wire.systeem = async root => {
+    const ub = root.querySelector('#updbox'); if (ub) E.updateBox(ub);
+    const cb = root.querySelector('#cambox'); if (cb) D.cam.settingsBox(cb);
+    const pbx = root.querySelector('#pinbox');
+    if (pbx) D.api('GET', '/api/flows/pin').then(st => {
+      const lock = D.cfg.settings.lock || {};
+      pbx.innerHTML = `<p class="note">Eén pincode voor de achterkant, voor het aanpassen of verwijderen van flows en voor het verwijderen van apparaten. ${st.set ? '<b>Ingesteld.</b>' : '<b>Nog niet ingesteld.</b>'}</p>
+        <div class="acts"><button class="btn sm" data-pinset>${icon('lock')}${st.set ? 'Pincode wijzigen' : 'Pincode instellen'}</button></div>` +
+        (st.set ? F.row('Achterkant op slot', F.toggle('settings.lock.enabled', !!lock.enabled, 'panel'), 'Vraagt de pincode na 4× tikken') +
+          F.row('Dit apparaat vertrouwen', `<button class="switch${E.trusted() ? ' on' : ''}" data-trust><i></i></button>`, 'Op dit scherm (bijv. je pc) nooit om de pincode vragen') : '');
+      pbx.querySelector('[data-pinset]').onclick = () => E.ai.changePin();
+      const tr = pbx.querySelector('[data-trust]'); if (tr) tr.onclick = () => { E.trusted(!E.trusted()); tr.classList.toggle('on', E.trusted()); D.toast(E.trusted() ? 'Dit apparaat vraagt niet meer om de pincode' : 'Dit apparaat vraagt weer om de pincode'); };
+      E.bind(pbx);
+    }).catch(() => { pbx.innerHTML = '<div class="muted">Kon de pincode-instellingen niet laden</div>'; });
     root.querySelector('[data-manual]').onclick = () => D.openManual();
     root.querySelector('[data-addurl]').onclick = () => E.commit(null, () => E.urls().quick.push(['', E.urls().prefix || 'http://']), () => E.refreshPanel());
     root.querySelector('[data-reseturl]').onclick = async () => { if (!(await D.confirm('Standaardbegin en snelknoppen terugzetten?', 'Terugzetten'))) return; E.commit(null, () => { D.cfg.settings.urls = URL_DEFAULTS(); }, () => E.refreshPanel()); };

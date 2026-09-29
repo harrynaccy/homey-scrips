@@ -1,6 +1,7 @@
 'use strict';
 // Technische (Engelse) foutmeldingen omzetten naar gewoon Nederlands.
 const RULES = [
+  [/fetch failed|getaddrinfo/i, 'Niet bereikbaar vanaf de NAS (geen verbinding met internet, de camera of de dienst). Controleer het adres en of het apparaat aan staat.'],
   [/ECONNREFUSED|EHOSTUNREACH|ENETUNREACH|socket hang up|ECONNRESET/i, 'Homey reageert niet. Staat Homey aan en is hij verbonden met het netwerk?'],
   [/ETIMEDOUT|timed? ?out|Timeout/i, 'Homey reageerde niet op tijd. Probeer het zo nog eens.'],
   [/ENOTFOUND|EAI_AGAIN/i, 'Het adres van Homey is niet te vinden. Controleer HOMEY_ADDRESS in docker-compose.yml.'],

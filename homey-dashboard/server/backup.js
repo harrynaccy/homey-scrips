@@ -115,6 +115,9 @@ function fullBackup({ dataDir, keys }) {
   // data (indeling, achtergronden, back-ups, pincode, flow-geschiedenis)
   if (fs.existsSync(dataDir)) { const d = []; walk2(dataDir, 'data', d); entries.push(...d); }
   // docker-compose.yml: het echte bestand als het er is, anders opbouwen uit de instellingen
+  // camera-wachtwoorden alleen mee als er "met sleutels" gekozen is
+  const cam = entries.find(x => x.name === 'data/cameras.json');
+  if (cam && !keys) { try { const j = JSON.parse(cam.data.toString('utf8')); if (j.ss) j.ss.pass = ''; for (const c of j.cams || []) c.pass = ''; cam.data = Buffer.from(JSON.stringify(j, null, 1)); } catch (e) { /* */ } }
   const ci = entries.findIndex(x => x.name === 'docker-compose.yml');
   if (ci >= 0) { if (!keys) entries[ci].data = Buffer.from(redact(entries[ci].data.toString('utf8'))); }
   else entries.push({ name: 'docker-compose.yml', data: Buffer.from(composeFromEnv(keys)) });
@@ -124,7 +127,7 @@ function fullBackup({ dataDir, keys }) {
 // data-map: alles meenemen (ook submappen), behalve tijdelijke bestanden
 function walk2(dir, base, out) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (e.name.endsWith('.tmp')) continue;
+    if (e.name.endsWith('.tmp') || e.name.startsWith('voor-update-') || ['update-terug', 'update-proef'].includes(e.name)) continue;
     const full = path.join(dir, e.name); const rel = base + '/' + e.name;
     if (e.isDirectory()) walk2(full, rel, out); else if (e.isFile()) out.push({ name: rel, data: fs.readFileSync(full) });
   }

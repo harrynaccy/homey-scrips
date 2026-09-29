@@ -163,6 +163,16 @@
     D._sheetCancel = () => resolve(null);
   });
   A.askPin = askPin;
+  // pincode instellen of wijzigen (één pincode voor achterkant, flows en apparaten)
+  A.changePin = async () => {
+    const set = (await D.api('GET', '/api/flows/pin')).set; let old;
+    if (set) { old = await askPin('Voer je huidige pincode in.'); if (old === null) return false; }
+    const p1 = await askPin('Kies een nieuwe pincode (4 tot 8 cijfers).'); if (p1 === null) return false;
+    const p2 = await askPin('Voer de nieuwe pincode nog een keer in.'); if (p2 === null) return false;
+    if (p1 !== p2) { D.toast('De twee pincodes zijn niet gelijk', true); return false; }
+    try { await D.api('POST', '/api/flows/pin', { old, pin: p1 }); if (A.status) A.status.pinSet = true; D.toast('Pincode opgeslagen'); E.refreshPanel(); return true; }
+    catch (e) { D.toast(e.message, true); return false; }
+  };
 
   // Een eerder toegepast voorstel terugdraaien: flows via de server, het dashboard door
   // alleen de tegels en tabbladen van dat voorstel terug te zetten (latere wijzigingen blijven staan).
@@ -350,15 +360,7 @@
     root.querySelectorAll('[data-aiapply]').forEach(b => b.onclick = async () => { b.disabled = true; try { await apply(A.history[Number(b.dataset.aiapply)]); } catch (e) { D.toast('Toepassen mislukt: ' + e.message, true); E.refreshPanel(); } });
     root.querySelectorAll('[data-aicancel]').forEach(b => b.onclick = () => { A.history[Number(b.dataset.aicancel)].state = 'cancelled'; E.refreshPanel(); });
     root.querySelectorAll('[data-aiundo]').forEach(b => b.onclick = () => undoProposal(A.history[Number(b.dataset.aiundo)]));
-    const pb = root.querySelector('[data-aipin]'); if (pb) pb.onclick = async () => {
-      let old;
-      if (A.status.pinSet) { old = await askPin('Voer je huidige pincode in.'); if (old === null) return; }
-      const p1 = await askPin('Kies een nieuwe pincode (4 tot 8 cijfers).'); if (p1 === null) return;
-      const p2 = await askPin('Voer de nieuwe pincode nog een keer in.'); if (p2 === null) return;
-      if (p1 !== p2) { D.toast('De twee pincodes zijn niet gelijk', true); return; }
-      try { await D.api('POST', '/api/flows/pin', { old, pin: p1 }); A.status.pinSet = true; D.toast('Pincode opgeslagen'); } catch (e) { D.toast(e.message, true); }
-      E.refreshPanel();
-    };
+    const pb = root.querySelector('[data-aipin]'); if (pb) pb.onclick = () => A.changePin();
     const rt = root.querySelector('[data-airetry]'); if (rt) rt.onclick = () => { const m = A.history.pop(); if (A.history.length && A.history[A.history.length - 1].role === 'user') A.history.pop(); send(m.retry); };
     const cl = root.querySelector('[data-aiclear]'); if (cl) cl.onclick = () => { A.history = []; E.refreshPanel(); };
   };
