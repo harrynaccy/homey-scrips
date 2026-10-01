@@ -37,7 +37,11 @@ class AppBridge extends EventEmitter {
     this.state = {}; // appId -> { route, error, tried, realtime, lastOkAt, lastCallAt }
     this.subs = {};
     this.lastState = {};
-    setInterval(() => this.pollFallback(), 3000);
+    this.polling = {};
+    // Altijd meedraaien (ook als live-berichten "aan" staan): die komen via
+    // de API-sleutel niet altijd door, en dan bleef een nieuw nummer tot
+    // 30 s hangen. Elke 2 s lokaal bij je Homey kijken; dit gaat NIET naar Spotify.
+    setInterval(() => this.pollFallback(), 2000);
   }
 
   // Welke widgets staan er in de map appwidgets?
@@ -115,7 +119,11 @@ class AppBridge extends EventEmitter {
     if (this.subs[appId] || !this.homey.subscribeApp) return;
     this.subs[appId] = 'bezig';
     try {
-      await this.homey.subscribeApp(appId, (event, data) => this.emit('event', { appId, event, data }));
+      await this.homey.subscribeApp(appId, (event, data) => {
+        // Live-bericht onthouden, zodat de controle hieronder hetzelfde niet nog eens stuurt.
+        if (event === 'state') this.lastState[appId] = this.stateKey(data);
+        this.emit('event', { appId, event, data });
+      });
       this.st(appId).realtime = true;
       console.log(`[appbridge] ${appId}: live-berichten actief`);
     } catch (err) {
@@ -124,19 +132,25 @@ class AppBridge extends EventEmitter {
     }
   }
 
-  // Vangnet zonder live-berichten: zolang er widgets in beeld zijn (die
-  // vragen elke 30 s zelf de status op) elke 3 s lokaal de status ophalen
+  stateKey(st) {
+    const { now, sampledAt, ...cmp } = st || {};
+    return JSON.stringify(cmp);
+  }
+
+  // Controle naast de live-berichten: zolang er widgets in beeld zijn (die
+  // vragen elke 30 s zelf de status op) elke 2 s lokaal de status ophalen
   // en alleen bij verandering doorsturen. Dit gaat naar je Homey, niet naar Spotify.
   async pollFallback() {
     for (const [appId, s] of Object.entries(this.state)) {
-      if (s.realtime || !s.route || !s.lastCallAt || Date.now() - s.lastCallAt > 75000) continue;
+      if (this.polling[appId] || !s.route || !s.lastCallAt || Date.now() - s.lastCallAt > 75000) continue;
       const w = this.list().find(x => x.appId === appId); if (!w) continue;
+      this.polling[appId] = true;
       try {
         const st = await this.call(appId, w.widgetId, 'GET', '/state', undefined, true);
-        const { now, sampledAt, ...cmp } = st || {};
-        const key = JSON.stringify(cmp);
+        const key = this.stateKey(st);
         if (key !== this.lastState[appId]) { this.lastState[appId] = key; this.emit('event', { appId, event: 'state', data: st }); }
       } catch (e) { /* wordt in status getoond */ }
+      finally { this.polling[appId] = false; }
     }
   }
 }
