@@ -629,7 +629,11 @@
       scene: { targets: ['flow', 'mood', 'device'], allowNone: true },
       panic: { targets: ['flow', 'device', 'mood'], allowNone: true },
       cover: { targets: ['device'], filter: d => !!(d.caps.windowcoverings_set || d.caps.windowcoverings_state), sub: 'Alleen rolluiken, gordijnen en zonwering' },
-    }[kind] || { targets: ['device', 'flow', 'mood'], allowNone: true };
+    }[kind] || (D.isFader && D.isFader(kind)
+      ? (kind === 'fv-ct' ? { targets: ['device'], filter: d => !!d.caps.light_temperature, sub: 'Alleen lampen met warm en koel wit' }
+        : kind === 'fv-hue' ? { targets: ['device'], filter: d => !!d.caps.light_hue, sub: 'Alleen kleurlampen' }
+          : { targets: ['device'], filter: d => D.faderCaps(d).length > 0, sub: 'Dimbare lampen, volume, rolluiken' })
+      : { targets: ['device', 'flow', 'mood'], allowNone: true });
   };
   E.pickTarget = (opt = {}) => new Promise(resolve => {
     const targets = opt.targets || ['device']; let cur = targets[0]; let q = '';
@@ -673,7 +677,7 @@
     if (mdi && mdi.s === 'paar') { mdiOff = mdi.off; mdi = mdi.on; }
     if (!mdi) { mdi = await E.getIcon(D.defaultMdiName(kind, ref)); auto = true; }
     if (mdi && !mdiOff && !auto) { const pr = await E.pairFor(mdi); if (pr && pr.role === 'on') mdiOff = pr.other; else if (pr && pr.role === 'off') { mdiOff = mdi; mdi = pr.other; } }
-    const [w, h] = { cover: [2, 3], dim: [3, 2], toggle: [3, 2] }[kind] || [2, 2];
+    const [w, h] = { cover: [2, 3], dim: [3, 2], toggle: [3, 2] }[kind] || (D.isFader(kind) ? (kind[1] === 'h' ? [4, 2] : kind[1] === 'r' ? [3, 3] : [2, 4]) : [2, 2]);
     const spot = E.firstFree(tab, w, h);
     if (!spot) { D.toast('Geen ruimte meer op dit tabblad. Maak ruimte of vergroot het raster.', true); return; }
     const opts = { kind }; if (mdi) opts.mdi = mdi; if (auto) opts.mdiAuto = true; if (mdiOff) { opts.mdiOff = mdiOff; opts.mdiOffAuto = true; }
@@ -870,7 +874,11 @@
       const o = t.opts; const d = t.ref && t.ref.target === 'device' ? D.dev(t.ref.deviceId) : null;
       spec += F.row('Knopstijl', E.kindSelect(t, d));
       spec += F.row('Gekoppeld aan', `<span class="tgt">${esc(D.btnTargetName(t.ref) || 'Niets')}</span><button class="btn sm" data-retarget>Wijzigen</button>`);
-      if (d) spec += F.row('Toestand van', F.select(`${P}.opts.cap`, o.cap || '', [['', 'Automatisch'], ...Object.keys(d.caps).map(k => [k, d.caps[k].title || k])], 'tilepanel'), 'Welke waarde de knop laat zien');
+      const fader = D.isFader(o.kind);
+      if (d && fader) spec += F.row('Bedient', F.select(`${P}.opts.cap`, o.cap || '', [['', 'Automatisch'], ...D.faderCaps(d).map(k => [k, ({ dim: 'Helderheid', volume_set: 'Volume', windowcoverings_set: 'Positie', light_temperature: 'Warm / koel wit', light_hue: 'Kleur', light_saturation: 'Verzadiging' })[k] || d.caps[k].title || k])], 'tilepanel'));
+      else if (d) spec += F.row('Toestand van', F.select(`${P}.opts.cap`, o.cap || '', [['', 'Automatisch'], ...Object.keys(d.caps).map(k => [k, d.caps[k].title || k])], 'tilepanel'), 'Welke waarde de knop laat zien');
+      if (fader && o.kind !== 'fv-pm') spec += F.row('Tikken doet', F.seg(`${P}.opts.tapAct`, o.tapAct || D.FADER_KINDS.find(k => k[0] === o.kind)[4], [['toggle', 'Aan/uit'], ['set', 'Naar die plek'], ['none', 'Niets']], 'tile'), 'Vegen verandert altijd de waarde');
+      if (fader) spec += F.row('Stapgrootte', F.seg(`${P}.opts.step`, o.step || '', [['', 'Standaard'], [0.01, '1%'], [0.05, '5%'], [0.1, '10%'], [0.25, '25%']], 'tile'));
       spec += E.iconRows(t, 'chip');
       spec += F.row('Kleur als aan', F.colorOpt(`${P}.opts.colorOn`, o.colorOn, th.onColor, 'tilepanel')) + F.row('Kleur als uit', F.colorOpt(`${P}.opts.colorOff`, o.colorOff, '#9aa3b2', 'tilepanel'));
       spec += F.row('Naam tonen', F.toggle(`${P}.opts.label`, o.label !== false, 'tile')) + F.row('Toestand tonen', F.toggle(`${P}.opts.state`, o.state !== false, 'tile'), 'Bijv. "Aan · 70%" of "Open"');
@@ -886,7 +894,21 @@
       `<div class="acts"><button class="btn sm" data-insall>${icon('copy')}Overnemen voor alle grafieken</button></div><p class="note">Neemt grootte, verbergen, lijndikte en vulling over op alle grafieken. Periode en lijnkleur blijven per grafiek.</p>`; }
     else if (t.type === 'energy') spec += F.row('Totaal van', F.select(`${P}.opts.mainDeviceId`, t.opts.mainDeviceId || '', [['', 'Som van alle apparaten'], ...D.lib.devices.filter(d => d.caps.measure_power).map(d => [d.id, d.name])], 'tile'), 'Kies je P1-meter voor het echte huisverbruik');
     else if (t.type === 'apps') spec += F.row('Alleen problemen', F.toggle(`${P}.opts.onlyProblems`, t.opts.onlyProblems, 'tile'));
-    else if (t.type === 'clock') spec += F.row('Seconden', F.toggle(`${P}.opts.seconds`, t.opts.seconds, 'tile')) + F.row('Datum', F.toggle(`${P}.opts.date`, t.opts.date !== false, 'tile'));
+    else if (t.type === 'clock') {
+      const o = t.opts; const stl = o.style || 'd-thin'; const an = stl[0] === 'a';
+      spec += F.row('Klokstijl', F.select(`${P}.opts.style`, stl, D.CLOCK_STYLES.map(([id, n]) => [id, n]), 'tilepanel')) +
+        F.row('Seconden', F.toggle(`${P}.opts.seconds`, an ? o.seconds !== false : !!o.seconds, 'tile')) +
+        (an ? F.row('Secondewijzer vloeiend', F.toggle(`${P}.opts.smooth`, !!o.smooth, 'tile'), 'Uit = tikkend') : F.row('Dubbele punt knippert', F.toggle(`${P}.opts.blink`, !!o.blink, 'tile'))) +
+        F.row('12-uursklok', F.toggle(`${P}.opts.h12`, !!o.h12, 'tile')) +
+        F.row('Datum', F.toggle(`${P}.opts.date`, o.date !== false, 'tilepanel')) +
+        (o.date !== false ? F.row('Datum als', F.select(`${P}.opts.dateFmt`, o.dateFmt || 'long', [['long', 'Donderdag 1 oktober'], ['short', '1 okt'], ['num', '01-10-2026'], ['weekday', 'Donderdag'], ['week', 'Met weeknummer']], 'tile')) : '') +
+        F.row('Grootte', F.range(`${P}.opts.size`, o.size || 1, 0.4, 2.5, 0.05, 'tile', 'x')) +
+        F.row(an ? 'Wijzerplaat' : 'Achtergrond (lcd)', F.colorOpt(`${P}.opts.cFace`, o.cFace, '#1b212b', 'tilepanel')) +
+        (an ? F.row('Wijzers', F.colorOpt(`${P}.opts.cHand`, o.cHand, '#ffffff', 'tilepanel')) + F.row('Secondewijzer', F.colorOpt(`${P}.opts.cSec`, o.cSec, '#ff5d4d', 'tilepanel')) : '') +
+        F.row('Cijfers en streepjes', F.colorOpt(`${P}.opts.cNum`, o.cNum, '#ffffff', 'tilepanel')) + F.row('Accentkleur', F.colorOpt(`${P}.opts.cAcc`, o.cAcc, th.accent, 'tilepanel'), 'Neon, led, 7-segment, ring, nixie') +
+        (stl === 'a-world' ? F.row('Naam hier', F.text(`${P}.opts.tz1Label`, o.tz1Label || '', 'tile', 'Hier')) + F.row('Tweede tijdzone', F.select(`${P}.opts.tz2`, o.tz2 || 'America/New_York', TZS.map(z => [z, z.replace(/_/g, ' ')]), 'tile')) + F.row('Naam daar', F.text(`${P}.opts.tz2Label`, o.tz2Label || '', 'tile', 'bijv. New York')) : '') +
+        `<p class="note">Zonder kader en doorzichtig maken kan bij <b>Stijl</b> hieronder (Zonder kader, Doorzichtigheid).</p>`;
+    }
     else if (t.type === 'text') spec += `<textarea data-k="${P}.opts.text" data-fx="tile" rows="4">${esc(t.opts.text || '')}</textarea>` + F.row('Uitlijnen', F.seg(`${P}.opts.align`, t.opts.align || 'left', [['left', 'Links'], ['center', 'Midden'], ['right', 'Rechts']], 'tile')) + F.row('Grootte', F.range(`${P}.opts.size`, t.opts.size || 1, 0.5, 4, 0.05, 'tile', 'x'));
     else if (t.type === 'web') spec += `<div class="f col"><label>Adres (URL)</label>${F.url(`${P}.opts.url`, t.opts.url, 'none')}</div>` + `<button class="btn sm" data-reload>${icon('refresh')}Laden</button>` + F.row('Bedienbaar', F.toggle(`${P}.opts.interactive`, t.opts.interactive !== false, 'tile'), 'Uit = alleen kijken') + F.row('Zoom', F.range(`${P}.opts.zoom`, t.opts.zoom || 1, 0.3, 2, 0.05, 'tile', 'x')) + F.row('Verversen', F.num(`${P}.opts.refresh`, t.opts.refresh || 0, 0, 1440, 'tile'), 'minuten, 0 = nooit');
 
@@ -900,6 +922,7 @@
       F.group('Acties', `<div class="acts"><button class="btn sm" data-dup>${icon('copy')}Dupliceren</button><button class="btn sm danger" data-del>${icon('trash')}Verwijderen</button></div>` +
         (tabsOpts.length ? F.row('Naar tabblad', `<select id="totab">${tabsOpts.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('')}</select>`) + `<div class="acts"><button class="btn sm" data-copyto>${icon('copy')}Kopiëren</button><button class="btn sm" data-moveto>${icon('right')}Verplaatsen</button></div>` : ''));
   };
+  const TZS = ['Europe/London', 'Europe/Lisbon', 'Europe/Madrid', 'Europe/Istanbul', 'Africa/Cairo', 'Asia/Dubai', 'Asia/Kolkata', 'Asia/Bangkok', 'Asia/Shanghai', 'Asia/Tokyo', 'Australia/Sydney', 'Pacific/Auckland', 'America/Sao_Paulo', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'America/Curacao', 'America/Paramaribo', 'Pacific/Honolulu'];
   const INS_KEYS = ['valSize', 'nameSize', 'mmSize', 'noIcon', 'noRes', 'noMinMax', 'lineW', 'noFill'];
   E.wire.tegel = root => {
     const insAll = root.querySelector('[data-insall]');

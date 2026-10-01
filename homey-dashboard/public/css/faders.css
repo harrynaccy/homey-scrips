@@ -1,0 +1,87 @@
+/* Dimmers en schuifregelaars (js/faders.js). --pv = waarde 0–100 */
+.kb.fd { --fc: var(--koff); align-items: stretch; justify-content: flex-start; gap: .45em; text-align: center; }
+.kb.fd.is-on { --fc: var(--kon); }
+.fd .kb-txt { flex: none; }
+.ftrack { position: relative; flex: 1; min-height: 0; touch-action: none; cursor: pointer; }
+.fd-h .ftrack { flex: none; height: 2.6em; margin-top: auto; }
+.fd-r .ftrack { display: block; }
+.fd .fic { position: absolute; left: 50%; bottom: .7em; transform: translateX(-50%); width: 1.9em; height: 1.9em; pointer-events: none; }
+.fd .fic .ic { width: 100%; height: 100%; color: var(--text); filter: drop-shadow(0 1px 3px rgba(0,0,0,.45)); }
+.fd-h .fic { left: .7em; bottom: auto; top: 50%; transform: translateY(-50%); width: 1.4em; height: 1.4em; }
+.fd-h .kb-row .kb-txt { text-align: left; }
+
+/* volle balk, smalle balk, kleurverloop */
+.fd-fill .ftrack, .fd-slim .ftrack, .fd-grad .ftrack { border-radius: 1.1em; background: color-mix(in srgb, var(--text) 10%, transparent); overflow: hidden; }
+.fd-slim .ftrack { width: 38%; max-width: 4.6em; align-self: center; border-radius: 99px; }
+.ffill { position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--pv) * 1%); background: var(--fc); transition: height .12s, width .12s, background .25s; }
+.fd-grad .ffill { background: linear-gradient(to top, color-mix(in srgb, var(--fc) 20%, transparent), var(--fc)); }
+.fd-h .ffill { top: 0; right: auto; height: auto; width: calc(var(--pv) * 1%); }
+
+/* glazen buis */
+.ftube { position: absolute; inset: 0 30%; border-radius: 99px; border: 2px solid rgba(255,255,255,.32); background: rgba(255,255,255,.05); overflow: hidden; box-shadow: inset 0 0 1em rgba(255,255,255,.08); }
+.fliquid { position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--pv) * 1%); background: linear-gradient(to top, var(--fc), color-mix(in srgb, var(--fc) 55%, #fff)); box-shadow: 0 0 1.2em var(--fc); transition: height .12s; }
+.fshine { position: absolute; top: 6%; bottom: 6%; left: 18%; width: 13%; border-radius: 99px; background: linear-gradient(to bottom, rgba(255,255,255,.55), rgba(255,255,255,.04)); }
+
+/* schuif met bolletje (ook warm/koel en kleur) */
+.fline { position: absolute; left: 50%; top: .8em; bottom: .8em; width: .38em; transform: translateX(-50%); border-radius: 99px; background: color-mix(in srgb, var(--text) 14%, transparent); }
+.fdone { position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--pv) * 1%); border-radius: 99px; background: var(--fc); }
+.fball { position: absolute; left: 50%; bottom: calc(.8em + (100% - 1.6em) * var(--pv) / 100); width: 1.6em; height: 1.6em; margin: 0 0 -.8em -.8em; border-radius: 50%; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.4), 0 0 0 .22em var(--fc); }
+.fd-h .fline { top: 50%; bottom: auto; left: .8em; right: .8em; width: auto; height: .38em; transform: translateY(-50%); }
+.fd-h .fdone { top: 0; right: auto; height: auto; width: calc(var(--pv) * 1%); }
+.fd-h .fball { bottom: auto; top: 50%; left: calc(.8em + (100% - 1.6em) * var(--pv) / 100); margin: -.8em 0 0 -.8em; }
+.fd-ct .fline, .fd-hue .fline { width: 1.15em; }
+.fd-ct .fline { background: linear-gradient(to top, #ffb35c, #fff4e0, #cfe4ff); }
+.fd-hue .fline { background: linear-gradient(to top, red, #ff0, lime, cyan, blue, #f0f, red); }
+.fd-ct .fdone, .fd-hue .fdone { display: none; }
+.fd-ct .fball { box-shadow: 0 2px 8px rgba(0,0,0,.45), 0 0 0 .22em #fff; }
+.fd-hue .fball { background: var(--fhue, #fff); box-shadow: 0 2px 8px rgba(0,0,0,.45), 0 0 0 .22em #fff; }
+
+/* mengpaneel */
+.fd-mixer .fslot { position: absolute; left: 50%; top: .6em; bottom: .6em; width: .32em; transform: translateX(-50%); border-radius: 2px; background: rgba(0,0,0,.55); box-shadow: inset 0 1px 2px #000; }
+.fd-mixer .fscale, .fd-ticks .fscale { position: absolute; inset: .6em 0; pointer-events: none; }
+.fd-mixer .fscale i { position: absolute; top: calc(var(--t) * 1%); left: 24%; right: 24%; height: 1px; background: rgba(255,255,255,.18); }
+.fcap { position: absolute; left: 50%; width: 2.8em; height: 1.5em; margin-left: -1.4em; bottom: calc(.6em + (100% - 1.2em) * var(--pv) / 100 - .75em); border-radius: .3em;
+  background: linear-gradient(#5d6373, #2b2f38 45%, #1c1f26 55%, #3b404b); box-shadow: 0 3px 8px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.2); }
+.fcap::after { content: ''; position: absolute; left: 10%; right: 10%; top: 50%; height: 2px; margin-top: -1px; background: var(--fc); box-shadow: 0 0 .4em var(--fc); }
+
+/* wanddimmer */
+.fplate { position: absolute; inset: 0 16%; border-radius: .6em; background: linear-gradient(160deg, #f4f4f1, #d6d6d1); box-shadow: 0 .3em .9em rgba(0,0,0,.45), inset 0 1px 0 #fff; }
+.fplate .fslot { position: absolute; left: 50%; top: 12%; bottom: 12%; width: .35em; margin-left: -.175em; border-radius: 99px; background: #a3a39e; box-shadow: inset 0 1px 2px rgba(0,0,0,.35); }
+.flever { position: absolute; left: 22%; right: 22%; height: 1.4em; bottom: calc(12% + 76% * var(--pv) / 100 - .7em); border-radius: .35em; background: linear-gradient(#fff, #e1e1db); box-shadow: 0 2px 5px rgba(0,0,0,.35); }
+.flever::after { content: ''; position: absolute; left: 22%; right: 22%; top: 50%; height: 3px; margin-top: -1.5px; border-radius: 2px; background: var(--fc); }
+
+/* blokjes en ledladder */
+.fcells { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 4px; }
+.fd-h .fcells { flex-direction: row; }
+.fcells i { flex: 1; border-radius: .35em; background: color-mix(in srgb, var(--text) 10%, transparent); transition: background .15s, box-shadow .15s; }
+.fcells i.on { background: var(--fc); }
+.fd-led .fcells { align-items: center; gap: 3px; }
+.fd-led .fcells i { flex: 1 1 0; height: auto; width: auto; max-width: 1.2em; aspect-ratio: 1; border-radius: 50%; min-height: 0; }
+.fd-led .fcells i.on { box-shadow: 0 0 .6em var(--fc); }
+
+/* schaal met streepjes */
+.fd-ticks .ftrack::before { content: ''; position: absolute; left: 30%; width: .42em; bottom: .6em; height: calc((100% - 1.2em) * var(--pv) / 100); border-radius: 99px; background: var(--fc); }
+.fd-ticks .fscale i { position: absolute; left: 36%; width: 18%; height: 2px; top: calc(var(--t) * 1%); background: rgba(255,255,255,.3); }
+.fd-ticks .fscale em { position: absolute; left: 130%; top: -.6em; font-size: .65em; font-style: normal; color: var(--muted); }
+.fmark { position: absolute; left: 20%; width: 38%; height: .38em; border-radius: 99px; background: var(--fc); bottom: calc(.6em + (100% - 1.2em) * var(--pv) / 100 - .19em); box-shadow: 0 0 .6em var(--fc); }
+
+/* plus en min */
+.fd-pm { align-items: center; justify-content: space-between; }
+.fpm { width: 72%; flex: 1; max-height: 3.2em; min-height: 2em; border-radius: 1em; background: color-mix(in srgb, var(--text) 10%, transparent); display: grid; place-items: center; color: var(--text); }
+.fpm:active { background: color-mix(in srgb, var(--fc) 35%, transparent); }
+.fpm .ic { width: 1.4em; height: 1.4em; }
+.fpmv { display: flex; flex-direction: column; align-items: center; gap: .2em; min-height: 0; }
+.fpmv b { font-size: calc(1.8em * var(--ts-val, 1)); color: var(--fc); font-variant-numeric: tabular-nums; }
+
+/* draaiknop en ring */
+.fd-r svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.fa-bg, .fa-val { fill: none; stroke-width: 9; stroke-linecap: round; }
+.fa-bg { stroke: color-mix(in srgb, var(--text) 12%, transparent); }
+.fa-val { stroke: var(--fc); filter: drop-shadow(0 0 3px color-mix(in srgb, var(--fc) 60%, transparent)); }
+.farc .fa-bg { stroke-dasharray: 75 100; transform: rotate(135deg); transform-origin: 50px 50px; }
+.farc .fa-val { transform: rotate(135deg); transform-origin: 50px 50px; }
+.fring .fa-val { transform: rotate(-90deg); transform-origin: 50px 50px; }
+.fa-knob circle { r: 7; fill: #fff; filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); }
+.fpct { position: absolute; inset: 0; display: grid; place-items: center; font-weight: 600; font-size: calc(1.3em * var(--ts-val, 1)); pointer-events: none; color: var(--text); }
+.tile.gw-never .fa-val { filter: none; }
+.tile.gw-never .fliquid, .tile.gw-never .fcap::after, .tile.gw-never .fmark, .tile.gw-never .fd-led .fcells i.on { box-shadow: none; }

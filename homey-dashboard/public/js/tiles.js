@@ -480,7 +480,7 @@
       inner.innerHTML = `<div class="clock"><b>${time}</b>${t.opts.date !== false ? `<span>${now.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })}</span>` : ''}</div>`;
     },
   };
-  setInterval(() => { if (D.cfg) D.refreshWhere(t => t.type === 'clock' && (t.opts.seconds || new Date().getSeconds() < 2)); }, 1000);
+  // verversen van klokken: zie js/clocks.js
 
   // ---------- Tekst ----------
   tiles.text = {

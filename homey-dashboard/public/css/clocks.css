@@ -1,0 +1,127 @@
+/* Klokken (js/clocks.js). Kleuren: --ck-face, --ck-hand, --ck-sec, --ck-num, --ck-acc; grootte: --ck-size */
+.ck { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .35em; min-height: 0; text-align: center; font-size: calc(1em * var(--ck-size, 1)); color: var(--ck-num, var(--text)); }
+.ck .ck-date { color: var(--muted); font-size: calc(1em * var(--ts-small, 1)); }
+.ck .ck-date::first-letter, .ck-dig span::first-letter { text-transform: uppercase; }
+.ck-col { font-style: normal; }
+.ck-col.blink { animation: ckblink 1s steps(1) infinite; }
+@keyframes ckblink { 50% { opacity: 0; } }
+.ck-dig b small { font-size: .38em; margin-left: .15em; opacity: .7; font-weight: inherit; }
+.ck-dig b em { font-size: .3em; font-style: normal; margin-left: .25em; opacity: .7; }
+.ck-dig.bold b { font-weight: 800; letter-spacing: -.04em; }
+
+/* ---------- analoog ---------- */
+.ck-anwrap { position: relative; flex: 1; min-height: 0; width: 100%; }
+.ck-an { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.ck-face { fill: var(--ck-face, color-mix(in srgb, var(--text) 6%, transparent)); stroke: color-mix(in srgb, var(--text) 18%, transparent); stroke-width: 1.5; }
+.ck-t { stroke: var(--ck-num, var(--text)); stroke-linecap: round; opacity: .85; }
+.ck-t.sq { stroke-linecap: butt; }
+.ck-t.acc { stroke: var(--ck-acc, var(--accent)); }
+.ck-n { fill: var(--ck-num, var(--text)); font-size: 15px; font-weight: 500; text-anchor: middle; dominant-baseline: central; font-family: var(--font); }
+.ck-n.serif { font-family: Georgia, 'Times New Roman', serif; font-size: 16px; }
+.ck-n.big { font-size: 24px; font-weight: 700; }
+.ck-n.mid { font-size: 18px; font-weight: 600; }
+.ck-dot { fill: var(--ck-num, var(--text)); }
+.ck-h { stroke: var(--ck-hand, var(--text)); stroke-linecap: round; }
+.ck-sec .ck-h, .ck-sdot { stroke: var(--ck-sec, #ff5d4d); fill: var(--ck-sec, #ff5d4d); }
+.ck-sec { transform-origin: 100px 100px; }
+.ck-sec.smooth { animation: cksweep 60s linear infinite; }
+@keyframes cksweep { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.ck-cap { fill: var(--ck-sec, #ff5d4d); stroke: var(--ck-hand, var(--text)); stroke-width: 2; }
+/* station: witte plaat, zwarte balken */
+.a-station .ck-face { fill: var(--ck-face, #f5f5f2); stroke: #2a2a2a; stroke-width: 4; }
+.a-station .ck-t, .a-station .ck-h:not(.sh) { stroke: var(--ck-hand, #111); }
+.a-station .ck-h.hh, .a-station .ck-h.mh { stroke-linecap: butt; }
+.a-station .ck-cap { fill: var(--ck-hand, #111); stroke: none; }
+/* bauhaus */
+.a-bauhaus .ck-face { fill: var(--ck-face, color-mix(in srgb, var(--accent) 12%, transparent)); }
+.a-bauhaus .ck-sec .ck-h { stroke: var(--ck-sec, var(--accent)); }
+/* chronograaf */
+.ck-sub { fill: color-mix(in srgb, var(--text) 5%, transparent); stroke: color-mix(in srgb, var(--text) 30%, transparent); stroke-width: 1; }
+.ck-subh { stroke: var(--ck-acc, var(--accent)); stroke-width: 1.6; stroke-linecap: round; }
+.ck-subl { fill: var(--muted); font-size: 8px; text-anchor: middle; font-family: var(--font); }
+.a-chrono .ck-face { stroke-width: 4; stroke: color-mix(in srgb, var(--text) 35%, transparent); }
+/* neon */
+.a-neon .ck-face { fill: var(--ck-face, #05070c); stroke: none; }
+.ck-neon { fill: none; stroke: var(--ck-acc, var(--accent)); stroke-width: 3; filter: drop-shadow(0 0 4px var(--ck-acc, var(--accent))) drop-shadow(0 0 10px var(--ck-acc, var(--accent))); }
+.a-neon .ck-h { stroke: var(--ck-hand, var(--ck-acc, var(--accent))); filter: drop-shadow(0 0 3px var(--ck-acc, var(--accent))); }
+/* glas */
+.a-glass .ck-face { fill: var(--ck-face, rgba(255,255,255,.08)); stroke: rgba(255,255,255,.4); }
+.ck-shine { fill: rgba(255,255,255,.1); }
+/* skelet */
+.ck-skel { fill: transparent; stroke-dasharray: 2 4; }
+.ck-gears circle { fill: none; stroke: color-mix(in srgb, var(--ck-acc, var(--accent)) 60%, transparent); stroke-width: 1.4; stroke-dasharray: 4 2; }
+.a-skeleton .ck-h { stroke: var(--ck-hand, var(--text)); }
+/* vintage */
+.a-vintage .ck-face { fill: var(--ck-face, #efe6d2); stroke: #b9a77f; stroke-width: 3; }
+.a-vintage .ck-t, .a-vintage .ck-n { stroke: #3b3226; fill: #3b3226; }
+.a-vintage .ck-h:not(.sh) { stroke: var(--ck-hand, #23395d); }
+.a-vintage .ck-cap { fill: var(--ck-hand, #23395d); stroke: none; }
+/* kinderklok */
+.a-kids .ck-face { fill: var(--ck-face, #fffaf0); stroke: #ffd166; stroke-width: 6; }
+.a-kids .ck-h:not(.sh) { stroke: var(--ck-hand, #3a3a5c); }
+/* wereldklok */
+.ck-world { flex: 1; min-height: 0; width: 100%; display: flex; gap: 6%; align-items: center; justify-content: center; }
+.ck-world figure { margin: 0; height: 100%; flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: .2em; }
+.ck-world figcaption { color: var(--muted); font-size: calc(.9em * var(--ts-small, 1)); }
+
+/* ---------- digitaal ---------- */
+/* 7-segment */
+.ck-7 { display: flex; align-items: center; gap: .12em; height: min(42cqh, 19cqw); max-width: 100%; }
+.ck-7 .s7 { height: 100%; width: auto; }
+.s7 path { fill: color-mix(in srgb, var(--ck-acc, #ff3b30) 10%, transparent); }
+.s7 path.on { fill: var(--ck-acc, #ff3b30); filter: drop-shadow(0 0 3px var(--ck-acc, #ff3b30)); }
+.ck-7 .ck-col { color: var(--ck-acc, #ff3b30); font-size: min(3em, 9cqw); line-height: 1; margin: 0 .05em; }
+.ck-7s { height: 45%; display: flex; gap: .08em; align-self: flex-end; margin-left: .2em; }
+.ck-7 em { font-style: normal; color: var(--ck-acc, #ff3b30); font-size: .9em; align-self: flex-start; }
+/* matrix */
+.ck-mx { width: 92%; }
+.ck-mx .mx { width: 100%; height: auto; }
+.mx circle { fill: color-mix(in srgb, var(--ck-acc, #ffb000) 12%, transparent); }
+.mx circle.on { fill: var(--ck-acc, #ffb000); filter: drop-shadow(0 0 .3px var(--ck-acc, #ffb000)); }
+/* flip */
+.ck-flip { display: flex; align-items: center; gap: .14em; }
+.ck-flip b { position: relative; display: grid; place-items: center; width: 1.25em; height: 1.7em; font-size: min(2.6em, 13cqw, 28cqh); font-weight: 700; color: var(--ck-num, #f4f4f4); background: linear-gradient(#2b2f37 0 49.5%, #1d2026 50.5% 100%); border-radius: .14em; box-shadow: 0 .08em .2em rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.08); font-variant-numeric: tabular-nums; }
+.ck-flip b::after { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 2px; margin-top: -1px; background: rgba(0,0,0,.65); }
+.ck-flip b.s { font-size: min(1.4em, 7cqw); }
+.ck-flip .ck-sp { width: .35em; }
+/* nixie */
+.ck-nix { display: flex; align-items: center; gap: .12em; }
+.ck-nix b { position: relative; display: grid; place-items: center; width: 1.05em; height: 1.6em; font-size: min(2.4em, 15cqw, 30cqh); font-weight: 300; color: var(--ck-acc, #ff9a3c); text-shadow: 0 0 .15em var(--ck-acc, #ff9a3c), 0 0 .45em color-mix(in srgb, var(--ck-acc, #ff7a1a) 80%, transparent); background: radial-gradient(ellipse at 50% 30%, rgba(255,255,255,.08), rgba(0,0,0,.35) 70%); border: 1px solid rgba(255,255,255,.14); border-radius: .5em .5em .2em .2em; font-variant-numeric: tabular-nums; }
+.ck-nix b i { position: absolute; inset: 0; display: grid; place-items: center; font-style: normal; color: rgba(255,170,90,.07); text-shadow: none; }
+.ck-dotz { width: .3em; height: .3em; border-radius: 50%; background: var(--ck-acc, #ff9a3c); box-shadow: 0 0 .4em var(--ck-acc, #ff9a3c); margin: 0 .1em; }
+/* lcd */
+.ck-lcd { position: relative; padding: .4em .7em .5em; border-radius: .35em; background: var(--ck-face, #9fb08a); box-shadow: inset 0 0 .6em rgba(0,0,0,.35), 0 .1em .3em rgba(0,0,0,.4); color: var(--ck-num, #1e2a16); font-family: 'Courier New', monospace; display: grid; justify-items: center; }
+.ck-lcd span { grid-area: 1 / 1; font-size: min(3.2em, 14cqw, 30cqh); font-weight: 700; letter-spacing: .04em; line-height: 1; }
+.ck-lcd .ghost { opacity: .1; }
+.ck-lcd em { position: absolute; right: .4em; top: .25em; font-style: normal; font-size: .8em; }
+.ck-lcd small { color: inherit; opacity: .8; font-size: .9em; margin-top: .2em; }
+/* uren boven minuten */
+.ck-stack { display: flex; flex-direction: column; align-items: center; line-height: .9; }
+.ck-stack b { font-size: min(4em, 30cqh, 40cqw); font-weight: 800; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.ck-stack b.m { color: var(--ck-acc, var(--accent)); font-weight: 300; }
+.ck-stack small { color: var(--muted); font-size: 1.1em; margin-top: .2em; }
+/* secondenring */
+.ck-ring { position: relative; height: 100%; aspect-ratio: 1; max-width: 100%; display: grid; place-items: center; }
+.ck-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.ck-ring .r0, .ck-ring .r1 { fill: none; stroke-width: 4; }
+.ck-ring .r0 { stroke: color-mix(in srgb, var(--text) 12%, transparent); }
+.ck-ring .r1 { stroke: var(--ck-acc, var(--accent)); stroke-linecap: round; }
+.ck-ring > div { display: flex; flex-direction: column; align-items: center; gap: .2em; }
+.ck-ring b { font-size: min(2.6em, 15cqw, 15cqh); font-weight: 300; font-variant-numeric: tabular-nums; }
+/* woordklok */
+.ck-words { font-size: min(2em, 9cqw, 16cqh); font-weight: 600; line-height: 1.15; padding: 0 .3em; text-wrap: balance; }
+.ck-words::first-letter { text-transform: uppercase; }
+/* week */
+.ck-wk { display: flex; gap: .25em; }
+.ck-wk span { padding: .2em .45em; border-radius: .5em; font-size: .85em; color: var(--muted); background: color-mix(in srgb, var(--text) 6%, transparent); }
+.ck-wk span.past { opacity: .5; }
+.ck-wk span.on { background: var(--ck-acc, var(--accent)); color: #0b0f16; font-weight: 700; }
+/* zon */
+.ck-sun { display: flex; gap: 1em; color: var(--muted); font-size: .95em; }
+.ck-sun span { display: inline-flex; align-items: center; gap: .3em; }
+.ck-sun .ic { width: 1.1em; height: 1.1em; color: var(--ck-acc, #ffc34d); }
+
+.ck .clock { margin: auto; }
+.ck .clock b { font-size: calc(min(4.4em, 24cqw, 46cqh) * var(--ts-val, 1)); white-space: nowrap; }
+.ck-ring { height: min(100%, 100cqw); }
+.ck .clock b:has(small) { font-size: calc(min(3.8em, 19cqw, 42cqh) * var(--ts-val, 1)); }
