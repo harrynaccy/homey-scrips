@@ -129,8 +129,10 @@ input, select, textarea { font: inherit; }
 .chart { flex: 1; min-height: 0; display: flex; flex-direction: column; margin-top: .4em; }
 .chart svg { flex: 1; width: 100%; min-height: 0; }
 .cstat { display: flex; align-items: baseline; gap: .7em; flex-wrap: wrap; }
-.cstat b { font-size: 1.7em; font-weight: 600; }
-.cstat span { color: var(--muted); font-size: .78em; }
+.cstat b { font-size: calc(1.7em * var(--ts-val, 1) * var(--ins-val, 1)); font-weight: 600; }
+.cstat span { color: var(--muted); font-size: calc(.78em * var(--ts-small, 1) * var(--ins-mm, 1)); }
+.tile.t-insight .hd .name { font-size: calc(1em * var(--ts-name, 1) * var(--ins-name, 1)); }
+.tile.ins-noicon .hd .badge, .tile.ins-nores .hd .sub, .tile.ins-nomm .cstat span { display: none; }
 
 /* detailvenster */
 #sheet-wrap { position: fixed; inset: 0; z-index: 850; background: rgba(0,0,0,.5); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity .2s; }
@@ -405,3 +407,15 @@ body.editing #connbar { left: 10px; bottom: 10px; }
 #sheet .form input, #sheet .form select { height: 40px; border-radius: 10px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.06); color: #fff; padding: 0 10px; font: inherit; }
 #sheet .msg { font-size: 13.5px; margin: 6px 0; min-height: 18px; } #sheet .msg.ok { color: #7be3a0; } #sheet .msg.bad, .note.bad { color: #ff8a7a; }
 .cam-prev img { width: 100%; max-height: 260px; object-fit: contain; border-radius: 12px; background: #000; margin-top: 8px; }
+
+/* ---------- Tekst gelijk maken: drie lagen (namen, waarden, kleine tekst), standaard 1 = zoals het was ---------- */
+.tile .name, .tile .kb-label { font-size: calc(1em * var(--ts-name, 1)); }
+.tile .h-tile b { font-size: calc(15px * var(--tfs, 1) * var(--ts-name, 1)); }
+.tile .big { font-size: calc(2.6em * var(--ts-val, 1)); }
+.tile .big.sm { font-size: calc(1.6em * var(--ts-val, 1)); }
+.tile .state { font-size: calc(1.05em * var(--ts-val, 1)); }
+.tile .clock b { font-size: calc(4.4em * var(--ts-val, 1)); }
+.tile .sub, .tile small, .tile .muted, .tile .kb-state { font-size: calc(.8em * var(--ts-small, 1)); }
+.tile .h-tile small { font-size: calc(11.5px * var(--tfs, 1) * var(--ts-small, 1)); }
+.tile .clock span { font-size: calc(1.1em * var(--ts-small, 1)); }
+.tile.t-insight .hd .name { font-size: calc(1em * var(--ts-name, 1) * var(--ins-name, 1)); }

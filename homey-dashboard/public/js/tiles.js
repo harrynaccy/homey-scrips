@@ -372,6 +372,10 @@
     async render(t, inner, el) {
       const res = t.opts.resolution || 'last24Hours';
       const l = D.lib.insights.find(x => x.id === t.ref.id && x.uri === t.ref.uri) || {};
+      const o = t.opts || {};
+      // eigen weergave per grafiek: pictogram, periode, min/max, grootte van waarde/naam/min-max
+      el.classList.toggle('ins-noicon', !!o.noIcon); el.classList.toggle('ins-nores', !!o.noRes); el.classList.toggle('ins-nomm', !!o.noMinMax);
+      for (const [k, v] of [['--ins-val', o.valSize], ['--ins-name', o.nameSize], ['--ins-mm', o.mmSize]]) if (v) el.style.setProperty(k, v); else el.style.removeProperty(k);
       inner.innerHTML = head(t, 'chart', RES[res]) + `<div class="chart"><div class="muted">Laden…</div></div>`;
       const key = `${t.ref.uri}|${t.ref.id}|${res}`; D._ins = D._ins || {};
       let data = D._ins[key];
@@ -393,7 +397,7 @@
       const vals = pts.map(p => p.v);
       box.innerHTML = `<div class="cstat"><b>${f(vals[vals.length - 1])}</b><span>min ${f(Math.min(...vals))} · max ${f(Math.max(...vals))}</span></div>
         <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".35"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
-        <path d="${line}L${W},${H}L0,${H}Z" fill="url(#${gid})"/><path d="${line}" fill="none" stroke="${col}" stroke-width="2.2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`;
+        ${o.noFill ? '' : `<path d="${line}L${W},${H}L0,${H}Z" fill="url(#${gid})"/>`}<path d="${line}" fill="none" stroke="${col}" stroke-width="${o.lineW || 2.2}" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`;
     },
   };
 

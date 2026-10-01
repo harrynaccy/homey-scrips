@@ -113,6 +113,7 @@
     r.setProperty('--blur', t.tileBlur + 'px'); r.setProperty('--radius', t.radius + 'px');
     r.setProperty('--shadow', `0 10px 30px rgba(0,0,0,${t.shadow})`); r.setProperty('--border', `rgba(255,255,255,${t.border})`);
     r.setProperty('--fs', t.fontScale || 1);
+    r.setProperty('--ts-name', t.tsName || 1); r.setProperty('--ts-val', t.tsVal || 1); r.setProperty('--ts-small', t.tsSmall || 1);
     const fam = FONTS[t.font] ? `'${t.font}', system-ui, sans-serif` : 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
     r.setProperty('--font', fam);
     if (FONTS[t.font]) { const href = `https://fonts.googleapis.com/css2?family=${FONTS[t.font]}&display=swap`; const l = $('#fontlink'); if (l.href !== href) l.href = href; }

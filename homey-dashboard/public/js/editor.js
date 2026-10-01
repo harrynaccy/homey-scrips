@@ -213,6 +213,13 @@
     panel: () => { D.applyBrightness(); E.refreshPanel(); },
     none: () => {},
   };
+  // ---------- kleurfavorieten ----------
+  E.favUse = hex => {
+    hex = String(hex || '').toLowerCase(); if (!/^#[0-9a-f]{6}$/.test(hex)) return;
+    const s = D.cfg.settings; const u = s.colorUse = s.colorUse || {}; u[hex] = (u[hex] || 0) + 1;
+    E.scheduleSave();
+  };
+  E.favs = () => Object.entries(D.cfg.settings.colorUse || {}).filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]).slice(0, 12).map(x => x[0]);
   E.bind = root => {
     const apply = (k, v, fx, live, inp) => {
       const info = inp ? E.describe(inp, k) : null;
@@ -227,7 +234,16 @@
       else if (inp.type === 'range') {
         inp.oninput = () => { const v = Number(inp.value); const o = inp.parentNode.querySelector('output'); if (o) o.textContent = E.fmtOut(v, o.dataset.fmt); apply(k, v, fx === 'tilepanel' ? 'tile' : fx, true, inp); };
       } else if (inp.tagName === 'SELECT') inp.onchange = () => { const raw = inp.value; const v = raw === '' ? undefined : (/^-?\d+(\.\d+)?$/.test(raw) && inp.dataset.str === undefined ? Number(raw) : raw); apply(k, v, fx, false, inp); if (fx === 'tilepanel' || fx === 'panel' || inp.hasAttribute('data-refresh')) E.refreshPanel(); };
-      else if (inp.type === 'color') { inp.oninput = () => { inp.classList.remove('unset'); apply(k, inp.value, fx === 'tilepanel' ? 'tile' : fx, true, inp); }; inp.onchange = () => { if (fx === 'tilepanel') E.refreshPanel(); }; }
+      else if (inp.type === 'color') {
+        inp.oninput = () => { inp.classList.remove('unset'); apply(k, inp.value, fx === 'tilepanel' ? 'tile' : fx, true, inp); };
+        inp.onchange = () => { E.favUse(inp.value); if (fx === 'tilepanel') E.refreshPanel(); };
+        // kleurfavorieten: kleuren die je vaker dan één keer koos, vooraan de meest gebruikte
+        const favs = E.favs();
+        if (favs.length && !inp.dataset.nofav) {
+          inp.insertAdjacentHTML('beforebegin', `<span class="cfav">${favs.map(h => `<button data-cf="${h}" title="${h.toUpperCase()}" style="background:${h}"></button>`).join('')}</span>`);
+          inp.previousElementSibling.querySelectorAll('[data-cf]').forEach(b => b.onclick = e => { e.preventDefault(); inp.value = b.dataset.cf; inp.oninput(); inp.onchange(); });
+        }
+      }
       else if (inp.type === 'number') inp.onchange = () => { const min = Number(inp.min), max = Number(inp.max); const v = D.clamp(Number(inp.value) || 0, min, max); inp.value = v; apply(k, v, fx, false, inp); };
       else inp.oninput = () => apply(k, inp.value, fx === 'tilepanel' ? 'tile' : fx, true, inp);
     });
@@ -862,7 +878,12 @@
     }
     else if (t.type === 'variable') { const v = D.lib.variables.find(x => x.id === t.ref.id); if (v && v.type === 'number') spec += F.row('Stapgrootte', F.text(`${P}.opts.step`, t.opts.step || 1, 'tile')) + F.row('Eenheid', F.text(`${P}.opts.unit`, t.opts.unit || '', 'tile', 'bijv. °C')); }
     else if (t.type === 'camera') spec += D.cam.tileOptions(t, P, F);
-    else if (t.type === 'insight') spec += F.row('Periode', F.seg(`${P}.opts.resolution`, t.opts.resolution || 'last24Hours', Object.entries(D.RES).map(([k, l]) => [k, l.replace('Laatste ', '')]), 'tile')) + F.row('Lijnkleur', F.colorOpt(`${P}.opts.color`, t.opts.color, th.accent, 'tilepanel'));
+    else if (t.type === 'insight') { const o = t.opts; spec += F.row('Periode', F.seg(`${P}.opts.resolution`, o.resolution || 'last24Hours', Object.entries(D.RES).map(([k, l]) => [k, l.replace('Laatste ', '')]), 'tile')) + F.row('Lijnkleur', F.colorOpt(`${P}.opts.color`, o.color, th.accent, 'tilepanel')) +
+      F.row('Grootte waarde', F.range(`${P}.opts.valSize`, o.valSize || 1, 0.5, 3, 0.05, 'tile', 'x'), 'Bijv. de temperatuur') + F.row('Grootte naam', F.range(`${P}.opts.nameSize`, o.nameSize || 1, 0.5, 2.5, 0.05, 'tile', 'x')) +
+      F.row('Pictogram verbergen', F.toggle(`${P}.opts.noIcon`, !!o.noIcon, 'tile'), 'De naam schuift dan naar links') + F.row('Periode verbergen', F.toggle(`${P}.opts.noRes`, !!o.noRes, 'tile'), 'Bijv. "24 uur"') +
+      F.row('Min/max verbergen', F.toggle(`${P}.opts.noMinMax`, !!o.noMinMax, 'tile')) + (o.noMinMax ? '' : F.row('Grootte min/max', F.range(`${P}.opts.mmSize`, o.mmSize || 1, 0.5, 2.5, 0.05, 'tile', 'x'))) +
+      F.row('Lijndikte', F.range(`${P}.opts.lineW`, o.lineW || 2.2, 0.5, 8, 0.1, 'tile', 'n')) + F.row('Vulling onder de lijn verbergen', F.toggle(`${P}.opts.noFill`, !!o.noFill, 'tile')) +
+      `<div class="acts"><button class="btn sm" data-insall>${icon('copy')}Overnemen voor alle grafieken</button></div><p class="note">Neemt grootte, verbergen, lijndikte en vulling over op alle grafieken. Periode en lijnkleur blijven per grafiek.</p>`; }
     else if (t.type === 'energy') spec += F.row('Totaal van', F.select(`${P}.opts.mainDeviceId`, t.opts.mainDeviceId || '', [['', 'Som van alle apparaten'], ...D.lib.devices.filter(d => d.caps.measure_power).map(d => [d.id, d.name])], 'tile'), 'Kies je P1-meter voor het echte huisverbruik');
     else if (t.type === 'apps') spec += F.row('Alleen problemen', F.toggle(`${P}.opts.onlyProblems`, t.opts.onlyProblems, 'tile'));
     else if (t.type === 'clock') spec += F.row('Seconden', F.toggle(`${P}.opts.seconds`, t.opts.seconds, 'tile')) + F.row('Datum', F.toggle(`${P}.opts.date`, t.opts.date !== false, 'tile'));
@@ -879,7 +900,15 @@
       F.group('Acties', `<div class="acts"><button class="btn sm" data-dup>${icon('copy')}Dupliceren</button><button class="btn sm danger" data-del>${icon('trash')}Verwijderen</button></div>` +
         (tabsOpts.length ? F.row('Naar tabblad', `<select id="totab">${tabsOpts.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('')}</select>`) + `<div class="acts"><button class="btn sm" data-copyto>${icon('copy')}Kopiëren</button><button class="btn sm" data-moveto>${icon('right')}Verplaatsen</button></div>` : ''));
   };
+  const INS_KEYS = ['valSize', 'nameSize', 'mmSize', 'noIcon', 'noRes', 'noMinMax', 'lineW', 'noFill'];
   E.wire.tegel = root => {
+    const insAll = root.querySelector('[data-insall]');
+    if (insAll) insAll.onclick = () => {
+      const f = D.findTile(E.sel); if (!f) return; const src = f.tile.opts || {};
+      const all = D.cfg.tabs.flatMap(tab => tab.tiles).filter(x => x.type === 'insight' && x.id !== f.tile.id);
+      E.commit(null, () => { for (const x of all) { x.opts = x.opts || {}; for (const k of INS_KEYS) { if (src[k] === undefined) delete x.opts[k]; else x.opts[k] = src[k]; } } },
+        () => { D.renderAll(); D.toast(`Overgenomen op ${all.length} ${all.length === 1 ? 'andere grafiek' : 'andere grafieken'}`); });
+    };
     const f = E.sel && D.findTile(E.sel); if (!f) return; const t = f.tile;
     // plaats-velden met botsingscontrole
     root.querySelectorAll('[data-fx="tilepos"]').forEach(inp => inp.onchange = () => {
@@ -1042,15 +1071,36 @@
     return F.group('Thema\'s', `<div class="presets">${Object.entries(PRESETS).map(([id, p]) => card(id, p)).join('')}${(D.cfg.themes || []).map((p, i) => card(i, p, true)).join('')}</div>
         <div class="saverow"><input type="text" id="thname" placeholder="Naam eigen thema"><button class="btn sm" data-saveth>${icon('plus')}Opslaan</button></div>`) +
       F.group('Kleuren', F.row('Accentkleur', F.color(k + 'accent', t.accent, 'theme')) + F.row('Kleur als iets aan staat', F.color(k + 'onColor', t.onColor, 'theme')) + F.row('Tekstkleur', F.color(k + 'text', t.text, 'theme')) + F.row('Tegelkleur', F.color(k + 'tileBg', t.tileBg, 'theme'))) +
-      F.group('Tekst', F.row('Lettertype', F.select(k + 'font', t.font, D.FONTS.map(f => [f, f]), 'theme')) + F.row('Tekstgrootte', F.range(k + 'fontScale', t.fontScale, 0.7, 1.6, 0.05, 'theme', 'x'))) +
+      F.group('Kleurfavorieten', E.favs().length ? `<p class="note">Kleuren die je vaker dan één keer koos. Ze staan bij elke kleurkiezer; tik erop om ze te gebruiken. Met het kruisje haal je er een weg.</p><div class="favlist">${E.favs().map(h => `<span class="fv" style="background:${h}" title="${h.toUpperCase()}"><b data-delfav="${h}">×</b><small>${(D.cfg.settings.colorUse || {})[h]}×</small></span>`).join('')}</div><div style="height:14px"></div>` : '<p class="note">Kies je een kleur voor de tweede keer, dan komt hij hier en bij elke kleurkiezer te staan (maximaal 12).</p>') +
+      F.group('Tekst gelijk maken', `<p class="note">Lettertype, kleur en grootte van alle tekst op het dashboard. Met de knop onderaan haal je eigen afwijkingen per tegel weg, zodat alles gelijk is. (Widgets van eigen apps en webpagina's hebben hun eigen tekst.)</p>` +
+        F.row('Lettertype', F.select(k + 'font', t.font, D.FONTS.map(f => [f, f]), 'theme')) + F.row('Tekstgrootte (alles)', F.range(k + 'fontScale', t.fontScale, 0.7, 1.6, 0.05, 'theme', 'x')) +
+        F.row('Kleur hoofdtekst', F.color(k + 'text', t.text, 'theme'), 'Namen, titels en waarden') + F.row('Kleur bijtekst', F.colorOpt(k + 'muted', t.muted, '#9aa3b2', 'theme'), 'Toestand, min/max, tijden') +
+        F.row('Grootte namen', F.range(k + 'tsName', t.tsName || 1, 0.5, 2.5, 0.05, 'theme', 'x'), 'Bijv. "Woonkamer", "Lamp keuken"') + F.row('Grootte waarden', F.range(k + 'tsVal', t.tsVal || 1, 0.5, 2.5, 0.05, 'theme', 'x'), 'Bijv. 19,7 °C, de klok') +
+        F.row('Grootte kleine tekst', F.range(k + 'tsSmall', t.tsSmall || 1, 0.5, 2.5, 0.05, 'theme', 'x'), 'Bijv. "Aan · 70%", min/max, "24 uur"') +
+        `<div class="f col"><label>Gelijk maken voor</label><div class="unitypes">${UNI_TYPES.map(([id, n]) => `<label class="chk"><input type="checkbox" data-uni="${id}" ${E._uni[id] === false ? '' : 'checked'}>${n}</label>`).join('')}</div></div>` +
+        `<div class="acts"><button class="btn sm primary" data-unify>${icon('check')}Alle tekst gelijk maken</button></div><p class="note">Haalt bij de aangevinkte tegels de eigen tekstkleur, tekstgrootte en doorzichtigheid weg (bij grafieken ook de eigen grootte van waarde, naam en min/max). Ongedaan maken kan met het pijltje linksboven.</p>`) +
       F.group('Tegels', F.row('Doorzichtigheid', F.range(k + 'tileOpacity', t.tileOpacity, 0, 1, 0.01, 'theme', '%')) + F.row('Glas-vervaging', F.range(k + 'tileBlur', t.tileBlur, 0, 40, 1, 'theme', 'px')) + F.row('Hoeken', F.range(k + 'radius', t.radius, 0, 48, 1, 'theme', 'px'))) +
       F.group('Standaard voor alle tegels en knoppen', `<p class="note">Geldt voor elke tegel. Per tegel kun je afwijken onder <b>Tegel → Stijl</b>.</p>` + E.fxControls('settings.theme.fx', t.fx, D.fxBase(), null)) +
       F.group('Terugzetten', `<p class="note">Kwijt? Zet het uiterlijk terug naar de begininstellingen. Je indeling, tegels, koppelingen en pictogrammen blijven staan. Ongedaan maken kan met het pijltje linksboven.</p>
         <div class="acts"><button class="btn sm" data-resettheme>${icon('refresh')}Uiterlijk terugzetten</button><button class="btn sm danger" data-resetlook>${icon('refresh')}Alles terugzetten, ook alle knoppen</button></div>
         <p class="note"><b>Uiterlijk terugzetten</b>: thema, kleuren, lettertype en de standaard voor alle tegels. Eigen instellingen per knop blijven.<br><b>Alles terugzetten</b>: daarnaast ook de eigen stijl en kleuren van alle tegels en knoppen.</p>`);
   };
+  const UNI_TYPES = [['button', 'Knoppen'], ['device', 'Apparaten'], ['zone', 'Zones'], ['insight', 'Grafieken'], ['notifications', 'Meldingen'], ['apps', 'Apps'], ['clock', 'Klok'], ['health', 'Controle'], ['other', 'Overige tegels']];
+  E._uni = E._uni || {};
   const DEFAULT_THEME = () => ({ preset: 'glas', accent: '#5aa9ff', text: '#ffffff', font: 'Inter', fontScale: 1, tileBg: '#141a24', tileOpacity: 0.5, tileBlur: 16, radius: 20, shadow: 0.35, border: 0.1, onColor: '#ffc34d' });
   E.wire.uiterlijk = root => {
+    root.querySelectorAll('[data-delfav]').forEach(b => b.onclick = () => { const u = D.cfg.settings.colorUse || {}; delete u[b.dataset.delfav]; E.scheduleSave(); E.refreshPanel(); });
+    root.querySelectorAll('[data-uni]').forEach(c => c.onchange = () => { E._uni[c.dataset.uni] = c.checked; });
+    const uni = root.querySelector('[data-unify]');
+    if (uni) uni.onclick = async () => {
+      const on = id => E._uni[id] !== false; const known = UNI_TYPES.map(x => x[0]);
+      const tiles = D.cfg.tabs.flatMap(tab => tab.tiles).filter(x => known.includes(x.type) ? on(x.type) : on('other'));
+      if (!tiles.length) { D.toast('Niets aangevinkt'); return; }
+      if (!(await D.confirm(`Bij ${tiles.length} tegels de eigen tekstinstellingen weghalen, zodat alles gelijk is?`, 'Gelijk maken'))) return;
+      E.logAction('Tekst gelijk gemaakt', tiles.flatMap(x => [E.snapTile(x, 'style'), E.snapTile(x, 'opts')]), `${tiles.length} tegels`);
+      E.commit(null, () => { for (const x of tiles) { const st = x.style || {}; for (const k2 of ['text', 'fontScale', 'txN', 'txS']) delete st[k2]; if (x.opts) for (const k2 of ['valSize', 'nameSize', 'mmSize']) delete x.opts[k2]; } },
+        () => { D.renderAll(); E.refreshPanel(); D.toast(`Tekst gelijk gemaakt op ${tiles.length} tegels`); });
+    };
     E.wireFx(root, () => D.fxBase());
     root.querySelector('[data-resettheme]').onclick = async () => {
       if (!(await D.confirm('Thema, kleuren, lettertype en de standaard voor alle tegels terugzetten naar de begininstellingen?', 'Terugzetten'))) return;
