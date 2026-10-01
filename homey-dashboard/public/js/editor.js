@@ -869,7 +869,7 @@
   // Keuzelijst knopstijl: bij een apparaat ook "Gewone tegel"
   E.kindSelect = (t, d) => {
     const cur = t.type === 'button' ? (t.opts.kind || 'glow') : '_tile';
-    const kinds = D.BUTTON_KINDS.filter(([k]) => { if (!d) return true; const o = E.targetOpts(k); return (!o.filter || o.filter(d)) && o.targets.includes('device'); });
+    const kinds = D.BUTTON_KINDS.filter(([k]) => { if (!d) return true; const o = E.targetOpts(k); return (!o.filter || o.filter(d)) && (o.targets || []).includes('device'); });
     const opts = [...(d ? [['_tile', 'Gewone tegel']] : []), ...kinds.map(k => [k[0], k[1]])];
     if (!opts.some(o => o[0] === cur)) opts.push([cur, (D.BUTTON_KINDS.find(k => k[0] === cur) || [cur, cur])[1]]);
     return `<select data-kindsel>${opts.map(([v, l]) => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>`;

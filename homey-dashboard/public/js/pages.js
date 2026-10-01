@@ -70,7 +70,7 @@
 
   // ---------- achterkant ----------
   const E = D.editor;
-  E.targetOpts = (orig => kind => kind === 'page' ? { pages: true } : orig(kind))(E.targetOpts);
+  E.targetOpts = (orig => kind => kind === 'page' ? { pages: true, targets: ['page'] } : orig(kind))(E.targetOpts);
   E.pickTarget = (orig => (opt = {}) => opt.pages ? pickPage() : orig(opt))(E.pickTarget);
   const pickPage = () => new Promise(resolve => {
     let done = false; const finish = v => { if (done) return; done = true; D._sheetCancel = null; D.closeSheet(); resolve(v); };
