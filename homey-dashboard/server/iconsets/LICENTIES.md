@@ -9,3 +9,5 @@
 | Hue (`hue.json`) | hass-hue-icons door Arallsopp, https://github.com/arallsopp/hass-hue-icons | CC BY-NC-SA 4.0: naamsvermelding, niet-commercieel, gelijk delen. Alleen voor eigen, niet-commercieel gebruik. Philips Hue is een handelsmerk van Signify. |
 | Lijn (`lijn.json`) | Tabler Icons 3.48, https://tabler.io/icons (omgezet naar één pad per pictogram) | MIT, © Paweł Kuna |
 | Deuren & ramen (`deuren.json`) | Eigen tekeningen voor dit dashboard | Vrij te gebruiken |
+
+QR-codes (tegel Wifi voor gasten): `public/js/vendor/qrcode.js`, qrcode-generator van Kazuhiko Arase, MIT.

@@ -91,6 +91,8 @@ homey.on('changed', healthPush);
 const AW_DIR = process.env.APPWIDGETS_DIR || path.join(__dirname, '..', 'appwidgets');
 const bridge = new AppBridge(homey, AW_DIR);
 bridge.on('event', e => broadcast('appevent', e));
+const { Extra } = require('./extra');
+const extra = new Extra({ homey, dataDir: DATA, broadcast });
 const { AppScan } = require('./appscan');
 const appscan = new AppScan(homey, AW_DIR);
 
@@ -191,6 +193,24 @@ app.get('/api/assistant/job/:id', (req, res) => {
   res.json({ status: j.status, progress: j.progress, seconds: Math.round((Date.now() - j.started) / 1000), result: j.result, error: j.error });
 });
 
+// ---------- extra tegels: gegevens van buiten en van NAS/Homey ----------
+const xr = fn => async (req, res) => { try { res.json(await fn(req)); } catch (e) { res.status(502).json({ error: String(e.message || e) }); } };
+app.get('/api/x/rain', xr(r => extra.rain(r.query.lat, r.query.lon)));
+app.get('/api/x/weather', xr(r => extra.weather(r.query.lat, r.query.lon)));
+app.get('/api/x/air', xr(r => extra.air(r.query.lat, r.query.lon)));
+app.get('/api/x/price', xr(() => extra.price()));
+app.post('/api/x/waste', xr(r => extra.waste(r.body || {})));
+app.post('/api/x/ical', xr(r => extra.ical((r.body || {}).urls)));
+app.get('/api/x/ov/search', xr(r => extra.ovSearch(r.query.q)));
+app.get('/api/x/ov/departures', xr(r => extra.ovDepartures(r.query.code)));
+app.post('/api/x/travel', xr(r => extra.travel(r.body || {})));
+app.get('/api/x/nas', xr(() => extra.nas()));
+app.post('/api/x/nas/setup', xr(r => { extra.setNas(r.body || {}); return extra.hasSecrets(); }));
+app.post('/api/x/key', xr(r => { const b = r.body || {}; if (!['tomtom'].includes(b.name)) throw new Error('Onbekende sleutel'); extra.setKey(b.name, b.value); return extra.hasSecrets(); }));
+app.get('/api/x/secrets', xr(() => extra.hasSecrets()));
+app.get('/api/x/homey', xr(() => extra.homeyInfo()));
+app.get('/api/x/notes/:id', xr(r => extra.notes(String(r.params.id))));
+app.post('/api/x/notes/:id', xr(r => extra.setNotes(String(r.params.id), (r.body || {}).list)));
 app.post('/api/appwidgets/scan', async (req, res) => { try { res.json(await appscan.scan()); } catch (e) { fail(res, e); } });
 app.post('/api/appwidgets/install', async (req, res) => { try { const b = req.body || {}; res.json(await appscan.install(String(b.appId || ''), String(b.widgetId || ''))); } catch (e) { fail(res, e); } });
 app.get('/api/appwidgets', wrap(() => ({ widgets: bridge.list(), status: bridge.status(), demo: homey.status.mode === 'demo' })));

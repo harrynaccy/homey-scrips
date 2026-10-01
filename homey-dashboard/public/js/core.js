@@ -46,6 +46,7 @@
   D.conn = { nasAt: 0, nasErr: false, nasSince: Date.now(), homey: null };
   D.connectEvents = () => {
     const es = new EventSource('/api/events');
+    es.addEventListener('notes', ev => { try { if (D._notesPush) D._notesPush(JSON.parse(ev.data)); } catch (e) { /* */ } });
     es.addEventListener('health', ev => { try { if (D.health && D.health.push) D.health.push(JSON.parse(ev.data)); } catch (e) { /* */ } });
     es.addEventListener('appevent', ev => { try { window.__awBus.dispatch(JSON.parse(ev.data)); } catch (e) { /* */ } });
     es.addEventListener('update', ev => {

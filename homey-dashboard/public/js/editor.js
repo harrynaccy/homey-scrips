@@ -447,6 +447,7 @@
   const CATS = [['devices', 'Apparaten'], ['zones', 'Zones'], ['flows', 'Flows'], ['moods', 'Moods'], ['variables', 'Variabelen'], ['insights', 'Grafieken'], ['appw', 'Eigen apps'], ['webw', 'Webwidgets'], ['extra', 'Overig']];
   E.loadAppWidgets = async () => { try { E._aw = await D.api('GET', '/api/appwidgets'); } catch (e) { E._aw = { widgets: [], status: [] }; } return E._aw; };
   const EXTRA = [['clock', 'Klok', 'Tijd en datum'], ['text', 'Tekst', 'Eigen tekst of label'], ['web', 'Webpagina', 'Andere pagina of eigen widget'], ['energy', 'Energie', 'Live verbruik'], ['presence', 'Wie is thuis', 'Aanwezigheid gebruikers'], ['alarms', 'Wekkers', 'Homey-wekkers aan/uit'], ['notifications', 'Meldingen', 'Tijdlijn van Homey'], ['apps', 'Apps', 'Status van Homey-apps'], ['health', 'Controle', 'Problemen met apparaten en flows'], ['camera', 'Camera', 'Beeld van een camera (Surveillance Station, Homey of Reolink)']];
+  EXTRA.push(...(D.EXTRA2 || []));
   // Catalogus met kant-en-klare webwidgets (op jouw plek: Scherm → Nachtmodus → breedte/lengte, standaard Enschede)
   const LOC = () => { const n = D.cfg.settings.night || {}; return { lat: Number(n.lat) || 52.22, lon: Number(n.lon) || 6.89 }; };
   const windy = (ov, z = 7) => ({ lat, lon }) => `https://embed.windy.com/embed2.html?lat=${lat}&lon=${lon}&detailLat=${lat}&detailLon=${lon}&zoom=${z}&level=surface&overlay=${ov}&product=ecmwf&menu=&message=true&marker=true&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1`;
@@ -557,7 +558,7 @@
     }
     else if (kind === 'webw') { const x = E.WEBW.find(w => w[0] === id); if (!x) return; tile = { type: 'web', opts: { url: x[5](LOC()), title: x[1], interactive: true }, style: { frameless: true, hideTitle: true }, w: x[4][0], h: x[4][1] }; }
     else if (kind === 'insight') { const [uri, lid] = id.split('|'); tile = { type: 'insight', ref: { uri, id: lid }, opts: { resolution: 'last24Hours' } }; }
-    else tile = { type: id, opts: id === 'clock' ? { date: true } : id === 'text' ? { text: 'Nieuwe tekst', size: 1.2 } : id === 'web' ? { url: '', interactive: true } : {} };
+    else { tile = { type: id, opts: id === 'clock' ? { date: true } : id === 'text' ? { text: 'Nieuwe tekst', size: 1.2 } : id === 'web' ? { url: '', interactive: true } : {} }; const dx = (D.EXTRA2_DEFAULTS || {})[id]; if (dx) tile = { ...tile, opts: { ...tile.opts, ...D.clone(dx.opts || {}) }, style: D.clone(dx.style || {}) }; }
     const T = D.tiles[tile.type]; const tab = D.currentTab();
     const spot = tile.x !== undefined ? { x: tile.x, y: tile.y, w: tile.w, h: tile.h } : E.firstFree(tab, tile.w || T.size[0], tile.h || T.size[1]);
     if (!spot) { D.toast('Geen ruimte meer op dit tabblad. Maak ruimte of vergroot het raster.', true); return; }
@@ -933,6 +934,7 @@
       F.row('Min/max verbergen', F.toggle(`${P}.opts.noMinMax`, !!o.noMinMax, 'tile')) + (o.noMinMax ? '' : F.row('Grootte min/max', F.range(`${P}.opts.mmSize`, o.mmSize || 1, 0.5, 2.5, 0.05, 'tile', 'x'))) +
       F.row('Lijndikte', F.range(`${P}.opts.lineW`, o.lineW || 2.2, 0.5, 8, 0.1, 'tile', 'n')) + F.row('Vulling onder de lijn verbergen', F.toggle(`${P}.opts.noFill`, !!o.noFill, 'tile')) +
       `<div class="acts"><button class="btn sm" data-insall>${icon('copy')}Overnemen voor alle grafieken</button></div><p class="note">Neemt grootte, verbergen, lijndikte en vulling over op alle grafieken. Periode en lijnkleur blijven per grafiek.</p>`; }
+    else if (D.tileOptions && D.tileOptions[t.type]) spec += D.tileOptions[t.type](t, P, F, th);
     else if (t.type === 'energy') spec += F.row('Totaal van', F.select(`${P}.opts.mainDeviceId`, t.opts.mainDeviceId || '', [['', 'Som van alle apparaten'], ...D.lib.devices.filter(d => d.caps.measure_power).map(d => [d.id, d.name])], 'tile'), 'Kies je P1-meter voor het echte huisverbruik');
     else if (t.type === 'apps') spec += F.row('Alleen problemen', F.toggle(`${P}.opts.onlyProblems`, t.opts.onlyProblems, 'tile'));
     else if (t.type === 'clock') {
@@ -966,6 +968,7 @@
   const TZS = ['Europe/London', 'Europe/Lisbon', 'Europe/Madrid', 'Europe/Istanbul', 'Africa/Cairo', 'Asia/Dubai', 'Asia/Kolkata', 'Asia/Bangkok', 'Asia/Shanghai', 'Asia/Tokyo', 'Australia/Sydney', 'Pacific/Auckland', 'America/Sao_Paulo', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'America/Curacao', 'America/Paramaribo', 'Pacific/Honolulu'];
   const INS_KEYS = ['valSize', 'nameSize', 'mmSize', 'noIcon', 'noRes', 'noMinMax', 'lineW', 'noFill'];
   E.wire.tegel = root => {
+    const ft = D.findTile(E.sel); if (ft && D.tileWire && D.tileWire[ft.tile.type]) D.tileWire[ft.tile.type](root, ft.tile);
     const insAll = root.querySelector('[data-insall]');
     if (insAll) insAll.onclick = () => {
       const f = D.findTile(E.sel); if (!f) return; const src = f.tile.opts || {};
