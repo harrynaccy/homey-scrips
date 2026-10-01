@@ -67,6 +67,11 @@ window.anyIcon = function (x, cls, opt) {
     const u = String(x.u).replace(/[^a-zA-Z0-9/._-]/g, '');
     return `<img class="ic img ${cls || ''}" src="${u}" alt="" draggable="false" loading="lazy">`;
   }
+  if (x && typeof x === 'object' && x.s === 'lijn' && x.p) {
+    // lijn-pictogram: dikte via --icw (Tegel/Uiterlijk → Lijndikte pictogrammen)
+    const d = String(x.p).replace(/[^MmLlHhVvCcSsQqTtAaZz0-9.,\s-]/g, '');
+    return `<svg class="ic lijn ${cls || ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" style="stroke-width:var(--icw, 1.6)"><path d="${d}"/></svg>`;
+  }
   if (x && typeof x === 'object' && x.p) {
     const d = String(x.p).replace(/[^MmLlHhVvCcSsQqTtAaZz0-9.,\s-]/g, '');
     const brand = x.c && opt.brand !== false && /^#[0-9a-fA-F]{3,8}$/.test(x.c);

@@ -419,3 +419,6 @@ body.editing #connbar { left: 10px; bottom: 10px; }
 .tile .h-tile small { font-size: calc(11.5px * var(--tfs, 1) * var(--ts-small, 1)); }
 .tile .clock span { font-size: calc(1.1em * var(--ts-small, 1)); }
 .tile.t-insight .hd .name { font-size: calc(1em * var(--ts-name, 1) * var(--ins-name, 1)); }
+
+/* lijndikte van lijnpictogrammen (ook de ingebouwde) */
+.tile .ic:not(.mdi):not(.img):not(.lijn) { stroke-width: var(--icw, 1.8); }

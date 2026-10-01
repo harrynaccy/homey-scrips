@@ -214,17 +214,66 @@ function pairs() {
   }
   return PAIRS;
 }
-const PAIR_CATS = [['mdi', 'Eenkleurig'], ['hue', 'Hue']];
+// ---------- Lijn (Tabler Icons, met instelbare lijndikte) ----------
+let LIJN = null;
+const LIJN_NL = { Buildings: 'Gebouwen', Devices: 'Apparaten', Electrical: 'Elektra', Weather: 'Weer', Nature: 'Natuur', Animals: 'Dieren', Food: 'Eten', Health: 'Gezondheid', Media: 'Media', Arrows: 'Pijlen',
+  System: 'Systeem', Communication: 'Communicatie', Vehicles: 'Vervoer', Map: 'Kaart', Sport: 'Sport', Design: 'Ontwerp', Text: 'Tekst', Math: 'Rekenen', Symbols: 'Symbolen', Photography: 'Foto', Games: 'Spellen',
+  Document: 'Documenten', Badges: 'Badges', 'E-commerce': 'Winkelen', Computers: 'Computers', Laundry: 'Was', Shapes: 'Vormen', Numbers: 'Cijfers', Brand: 'Merken', Charts: 'Grafieken', Database: 'Database',
+  Currencies: 'Valuta', Gestures: 'Gebaren', Mood: 'Stemming', Letters: 'Letters', Development: 'Ontwikkeling', Extensions: 'Bestanden', 'Version control': 'Versiebeheer', Logic: 'Logica', Gender: 'Gender', Overig: 'Overig' };
+const LIJN_TOP = `bulb bulb-off lamp lamp-2 ceiling-light plug plug-connected power toggle-left toggle-right door door-enter door-exit window home home-2 sofa bed armchair
+  temperature temperature-celsius droplet snowflake flame air-conditioning propeller wind radiator sun moon cloud cloud-rain bolt battery battery-charging solar-panel solar-electricity
+  device-tv speakerphone volume music player-play player-pause camera video bell alarm lock lock-open key shield-check shield-lock router wifi
+  wash-machine fridge microwave coffee cup tools-kitchen-2 bath toilet-paper vacuum-cleaner plant plant-2 tree flower car bike garage mailbox dog cat paw clock calendar user users`.split(/\s+/);
+function lijn() {
+  if (!LIJN) {
+    const raw = load('lijn.json');
+    LIJN = raw.icons.map(([n, p, c, kw]) => ({ n, p, c: raw.cats[c], hay: (n + ' ' + kw).toLowerCase() }));
+    LIJN.cats = raw.cats; LIJN.byName = new Map(LIJN.map(i => [i.n, i]));
+  }
+  return LIJN;
+}
+function searchLijn(q, cat) {
+  const words = splitQ(q); let list = lijn();
+  if (cat) list = list.filter(i => i.c === cat);
+  if (words.length) list = rank(list, words, i => i.n, i => i.hay);
+  else if (!cat) { const top = LIJN_TOP.map(n => lijn().byName.get(n)).filter(Boolean); const seen = new Set(top); list = [...top, ...list.filter(i => !seen.has(i))]; }
+  return list.map(i => ({ s: 'lijn', n: i.n, p: i.p }));
+}
+
+// ---------- Deuren & ramen (eigen lijntekeningen, open/dicht-paren) ----------
+let DEUR = null;
+const DEUR_CATS = [['deuren', 'Deuren'], ['ramen', 'Ramen'], ['zonwering', 'Zonwering en gordijnen'], ['buiten', 'Garage, poort en buiten']];
+function deur() {
+  if (!DEUR) {
+    DEUR = load('deuren.json').map(x => ({ ...x, hay: (x.n + ' ' + x.t + ' ' + x.kw).toLowerCase(),
+      cat: /garage|poort|hek|schuur|brievenbus|kelder|zolder|katten/.test(x.n) ? 'buiten' : /rolluik|screen|zonnescherm|gordijn|vitrage|lamellen|jaloezie|rolgordijn|plisse|luiken/.test(x.n) ? 'zonwering' : /raam|bovenlicht/.test(x.n) ? 'ramen' : 'deuren' }));
+    DEUR.byName = new Map(DEUR.map(i => [i.n, i]));
+  }
+  return DEUR;
+}
+const deurPair = i => ({ s: 'paar', n: i.n + '-open|' + i.n + '-dicht', t: i.t, on: { s: 'lijn', n: i.n + '-open', t: i.t + ' (open)', p: i.open }, off: { s: 'lijn', n: i.n + '-dicht', t: i.t + ' (dicht)', p: i.dicht } });
+function searchDeur(q, cat) {
+  const words = splitQ(q); let list = deur();
+  if (cat) list = list.filter(i => i.cat === cat);
+  if (words.length) list = rank(list, words, i => i.n, i => i.hay);
+  return list.map(deurPair);
+}
+
+const PAIR_CATS = [['mdi', 'Eenkleurig'], ['hue', 'Hue'], ['deur', 'Deuren & ramen (lijn)']];
 function searchPairs(q, cat) {
+  if (cat === 'deur') return searchDeur(q, '');
   const words = splitQ(q); let list = pairs();
   if (cat) list = list.filter(i => i.set === cat);
   if (words.length) list = rank(list, words, i => i.on.n, i => i.hay);
-  return list.map(({ s, n, on, off }) => ({ s, n, on, off }));
+  const out = list.map(({ s, n, on, off }) => ({ s, n, on, off }));
+  return cat ? out : [...searchDeur(q, ''), ...out];
 }
 
 // ---------- algemeen ----------
-const SETS = [['mdi', 'Eenkleurig'], ['flat', 'Gekleurd plat'], ['3d', 'Gekleurd 3D'], ['merk', 'Merken'], ['hue', 'Hue'], ['paar', 'Aan/uit-paren']];
+const SETS = [['mdi', 'Eenkleurig'], ['lijn', 'Lijn'], ['deur', 'Deuren & ramen'], ['flat', 'Gekleurd plat'], ['3d', 'Gekleurd 3D'], ['merk', 'Merken'], ['hue', 'Hue'], ['paar', 'Aan/uit-paren']];
 function list(set, q, cat) {
+  if (set === 'lijn') return searchLijn(q, cat);
+  if (set === 'deur') return searchDeur(q, cat);
   if (set === 'flat' || set === '3d') return searchEmoji(set, q, cat);
   if (set === 'merk') return searchMerk(q, cat);
   if (set === 'hue') return searchHue(q, cat);
@@ -232,6 +281,8 @@ function list(set, q, cat) {
   return searchMdi(q, cat);
 }
 function categories(set) {
+  if (set === 'lijn') return lijn().cats.map(c => [c, LIJN_NL[c] || c]).sort((a, b) => a[1].localeCompare(b[1]));
+  if (set === 'deur') return DEUR_CATS;
   if (set === 'flat' || set === '3d') return EMO_CATS;
   if (set === 'merk') return MERK_CATS;
   if (set === 'hue') return HUE_CATS;
@@ -245,6 +296,11 @@ function search(q, cat, offset = 0, limit = 200, set = 'mdi') {
   return { total: all.length, items: all.slice(offset, offset + limit), cats: categories(set), sets: SETS, counts };
 }
 function get(name, set = 'mdi') {
+  if (set === 'lijn') {
+    const m = /^(.*)-(open|dicht)$/.exec(name); const d = m && deur().byName.get(m[1]);
+    if (d) return { s: 'lijn', n: name, t: d.t + ' (' + m[2] + ')', p: m[2] === 'open' ? d.open : d.dicht };
+    const i = lijn().byName.get(name); return i ? { s: 'lijn', n: i.n, p: i.p } : null;
+  }
   if (set === 'hue') { const i = hue().byName.get(name); return i ? { s: 'hue', n: i.n, p: i.p } : null; }
   if (set === 'merk') { const i = merk().byName.get(name); return i ? { s: 'merk', n: i.n, t: i.t, p: i.p, c: i.c } : null; }
   if (set === 'flat' || set === '3d') { const i = emo().byName.get(name); return i ? { s: set, n: i.n, t: i.t, u: `/iconsets/${set}/${i.n}.${set === 'flat' ? 'svg' : 'webp'}` } : null; }

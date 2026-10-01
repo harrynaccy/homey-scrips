@@ -230,7 +230,7 @@
   // ---------- stijl-effecten: schaduw, gloed, rand, tekst, vorm, marge, diepte, geluid ----------
   // Standaardwaarden; per tegel te overschrijven in t.style, voor alle tegels in settings.theme.fx
   D.FX_DEFAULT = { shT: 'tile', shS: 30, shD: 'down', shC: '#000000', glW: 'auto', glT: 'face', glC: '', glA: 0.7, glS: 24,
-    bdW: 1, bdC: '#ffffff', bdOn: false, txN: 1, txS: 1, fr: null, pad: null, fbw: null, depth: 1, tap: 1, snd: 'none', vol: 0.6, blink: 'auto', tint: 1 };
+    bdW: 1, bdC: '#ffffff', bdOn: false, txN: 1, txS: 1, fr: null, pad: null, fbw: null, depth: 1, tap: 1, snd: 'none', vol: 0.6, blink: 'auto', tint: 1, icw: null };
   D.FX_KEYS = [...Object.keys(D.FX_DEFAULT), 'shA', 'bdA'];
   D.fxBase = () => { const th = D.cfg.settings.theme; return { ...D.FX_DEFAULT, shA: th.shadow ?? 0.35, bdA: th.border ?? 0.1, ...(th.fx || {}) }; };
   D.fxOf = t => { const out = D.fxBase(); const s = (t && t.style) || {}; for (const k of D.FX_KEYS) if (s[k] !== undefined && s[k] !== null && s[k] !== '') out[k] = s[k]; return out; };
@@ -254,6 +254,7 @@
     for (const w of ['auto', 'never', 'on', 'always', 'alarm']) el.classList.toggle('gw-' + w, fx.glW === w);
     el.classList.toggle('blink-off', fx.blink === 'off'); el.classList.toggle('blink-on', fx.blink === 'on');
     el.classList.toggle('no-tint', fx.tint === 0 || fx.tint === false);
+    if (fx.icw) st.setProperty('--icw', fx.icw); else st.removeProperty('--icw');
     for (const g of ['tile', 'face', 'text']) el.classList.toggle('gt-' + g, fx.glT === g);
     // tekst
     st.setProperty('--txn', fx.txN); st.setProperty('--txs', fx.txS);
