@@ -91,6 +91,8 @@ homey.on('changed', healthPush);
 const AW_DIR = process.env.APPWIDGETS_DIR || path.join(__dirname, '..', 'appwidgets');
 const bridge = new AppBridge(homey, AW_DIR);
 bridge.on('event', e => broadcast('appevent', e));
+const { AppScan } = require('./appscan');
+const appscan = new AppScan(homey, AW_DIR);
 
 // ---------- app ----------
 const app = express();
@@ -189,6 +191,8 @@ app.get('/api/assistant/job/:id', (req, res) => {
   res.json({ status: j.status, progress: j.progress, seconds: Math.round((Date.now() - j.started) / 1000), result: j.result, error: j.error });
 });
 
+app.post('/api/appwidgets/scan', async (req, res) => { try { res.json(await appscan.scan()); } catch (e) { fail(res, e); } });
+app.post('/api/appwidgets/install', async (req, res) => { try { const b = req.body || {}; res.json(await appscan.install(String(b.appId || ''), String(b.widgetId || ''))); } catch (e) { fail(res, e); } });
 app.get('/api/appwidgets', wrap(() => ({ widgets: bridge.list(), status: bridge.status(), demo: homey.status.mode === 'demo' })));
 app.post('/api/aw/call', async (req, res) => {
   const { app: appId, widget, method, path: p, body } = req.body || {};
@@ -225,7 +229,8 @@ app.get('/api/config', wrap(() => readConfig()));
 app.put('/api/config', wrap(req => {
   const cfg = req.body;
   if (!cfg || !Array.isArray(cfg.tabs)) throw new Error('Ongeldige configuratie');
-  if (cfg.tabs.length > 10) throw new Error('Maximaal 10 tabbladen');
+  if (cfg.tabs.filter(t => !t.sub).length > 10) throw new Error('Maximaal 10 tabbladen');
+  if (cfg.tabs.filter(t => t.sub).length > 20) throw new Error("Maximaal 20 subpagina's");
   writeConfig(cfg);
   broadcast('config', { savedAt: cfg.savedAt, by: req.get('X-Client-Id') || null });
   return { ok: true, savedAt: cfg.savedAt };

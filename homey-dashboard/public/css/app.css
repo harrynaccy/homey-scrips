@@ -422,3 +422,12 @@ body.editing #connbar { left: 10px; bottom: 10px; }
 
 /* lijndikte van lijnpictogrammen (ook de ingebouwde) */
 .tile .ic:not(.mdi):not(.img):not(.lijn) { stroke-width: var(--icw, 1.8); }
+
+/* subpagina's: terugknop en knop "Open pagina" */
+#subback { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); z-index: 5; display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px 8px 10px; border-radius: 999px; background: var(--tile); color: var(--text);
+  -webkit-backdrop-filter: blur(var(--blur)); backdrop-filter: blur(var(--blur)); box-shadow: var(--shadow); border: 1px solid var(--border); font-size: 15px; font-weight: 600; }
+#subback .ic { width: 20px; height: 20px; }
+.kb-page .face { position: relative; }
+.kb-page .pg-go { position: absolute; right: -6%; bottom: -6%; width: 34%; height: 34%; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: #0b0f16; box-shadow: 0 2px 6px rgba(0,0,0,.35); }
+.kb-page .pg-go .ic { width: 70%; height: 70%; color: #0b0f16; filter: none; }
+.pick-it .emo-ic { font-size: 20px; line-height: 1; }

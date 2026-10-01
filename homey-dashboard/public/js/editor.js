@@ -444,9 +444,25 @@
   E.render = {}; E.wire = {};
 
   // Bibliotheek
-  const CATS = [['devices', 'Apparaten'], ['zones', 'Zones'], ['flows', 'Flows'], ['moods', 'Moods'], ['variables', 'Variabelen'], ['insights', 'Grafieken'], ['appw', 'Eigen apps'], ['extra', 'Overig']];
+  const CATS = [['devices', 'Apparaten'], ['zones', 'Zones'], ['flows', 'Flows'], ['moods', 'Moods'], ['variables', 'Variabelen'], ['insights', 'Grafieken'], ['appw', 'Eigen apps'], ['webw', 'Webwidgets'], ['extra', 'Overig']];
   E.loadAppWidgets = async () => { try { E._aw = await D.api('GET', '/api/appwidgets'); } catch (e) { E._aw = { widgets: [], status: [] }; } return E._aw; };
   const EXTRA = [['clock', 'Klok', 'Tijd en datum'], ['text', 'Tekst', 'Eigen tekst of label'], ['web', 'Webpagina', 'Andere pagina of eigen widget'], ['energy', 'Energie', 'Live verbruik'], ['presence', 'Wie is thuis', 'Aanwezigheid gebruikers'], ['alarms', 'Wekkers', 'Homey-wekkers aan/uit'], ['notifications', 'Meldingen', 'Tijdlijn van Homey'], ['apps', 'Apps', 'Status van Homey-apps'], ['health', 'Controle', 'Problemen met apparaten en flows'], ['camera', 'Camera', 'Beeld van een camera (Surveillance Station, Homey of Reolink)']];
+  // Catalogus met kant-en-klare webwidgets (op jouw plek: Scherm → Nachtmodus → breedte/lengte, standaard Enschede)
+  const LOC = () => { const n = D.cfg.settings.night || {}; return { lat: Number(n.lat) || 52.22, lon: Number(n.lon) || 6.89 }; };
+  const windy = (ov, z = 7) => ({ lat, lon }) => `https://embed.windy.com/embed2.html?lat=${lat}&lon=${lon}&detailLat=${lat}&detailLon=${lon}&zoom=${z}&level=surface&overlay=${ov}&product=ecmwf&menu=&message=true&marker=true&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1`;
+  E.WEBW = [
+    ['buienradar', 'Buienradar', 'Regenradar rond jouw plek', 'cloud', [4, 4], ({ lat, lon }) => `https://gadgets.buienradar.nl/gadget/zoommap/?lat=${lat}&lng=${lon}&overname=2&zoom=8&size=3&voor=1`],
+    ['windy-radar', 'Windy: neerslagradar', 'Live regenradar op een kaart', 'cloud', [6, 4], windy('radar', 8)],
+    ['windy-wind', 'Windy: wind', 'Bewegende windkaart', 'fan', [6, 4], windy('wind')],
+    ['windy-temp', 'Windy: temperatuur', 'Temperatuurkaart', 'thermo', [6, 4], windy('temp')],
+    ['windy-rain', 'Windy: regen en onweer', 'Voorspelde neerslag', 'cloud', [6, 4], windy('rain')],
+    ['windy-clouds', 'Windy: bewolking', 'Wolkenkaart', 'cloud', [6, 4], windy('clouds')],
+    ['meteoblue-dag', 'Meteoblue: weer per dag', '5 dagen vooruit', 'sun', [6, 3], () => 'https://www.meteoblue.com/nl/weer/widget/daily/enschede_nederland_2756071?geoloc=fixed&days=5&tempunit=CELSIUS&windunit=KILOMETER_PER_HOUR&precipunit=MILLIMETER&coloured=coloured&pictoicon=0&pictoicon=1&maxtemperature=0&maxtemperature=1&mintemperature=0&mintemperature=1&windspeed=0&windspeed=1&precipitation=0&precipitation=1&precipitationprobability=0&precipitationprobability=1&layout=dark'],
+    ['meteoblue-meteogram', 'Meteoblue: meteogram', 'Temperatuur, regen en wind per uur', 'chart', [8, 4], () => 'https://www.meteoblue.com/nl/weer/widget/meteogram/enschede_nederland_2756071?geoloc=fixed&temperature_units=CELSIUS&windspeed_units=KILOMETER_PER_HOUR&precipitation_units=MILLIMETER&forecast_days=3&layout=dark'],
+    ['ventusky', 'Ventusky: weerkaart', 'Radar, wind en temperatuur', 'globe', [6, 4], ({ lat, lon }) => `https://www.ventusky.com/?p=${lat};${lon};7&l=radar`],
+    ['blitzortung', 'Blitzortung: onweer', 'Live bliksemkaart', 'bolt', [6, 4], ({ lat, lon }) => `https://map.blitzortung.org/#7/${lat}/${lon}`],
+    ['osm', 'Kaart van je buurt', 'OpenStreetMap', 'globe', [4, 4], ({ lat, lon }) => `https://www.openstreetmap.org/export/embed.html?bbox=${(lon - 0.05).toFixed(3)},${(lat - 0.03).toFixed(3)},${(lon + 0.05).toFixed(3)},${(lat + 0.03).toFixed(3)}&layer=mapnik&marker=${lat},${lon}`],
+  ];
   const capSummary = d => { const k = D.devKind(d); return { switch: d.caps.dim ? 'Dimbaar' : 'Aan/uit', thermostat: 'Thermostaat', cover: 'Zonwering', lock: 'Slot', button: 'Knop', sensor: D.measures(d).map(m => (d.caps[m].title || m)).slice(0, 2).join(', ') || 'Sensor' }[k]; };
   const placedIds = () => new Set(D.currentTab().tiles.map(t => (t.ref && (t.ref.deviceId || t.ref.zoneId || t.ref.id)) || null));
   E.render.bibliotheek = () => {
@@ -477,11 +493,13 @@
             ws.filter(w => m(w.name)).map(w => item(`aw:${a}:${w.widgetId}`, 'apps', w.name, 'Losse widget')).join('');
         }
         body = body || '<div class="muted pad">Geen widgets gevonden in de map appwidgets</div>';
-        body += `<p class="note">De gegevens komen van de app op je Homey. Of dat werkt, zie je bij Systeem → Eigen apps.</p>`;
+        body += `<p class="note">De gegevens komen van de app op je Homey. Of dat werkt, zie je bij Systeem → Eigen apps.</p><div class="acts"><button class="btn sm" data-awscan>${icon('refresh')}Widgets van je Homey-apps zoeken (proef)</button></div>`;
       }
     }
+    else if (c === 'webw') body = E.WEBW.filter(x => m(x[1]) || m(x[2])).map(([k, n, s2, ic]) => item('webw:' + k, ic, n, s2)).join('') +
+      '<p class="note">Webwidgets zijn pagina\'s van andere sites in een kader. Ze tonen hun eigen opmaak. Blijft een kader leeg, dan staat die site het niet toe. Adres aanpassen kan daarna bij <b>Tegel</b>.</p>';
     else body = EXTRA.filter(x => m(x[1])).map(([k, n, s]) => item('extra:' + k, D.tiles[k].icon, n, s)).join('');
-    const counts = { appw: E._aw ? E._aw.widgets.length : '…', devices: L.devices.length, zones: L.zones.length, flows: L.flows.length + L.advancedFlows.length, moods: L.moods.length, variables: L.variables.length, insights: L.insights.length, extra: EXTRA.length };
+    const counts = { appw: E._aw ? E._aw.widgets.length : '…', devices: L.devices.length, zones: L.zones.length, flows: L.flows.length + L.advancedFlows.length, moods: L.moods.length, variables: L.variables.length, insights: L.insights.length, webw: E.WEBW.length, extra: EXTRA.length };
     return `<div class="lib-top"><input type="search" id="libq" placeholder="Zoeken in Homey…" value="${esc(E.libQ)}"><div class="chips-row">${CATS.map(([k, l]) => `<button data-cat="${k}" class="${k === c ? 'act' : ''}">${l}<i>${counts[k]}</i></button>`).join('')}</div></div>
       <p class="note">Tik op <b>+</b> om iets op <b>${esc(D.currentTab().name)}</b> te zetten. Daarna kun je het slepen en groter of kleiner maken.</p>
       <div class="lib-list">${body || '<div class="muted pad">Niets gevonden</div>'}</div>`;
@@ -491,6 +509,27 @@
     q.oninput = () => { E.libQ = q.value; const pos = q.selectionStart; E.refreshPanel(); const n = $('#libq'); n.focus(); n.setSelectionRange(pos, pos); };
     root.querySelectorAll('[data-cat]').forEach(b => b.onclick = () => { E.libCat = b.dataset.cat; E.refreshPanel(); });
     root.querySelectorAll('[data-add]').forEach(b => b.onclick = () => E.addFromLibrary(b.dataset.add));
+    const sc = root.querySelector('[data-awscan]'); if (sc) sc.onclick = () => E.awScan();
+  };
+  // Proef: widgets van apps op je Homey ophalen
+  E.awScan = async () => {
+    D.openSheet(`<div class="sheet-hd"><div><h2>Widgets van je Homey-apps</h2><div class="sub">Zoeken…</div></div><button class="xbtn" data-close>${icon('x')}</button></div><div class="muted pad">Bezig met zoeken op je Homey…</div>`, 'wide');
+    const bind = () => { const c = $('#sheet [data-close]'); if (c) c.onclick = () => D.closeSheet(); };
+    bind();
+    let r; try { r = await D.api('POST', '/api/appwidgets/scan'); } catch (e) { $('#sheet').innerHTML = `<div class="sheet-hd"><div><h2>Widgets van je Homey-apps</h2></div><button class="xbtn" data-close>${icon('x')}</button></div><p class="note">${esc(e.message)}</p>`; bind(); return; }
+    const draw = () => {
+      const ok = r.widgets.filter(w => w.ok).length;
+      $('#sheet').innerHTML = `<div class="sheet-hd"><div><h2>Widgets van je Homey-apps</h2><div class="sub">${r.widgets.length} gevonden, ${ok} op te halen</div></div><button class="xbtn" data-close>${icon('x')}</button></div>
+        <div class="pick-list">${r.widgets.map((w, i) => `<div class="awrow"><b>${esc(w.appName)} · ${esc(w.name)}</b>${w.installed ? '<span class="stat ok">Staat erop</span>' : w.ok ? `<button class="btn sm primary" data-awinst="${i}">${icon('plus')}Ophalen</button>` : '<span class="stat bad">Niet op te halen</span>'}<p class="note">${esc(w.tried.join(' · '))}</p></div>`).join('') || '<p class="note">Geen widgets gevonden.</p>'}</div>
+        <p class="note">Dit is een proef: Homey zegt niet officieel waar de widgetbestanden staan. Opgehaalde widgets staan daarna onder <b>Eigen apps</b>. Of ze ook gegevens krijgen, zie je bij Systeem → Eigen apps.${r.notes.length ? '<br><small>' + r.notes.map(esc).join(' · ') + '</small>' : ''}</p>`;
+      bind();
+      $('#sheet').querySelectorAll('[data-awinst]').forEach(b => b.onclick = async () => {
+        const w = r.widgets[Number(b.dataset.awinst)]; b.disabled = true;
+        try { const x = await D.api('POST', '/api/appwidgets/install', { appId: w.appId, widgetId: w.widgetId }); w.installed = true; D.toast(`${w.name} opgehaald (${x.files} bestanden${x.failed.length ? ', ' + x.failed.length + ' mislukt' : ''})`); E._aw = null; draw(); }
+        catch (e) { D.toast(e.message, true); b.disabled = false; }
+      });
+    };
+    draw();
   };
   E.addFromLibrary = key => {
     const [kind, ...rest] = key.split(':'); const id = rest.join(':');
@@ -516,6 +555,7 @@
         tile = { type: 'appwidget', ref: { appId, widgetId, name: w ? w.name : widgetId }, style: { frameless: true, hideTitle: true }, w: 3, h: tab0.grid.rows };
       }
     }
+    else if (kind === 'webw') { const x = E.WEBW.find(w => w[0] === id); if (!x) return; tile = { type: 'web', opts: { url: x[5](LOC()), title: x[1], interactive: true }, style: { frameless: true, hideTitle: true }, w: x[4][0], h: x[4][1] }; }
     else if (kind === 'insight') { const [uri, lid] = id.split('|'); tile = { type: 'insight', ref: { uri, id: lid }, opts: { resolution: 'last24Hours' } }; }
     else tile = { type: id, opts: id === 'clock' ? { date: true } : id === 'text' ? { text: 'Nieuwe tekst', size: 1.2 } : id === 'web' ? { url: '', interactive: true } : {} };
     const T = D.tiles[tile.type]; const tab = D.currentTab();
@@ -992,20 +1032,32 @@
 
   // Tabbladen
   E.render.tabs = () => {
-    const S = D.cfg.settings; const n = D.cfg.tabs.length;
-    return F.group('Tabbladen', `<div class="tablist">${D.cfg.tabs.map((t, i) => `<div class="tabrow${t.id === D.activeTab ? ' cur' : ''}">
+    const S = D.cfg.settings; const n = D.cfg.tabs.filter(t => !t.sub).length; const subs = D.cfg.tabs.map((t, i) => [t, i]).filter(([t]) => t.sub);
+    const last = D.cfg.tabs.length - 1;
+    return F.group('Tabbladen', `<div class="tablist">${D.cfg.tabs.map((t, i) => t.sub ? '' : `<div class="tabrow${t.id === D.activeTab ? ' cur' : ''}">
         <input class="emo" type="text" data-k="tabs.${i}.icon" data-fx="tabs" value="${esc(t.icon || '')}" maxlength="4">
         <input type="text" data-k="tabs.${i}.name" data-fx="tabs" value="${esc(t.name)}">
         <button class="ib sm${S.startTab === t.id ? ' on' : ''}" data-start="${t.id}" title="Starttabblad">${icon('home')}</button>
         <button class="ib sm" data-hide="${i}" title="${t.hidden ? 'Verborgen' : 'Zichtbaar'}">${icon(t.hidden ? 'eyeoff' : 'eye')}</button>
         <button class="ib sm" data-mv="${i}:-1" ${i === 0 ? 'disabled' : ''}>${icon('up')}</button>
-        <button class="ib sm" data-mv="${i}:1" ${i === n - 1 ? 'disabled' : ''}>${icon('down')}</button>
+        <button class="ib sm" data-mv="${i}:1" ${i === last ? 'disabled' : ''}>${icon('down')}</button>
         <button class="ib sm" data-deltab="${i}" ${n === 1 ? 'disabled' : ''}>${icon('trash')}</button></div>`).join('')}</div>
         <button class="btn sm" data-addtab ${n >= 10 ? 'disabled' : ''}>${icon('plus')}Tabblad toevoegen (${n}/10)</button>
         <p class="note">${icon('home')} = starttabblad · ${icon('eye')} verborgen tabbladen zie je alleen op de achterkant.</p>`) +
+      F.group('Subpagina\'s', `<p class="note">Een subpagina staat niet in de tabbalk. Je opent hem met een knop <b>Open pagina</b> (bij Knoppen), bijvoorbeeld "Woonkamer" met alle apparaten van die kamer. Op de subpagina staat linksboven een terugknop.</p>
+        <div class="tablist">${subs.map(([t, i]) => `<div class="tabrow${t.id === D.activeTab ? ' cur' : ''}">
+        <input class="emo" type="text" data-k="tabs.${i}.icon" data-fx="tabs" value="${esc(t.icon || '')}" maxlength="4">
+        <input type="text" data-k="tabs.${i}.name" data-fx="tabs" value="${esc(t.name)}">
+        <button class="btn sm" data-opensub="${t.id}">${t.id === D.activeTab ? 'Open' : 'Bewerken'}</button>
+        <button class="ib sm" data-deltab="${i}">${icon('trash')}</button></div>`).join('') || '<p class="note">Nog geen subpagina\'s.</p>'}</div>
+        <button class="btn sm" data-addsub ${subs.length >= D.MAX_SUB ? 'disabled' : ''}>${icon('plus')}Subpagina toevoegen (${subs.length}/${D.MAX_SUB})</button>
+        ${D.isSub(D.currentTab()) ? `<button class="btn sm ghost" data-backsub>${icon('left')}Terug naar ${esc((D.cfg.tabs.find(t => t.id === D._subFrom) || D.mainTabs()[0]).name)}</button>` : ''}`) +
       F.group('Tabbalk onderaan', F.row('Hoogte', F.range('settings.tabbar.height', S.tabbar.height, 32, 72, 1, 'tabbar', 'px')) + F.row('Iconen tonen', F.toggle('settings.tabbar.showIcons', S.tabbar.showIcons, 'tabbar')) + F.row('Namen tonen', F.toggle('settings.tabbar.showNames', S.tabbar.showNames, 'tabbar')) + F.row('Donkerte balk', F.range('settings.tabbar.opacity', S.tabbar.opacity, 0, 1, 0.01, 'tabbar', '%')));
   };
   E.wire.tabs = root => {
+    root.querySelectorAll('[data-opensub]').forEach(b => b.onclick = () => { D.openPage(b.dataset.opensub); E.refreshPanel(); });
+    const addSub = root.querySelector('[data-addsub]'); if (addSub) addSub.onclick = () => E.newSubpage(true);
+    const backSub = root.querySelector('[data-backsub]'); if (backSub) backSub.onclick = () => { D.closePage(); E.refreshPanel(); };
     root.querySelectorAll('[data-start]').forEach(b => b.onclick = () => E.commit(null, () => { D.cfg.settings.startTab = b.dataset.start; }, () => E.refreshPanel()));
     root.querySelectorAll('[data-hide]').forEach(b => b.onclick = () => { const t = D.cfg.tabs[b.dataset.hide]; E.commit(null, () => { t.hidden = !t.hidden; }, () => { D.renderTabbar(); E.refreshPanel(); }); });
     root.querySelectorAll('[data-mv]').forEach(b => b.onclick = () => { const [i, d] = b.dataset.mv.split(':').map(Number); E.commit(null, () => { const a = D.cfg.tabs; [a[i], a[i + d]] = [a[i + d], a[i]]; }, () => { D.renderTabbar(); D.applyBackground(); E.refreshPanel(); }); });
@@ -1015,7 +1067,7 @@
       E.commit(null, () => { D.cfg.tabs.splice(D.cfg.tabs.indexOf(t), 1); if (D.cfg.settings.startTab === t.id) D.cfg.settings.startTab = D.cfg.tabs[0].id; }, () => { if (D.activeTab === t.id) D.activeTab = D.cfg.tabs[0].id; D.applyAll(); E.refreshPanel(); });
     });
     const add = root.querySelector('[data-addtab]');
-    add.onclick = () => { if (D.cfg.tabs.length >= 10) return; const cur = D.currentTab(); const nt = { id: D.uid('t'), name: 'Tabblad ' + (D.cfg.tabs.length + 1), icon: '⭐', hidden: false, grid: D.clone(cur.grid), background: null, tiles: [] };
+    add.onclick = () => { if (D.cfg.tabs.filter(t => !t.sub).length >= 10) return; const cur = D.currentTab(); const nt = { id: D.uid('t'), name: 'Tabblad ' + (D.cfg.tabs.length + 1), icon: '⭐', hidden: false, grid: D.clone(cur.grid), background: null, tiles: [] };
       E.commit(null, () => D.cfg.tabs.push(nt), () => { D.renderAll(); D.switchTab(nt.id); E.refreshPanel(); }); };
   };
 

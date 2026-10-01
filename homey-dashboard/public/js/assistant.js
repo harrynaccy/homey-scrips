@@ -66,7 +66,7 @@
     const step = a => {
       switch (a.actie) {
         case 'tabblad_maken': {
-          if (cfg.tabs.length >= 10) throw new Error('er kunnen maximaal 10 tabbladen zijn');
+          if (cfg.tabs.filter(t => !t.sub).length >= 10) throw new Error('er kunnen maximaal 10 tabbladen zijn');
           const base = tabOf(null); const tab = { id: D.uid('t'), name: String(a.naam || 'Nieuw').slice(0, 30), icon: a.icoon || '⭐', hidden: false, grid: D.clone(base ? base.grid : { cols: 12, rows: 8, gap: 12, padding: 16 }), background: null, tiles: [] };
           cfg.tabs.push(tab); if (a.sleutel) keys[a.sleutel] = tab; keys[tab.name] = keys[tab.name] || tab; touched.push(tab.id); return '';
         }
