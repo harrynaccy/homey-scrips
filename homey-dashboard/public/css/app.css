@@ -275,6 +275,18 @@ input, select, textarea { font: inherit; }
 @keyframes blinkbox { 50% { box-shadow: var(--shadow); } }
 @keyframes blinkdrop { 50% { filter: var(--fsh, none); } }
 @keyframes blinktext { 50% { text-shadow: var(--tsh, none); } }
+/* gloed "Nooit": ook de ingebouwde gloed van de knopstijlen uit (kleur blijft) */
+.tile.gw-never :is(.kb.is-on .face > .ic, .kb.is-on .paddle > .ic, .kb.is-on .face > .ic.img) { filter: none; }
+.tile.gw-never .kb.is-on .led { box-shadow: none; }
+.tile.gw-never .kb-glow.is-on .face, .tile.gw-never .kb-scene.is-on .face { box-shadow: none; }
+.tile.gw-never .kb-ring.is-on .face { box-shadow: inset 0 0 0 var(--fbw, .2em) var(--kon); }
+/* knipperen bij alarm: standaard (pictogram- en paniekknop), altijd (alle stijlen) of nooit */
+.tile.blink-off :is(.kb-icon.is-on.is-alarm .face > .ic, .kb-panic.is-on .cap) { animation: none; }
+.tile.blink-off.gw-alarm.alarm-on, .tile.blink-off.gw-alarm.alarm-on .inner, .tile.blink-off.gw-alarm.alarm-on :is(.kb .face, .kb-mini, .badge) { animation: none; }
+.tile.blink-on.alarm-on :is(.kb .face, .kb-mini, .badge) { animation: alarmblink 1.2s ease-in-out infinite; }
+@keyframes alarmblink { 50% { opacity: .45; } }
+/* kleurt mee als aan: uit = knop en pictogram houden hun gewone kleur */
+.tile.no-tint, .tile.no-tint .kb { --kon: var(--muted) !important; --on: var(--muted) !important; }
 /* rand kleurt mee als het apparaat aan staat */
 .tile.bd-on:is(.on, .is-on) { border-color: var(--kon, var(--on)); }
 /* eigen knopvorm (0% = vierkant, 50% = rond) */

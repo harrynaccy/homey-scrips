@@ -337,7 +337,7 @@
     <tr><td>Apps</td><td>Vastgelopen of gestopt (terwijl ze aan staan)</td><td><b>App herstarten</b></td></tr>
     <tr><td>Apparaten</td><td>Niet bereikbaar</td><td>Staat de app erachter stil: <b>App herstarten</b>. Zigbee/Z-Wave: stroom eraf en erop, dichter bij Homey, of opnieuw koppelen</td></tr>
     <tr><td>Batterijen</td><td>Onder 20% (of batterij-alarm)</td><td>Batterij vervangen</td></tr>
-    <tr><td>Sensoren</td><td>24 uur niets gemeld</td><td>Batterij en bereik controleren; eventueel app herstarten</td></tr>
+    <tr><td>Sensoren op batterij</td><td>24 uur niets gemeld (virtuele apparaten en camera's tellen niet mee)</td><td>Batterij en bereik controleren; eventueel app herstarten</td></tr>
     <tr><td>Gewone flows</td><td>Kapot volgens Homey, apparaat bestaat niet meer, apparaat offline, app werkt niet, geen DAN-kaart</td><td><b>Laat Claude repareren</b></td></tr>
     <tr><td>Geavanceerde flows</td><td>Idem</td><td>Zelf in de Homey-app: vervang de kaartjes met een rood uitroepteken</td></tr>
   </table>
@@ -349,6 +349,9 @@
     <li><b>Apparaat verwijderen</b>: alleen bij apparaten die niet bereikbaar zijn. Je ziet eerst in welke flows en tegels het gebruikt wordt, daarna volgen twee bevestigingen en je pincode. <b>Dit is niet terug te draaien</b>: wil je het apparaat terug, dan moet je het opnieuw koppelen in de Homey-app, en flows en tegels opnieuw instellen.</li>
     <li><b>Laat Claude repareren</b>: opent de <b class="m">Assistent</b> met de vraag al ingevuld. Tik op <b>Vraag</b>. Claude leest de flow, zoekt het juiste apparaat en doet een voorstel. Omdat het een bestaande flow is, vraagt <b>Toepassen</b> je pincode.</li>
   </ul>
+  <h3>Negeren</h3>
+  <p>Bij elke melding staat <b>Negeren</b>. De melding verdwijnt dan uit de lijst en telt niet meer mee, zolang het probleem hetzelfde blijft. Is het probleem opgelost en komt het later terug, dan wordt het weer gemeld. Onderaan de lijst staat <b>Genegeerd</b> met de knop <b>Weer melden</b>.</p>
+  <p>Haal je in Homey een flow weg, herstart je een app of gaat een apparaat offline, dan is de lijst binnen enkele seconden bijgewerkt.</p>
   <h3>Automatisch controleren met een melding</h3>
   <p>Onder <b class="m">Controle</b> → <i>Automatisch controleren</i>:</p>
   <ul>
@@ -481,7 +484,9 @@
   <p>Kant-en-klare keuzes: <i>Zacht zwevend, Neon, Warm lampje, Diepe schaduw, Knipperen bij alarm, Geen effecten</i>. Daarna kun je alles zelf bijstellen.</p>
   <ul>
     <li><b>Schaduw op</b>: de tegel, de knop of de tekst. Met sterkte, grootte, richting (onder, schuin, rondom) en kleur.</li>
-    <li><b>Gloed</b>: <i>Nooit</i>, <i>Als aan</i>, <i>Altijd</i> of <i>Bij alarm</i> (knippert, bijvoorbeeld bij een open raam of beweging).</li>
+    <li><b>Gloed</b>: <i>Standaard</i> (de gloed die bij de knopstijl hoort), <i>Nooit</i> (helemaal geen gloed), <i>Als aan</i>, <i>Altijd</i> of <i>Bij alarm</i> (bijvoorbeeld bij een open raam of beweging).</li>
+    <li><b>Knipperen bij alarm</b>: <i>Standaard</i> (alleen pictogram- en paniekknoppen, en gloed <i>Bij alarm</i>), <i>Altijd</i> (elke knopstijl knippert bij alarm) of <i>Nooit</i>.</li>
+    <li><b>Kleurt mee als aan</b>: <i>Nee</i> = knop en pictogram houden hun gewone kleur, ook als het apparaat aan staat of het raam open is.</li>
     <li><b>Gloed op</b>: de tegel, de knop of de tekst. Met kleur (standaard de aan-kleur), sterkte en grootte.</li>
   </ul>
   <h3>Tekst</h3>

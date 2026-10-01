@@ -720,7 +720,7 @@
   // ---------- stijl: kleuren, vorm en rand, schaduw en gloed, tekst, bediening ----------
   // base = pad waar de waarden staan (tegel: tabs.x.tiles.y.style, standaard: settings.theme.fx)
   const FX_PRESETS = {
-    zacht: ['Zacht zwevend', { shT: 'tile', shA: 0.35, shS: 40, shD: 'down', glW: 'never' }],
+    zacht: ['Zacht zwevend', { shT: 'tile', shA: 0.35, shS: 40, shD: 'down', glW: 'auto' }],
     neon: ['Neon', { glW: 'on', glT: 'face', glA: 0.95, glS: 30, shA: 0, bdW: 2, bdOn: true }],
     warm: ['Warm lampje', { glW: 'on', glT: 'tile', glC: '#ffb347', glA: 0.6, glS: 34 }],
     diep: ['Diepe schaduw', { shT: 'tile', shA: 0.8, shS: 50, shD: 'diag' }],
@@ -748,8 +748,10 @@
       F.row('Schaduw op', F.seg(k('shT'), v.shT, [['tile', 'Tegel'], ['face', 'Knop'], ['text', 'Tekst']], fx)) +
       F.row('Schaduw sterkte', F.range(k('shA'), v.shA, 0, 1, 0.01, fx, '%') + reset('shA')) + F.row('Schaduw grootte', F.range(k('shS'), v.shS, 0, 60, 1, fx, 'px') + reset('shS')) +
       F.row('Richting', F.seg(k('shD'), v.shD, [['down', 'Onder'], ['diag', 'Schuin'], ['around', 'Rondom']], fx)) + F.row('Schaduwkleur', F.color(k('shC'), v.shC, fx) + reset('shC')) +
-      F.row('Gloed', F.seg(k('glW'), v.glW, [['never', 'Nooit'], ['on', 'Als aan'], ['always', 'Altijd'], ['alarm', 'Bij alarm']], fx), 'Bij alarm = knipperen, bijv. raam open of beweging') +
-      (v.glW !== 'never' ? F.row('Gloed op', F.seg(k('glT'), v.glT, [['tile', 'Tegel'], ['face', 'Knop'], ['text', 'Tekst']], fx)) +
+      F.row('Gloed', F.seg(k('glW'), v.glW, [['auto', 'Standaard'], ['never', 'Nooit'], ['on', 'Als aan'], ['always', 'Altijd'], ['alarm', 'Bij alarm']], fx), 'Standaard = de gloed van de knopstijl. Nooit = helemaal geen gloed. Bij alarm = bijv. raam open of beweging') +
+      F.row('Knipperen bij alarm', F.seg(k('blink'), v.blink || 'auto', [['auto', 'Standaard'], ['on', 'Altijd'], ['off', 'Nooit']], fx), 'Standaard = alleen pictogram- en paniekknoppen (en gloed "Bij alarm"). Altijd = elke knopstijl knippert bij alarm') +
+      F.row('Kleurt mee als aan', F.seg(k('tint'), v.tint === 0 || v.tint === false ? 0 : 1, [[1, 'Ja'], [0, 'Nee']], fx), 'Nee = knop en pictogram houden hun gewone kleur, aan of uit') +
+      (!['never', 'auto'].includes(v.glW) ? F.row('Gloed op', F.seg(k('glT'), v.glT, [['tile', 'Tegel'], ['face', 'Knop'], ['text', 'Tekst']], fx)) +
         F.row('Gloedkleur', F.colorOpt(k('glC'), v.glC, th.onColor, t ? 'tilepanel' : 'theme'), 'Standaard: de aan-kleur') +
         F.row('Gloed sterkte', F.range(k('glA'), v.glA, 0, 1, 0.01, fx, '%') + reset('glA')) + F.row('Gloed grootte', F.range(k('glS'), v.glS, 0, 60, 1, fx, 'px') + reset('glS')) : '');
     const text = (t ? F.row('Tekstgrootte', F.range(k('fontScale'), raw.fontScale || 1, 0.5, 2.5, 0.05, 'tile', 'x')) : '') +

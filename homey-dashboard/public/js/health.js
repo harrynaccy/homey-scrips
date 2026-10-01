@@ -14,7 +14,15 @@
   const refreshTiles = () => {
     for (const tab of D.cfg.tabs) for (const t of tab.tiles) if (t.type === 'health') { const el = D.tileEls.get(t.id); if (el) D.renderTileContent(t, el); }
   };
-  setInterval(() => { if (D.cfg && D.cfg.tabs.some(tab => tab.tiles.some(t => t.type === 'health'))) H.load(false); }, 10 * 60 * 1000);
+  // vangnet: elke minuut (lokaal, kost niets); wijzigingen in Homey komen meteen binnen via H.push
+  setInterval(() => { if (D.cfg && D.cfg.tabs.some(tab => tab.tiles.some(t => t.type === 'health'))) H.load(false); }, 60 * 1000);
+  // nieuwe uitslag van de server (na een wijziging in Homey of na negeren)
+  H.push = d => {
+    if (!d || !d.at) return;
+    H.data = d; H.err = null; refreshTiles();
+    if (D.editing && D.editor.section === 'controle') D.editor.refreshPanel();
+    if (H._redraw && document.querySelector('#sheet .h-list')) H._redraw();
+  };
 
   const time = at => new Date(at).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
   const summary = d => !d ? '' : d.errors + d.warnings === 0 ? 'Alles in orde'
@@ -27,6 +35,7 @@
       if (x.fix && x.fix.type === 'restartApp') fix = `<button class="btn sm${x.fix.optional ? '' : ' primary'}" data-hrestart="${esc(x.fix.appId)}">${icon('refresh')}${esc(x.fix.optional ? 'Probeer: ' + x.fix.label.toLowerCase() : x.fix.label)}</button>`;
       else if (x.fix && x.fix.type === 'assistant') fix = editor ? `<button class="btn sm primary" data-hai="${group}:${i}">${icon('sparkles')}${esc(x.fix.label)}</button>` : '<small class="muted">Repareren: achterkant → Controle</small>';
       else if (x.fix && x.fix.type === 'advice') fix = `<small class="h-adv">${esc(x.fix.text)}</small>`;
+      if (x.key) fix += `<button class="btn sm ghost" data-hign="${esc(x.key)}" data-title="${esc(x.title)}" data-problem="${esc(x.problem)}" title="Niet meer melden zolang dit probleem blijft">${icon('eyeoff')}Negeren</button>`;
       if (x.canDelete) fix += x.kind === 'flow'
         ? `<button class="btn sm danger" data-hdelflow="${esc(x.id)}" data-adv="${x.adv ? 1 : 0}" data-name="${esc(x.title)}">${icon('trash')}Flow verwijderen</button>`
         : `<button class="btn sm danger" data-hdeldev="${esc(x.id)}" data-name="${esc(x.title)}">${icon('trash')}Apparaat verwijderen</button>`;
@@ -38,6 +47,7 @@
     return (del ? `<h4 class="h-h">Net verwijderd</h4>${del}` : '') + `<div class="h-sum ${d.errors ? 'bad' : d.warnings ? 'warn' : 'ok'}">${icon(d.errors + d.warnings ? 'bell' : 'check')}<div><b>${esc(summary(d))}</b><small>Gecontroleerd om ${time(d.at)} · ${d.devicesTotal} apparaten, ${d.flowsTotal} flows</small></div></div>
       <h4 class="h-h">Apparaten en apps</h4>${dev || '<p class="note">Geen problemen gevonden.</p>'}
       <h4 class="h-h">Flows</h4>${fl || '<p class="note">Geen problemen gevonden.</p>'}
+      ${(d.ignored || []).length ? `<h4 class="h-h">Genegeerd (${d.ignored.length})</h4>${d.ignored.map(x => `<div class="h-row info"><i class="h-dot"></i><div class="h-t"><b>${esc(x.title)}</b><span>${esc(x.problem)}</span><small>Komt vanzelf terug als het probleem verdwijnt en later opnieuw optreedt.</small><div class="h-fix"><button class="btn sm" data-hunign="${esc(x.key)}">${icon('eye')}Weer melden</button></div></div></div>`).join('')}` : ''}
       ${d.flowsDisabled ? `<p class="note">${d.flowsDisabled} ${d.flowsDisabled === 1 ? 'flow staat' : 'flows staan'} uit (geen probleem, ter info).</p>` : ''}`;
   };
   H.deleted = [];
@@ -72,6 +82,16 @@
         await D.api('POST', '/api/health/delete-device/' + encodeURIComponent(id), { pin });
         D.toast(`"${name}" is verwijderd uit Homey`); await D.loadLibrary(); D.renderAll(); await again();
       } catch (e) { D.toast(e.message, true); }
+    });
+    root.querySelectorAll('[data-hign]').forEach(b => b.onclick = async () => {
+      b.disabled = true;
+      try { H.data = await D.api('POST', '/api/health/ignore', { key: b.dataset.hign, title: b.dataset.title, problem: b.dataset.problem }); D.toast('Genegeerd zolang dit probleem blijft'); refreshTiles(); rerender && rerender(); }
+      catch (e) { D.toast(e.message, true); b.disabled = false; }
+    });
+    root.querySelectorAll('[data-hunign]').forEach(b => b.onclick = async () => {
+      b.disabled = true;
+      try { H.data = await D.api('POST', '/api/health/unignore', { key: b.dataset.hunign }); D.toast('Wordt weer gemeld'); refreshTiles(); rerender && rerender(); }
+      catch (e) { D.toast(e.message, true); b.disabled = false; }
     });
     root.querySelectorAll('[data-hundo]').forEach(b => b.onclick = async () => {
       try {
@@ -117,6 +137,7 @@
       box.querySelector('[data-hre]').onclick = async () => { await H.load(true); draw(); };
       H.wire(box, draw);
     };
+    H._redraw = draw;
     draw(); if (!H.data) { await H.load(true); draw(); }
   };
 
@@ -129,7 +150,7 @@
       ${H.err ? `<p class="note h-err">${esc(H.err)}</p>` : ''}
       <div class="h-list">${d ? H.listHtml(d, true) : ''}</div>
       ${autoGroup()}
-      <p class="note">Batterij telt als bijna leeg onder 20%. Een sensor die 24 uur niets meldde, krijgt een waarschuwing. Zet de tegel <b>Controle</b> (Toevoegen → Overig) op het dashboard om de stand altijd te zien.</p>`;
+      <p class="note">Batterij telt als bijna leeg onder 20%. Een apparaat op batterij dat 24 uur niets meldde, krijgt een waarschuwing (virtuele apparaten en camera's niet). Met <b>Negeren</b> verdwijnt een melding zolang het probleem hetzelfde blijft. Wijzigingen in Homey (flow weg, app herstart) zie je binnen enkele seconden. Zet de tegel <b>Controle</b> (Toevoegen → Overig) op het dashboard om de stand altijd te zien.</p>`;
   };
   const autoGroup = () => {
     const F = E.F; const ac = { every: 1, notify: 'timeline', ...(D.cfg.settings.autocheck || {}) };

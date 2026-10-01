@@ -1,6 +1,8 @@
 'use strict';
 // Controle van apparaten, apps en flows. Kost niets (geen Claude); repareren = app herstarten
 // of (voor flows) een voorstel van de assistent.
+const fs = require('fs');
+const path = require('path');
 const BATTERY_LOW = 20;           // procent
 const STALE_HOURS = 24;           // sensor heeft zo lang niets gemeld
 
@@ -31,9 +33,14 @@ function checkDevices({ devices = [], apps = [] }, now = Date.now()) {
     if ((bat !== null && bat < BATTERY_LOW) || (c.alarm_battery && c.alarm_battery.value === true)) {
       out.push({ sev: 'warn', kind: 'device', id: d.id, title: d.name, problem: bat !== null ? `Batterij bijna leeg (${Math.round(bat)}%)` : 'Batterij bijna leeg', detail: 'Vervang de batterij.', fix: null });
     }
+    // "niets gemeld" alleen bij apparaten op batterij: een schakelaar of virtueel apparaat dat niets
+    // verandert, meldt ook niets en dat is normaal. Virtuele apparaten en camera's slaan we over.
     const sensor = Object.keys(c).some(k => /^(measure_|alarm_)/.test(k));
+    const onBattery = d.battery || bat !== null || !!c.alarm_battery;
+    const virtual = /virtu|devicecapab/i.test(`${appIdOf(d.driver) || ''} ${(app && app.name) || ''} ${d.driver || ''}`);
+    const camera = d.class === 'camera' || /onvif|camera/i.test(`${appIdOf(d.driver) || ''} ${(app && app.name) || ''}`);
     const last = Math.max(0, ...Object.values(c).map(x => ts(x.lastUpdated)));
-    if (sensor && last && now - last > STALE_HOURS * 3.6e6) {
+    if (sensor && onBattery && !virtual && !camera && last && now - last > STALE_HOURS * 3.6e6) {
       out.push({ sev: 'warn', kind: 'device', id: d.id, title: d.name, problem: `Al ${ago(now - last)} niets gemeld`, detail: 'Misschien is de batterij leeg of is het apparaat buiten bereik.', fix: app ? { ...restart(app), optional: true } : null });
     }
   }
@@ -85,8 +92,20 @@ function checkFlows({ flows = [], advancedFlows = [], devices = [], apps = [] })
   return { issues: out, disabled: off, total: all.length };
 }
 
+// Een melding herkennen, ook als een getal verandert ("4 dagen" → "5 dagen", "15%" → "12%").
+const keyOf = x => `${x.kind}|${x.id}|${String(x.problem || '').replace(/\d+/g, '#')}`;
+
 class Health {
-  constructor(homey) { this.homey = homey; this.last = null; }
+  constructor(homey, dataDir) {
+    this.homey = homey; this.last = null;
+    this.ignFile = dataDir ? path.join(dataDir, 'controle-negeren.json') : null;
+  }
+  // ---------- negeren: geldt zolang hetzelfde probleem blijft ----------
+  ignored() { try { return JSON.parse(fs.readFileSync(this.ignFile, 'utf8')) || {}; } catch (e) { return {}; } }
+  saveIgnored(o) { if (this.ignFile) fs.writeFileSync(this.ignFile, JSON.stringify(o, null, 1)); }
+  ignore(key, info) { const o = this.ignored(); o[key] = { title: String((info && info.title) || ''), problem: String((info && info.problem) || ''), at: Date.now() }; this.saveIgnored(o); this.last = null; }
+  unignore(key) { const o = this.ignored(); delete o[key]; this.saveIgnored(o); this.last = null; }
+
   async run(force) {
     if (!force && this.last && Date.now() - this.last.at < 60 * 1000) return this.last;
     const data = await this.homey.healthData();
@@ -101,8 +120,16 @@ class Health {
     const flows = checkFlows(data);
     const sevOrder = { error: 0, warn: 1 };
     const sort = l => l.sort((a, b) => sevOrder[a.sev] - sevOrder[b.sev] || a.title.localeCompare(b.title));
-    this.last = { at: Date.now(), devices: sort(devices), flows: sort(flows.issues), flowsDisabled: flows.disabled, flowsTotal: flows.total, devicesTotal: data.devices.length,
-      errors: [...devices, ...flows.issues].filter(x => x.sev === 'error').length, warnings: [...devices, ...flows.issues].filter(x => x.sev === 'warn').length };
+    // genegeerde meldingen apart; is het probleem weg, dan vervalt het negeren (komt het later terug, dan weer melden)
+    const ign = this.ignored(); const all = [...devices, ...flows.issues]; const seen = new Set();
+    for (const x of all) { x.key = keyOf(x); seen.add(x.key); }
+    let cleaned = false; for (const k of Object.keys(ign)) if (!seen.has(k)) { delete ign[k]; cleaned = true; }
+    if (cleaned) this.saveIgnored(ign);
+    const keep = l => l.filter(x => !ign[x.key]);
+    const devs = keep(devices), fls = keep(flows.issues);
+    const ignoredList = all.filter(x => ign[x.key]).map(x => ({ key: x.key, kind: x.kind, sev: x.sev, title: x.title, problem: x.problem, at: ign[x.key].at }));
+    this.last = { at: Date.now(), devices: sort(devs), flows: sort(fls), ignored: ignoredList, flowsDisabled: flows.disabled, flowsTotal: flows.total, devicesTotal: data.devices.length,
+      errors: [...devs, ...fls].filter(x => x.sev === 'error').length, warnings: [...devs, ...fls].filter(x => x.sev === 'warn').length };
     return this.last;
   }
   // waar wordt een apparaat gebruikt? (voordat je het verwijdert)

@@ -36,7 +36,7 @@ const homey = (isSet(process.env.HOMEY_ADDRESS) && isSet(process.env.HOMEY_TOKEN
 
 // Claude-assistent (alleen actief met ANTHROPIC_API_KEY; ASSISTANT_FAKE = testbestand zonder echte API)
 const flows = new FlowService(homey, DATA);
-const health = new Health(homey);
+const health = new Health(homey, DATA);
 const cameras = new Cameras({ homey, dataDir: DATA });
 health.cameras = cameras;
 let autocheck = null; // na readConfig
@@ -75,6 +75,17 @@ homey.on('update', u => broadcast('update', u));
 homey.on('library', () => broadcast('library', { at: Date.now() }));
 homey.on('status', s => broadcast('status', s));
 homey.on('link', l => broadcast('link', l));
+// Controle direct bijwerken als er in Homey een flow, app of apparaat verandert (gebundeld, hooguit eens per 10 s)
+let hTimer = null, hLast = 0;
+const healthPush = () => {
+  clearTimeout(hTimer);
+  hTimer = setTimeout(async () => {
+    if (Date.now() - hLast < 10000) return healthPush();
+    hLast = Date.now();
+    try { broadcast('health', await health.run(true)); } catch (e) { /* volgende keer */ }
+  }, 3000);
+};
+homey.on('changed', healthPush);
 
 // ---------- brug naar widgets van je eigen Homey-apps ----------
 const AW_DIR = process.env.APPWIDGETS_DIR || path.join(__dirname, '..', 'appwidgets');
@@ -127,6 +138,8 @@ app.get('/api/health', async (req, res) => {
   try { res.json(await health.run(req.query.force === '1')); }
   catch (e) { console.error('[controle]', e.message || e); res.status(500).json({ error: 'Controleren lukt niet. ' + nl(e) }); }
 });
+app.post('/api/health/ignore', async (req, res) => { try { const b = req.body || {}; if (!b.key) throw new Error('Geen melding opgegeven'); health.ignore(String(b.key), b); const r = await health.run(true); broadcast('health', r); res.json(r); } catch (e) { fail(res, e); } });
+app.post('/api/health/unignore', async (req, res) => { try { const b = req.body || {}; health.unignore(String(b.key || '')); const r = await health.run(true); broadcast('health', r); res.json(r); } catch (e) { fail(res, e); } });
 app.get('/api/health/usage/:id', async (req, res) => { try { res.json(await health.usage(req.params.id, readConfig())); } catch (e) { fail(res, e); } });
 app.post('/api/health/delete-device/:id', async (req, res) => { try { res.json(await health.deleteDevice(req.params.id, flows, req.body.pin)); } catch (e) { fail(res, e); } });
 // camera's (wachtwoorden blijven op de NAS)

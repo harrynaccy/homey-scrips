@@ -18,6 +18,7 @@ function slimDevice(d) {
     driver: d.driverId || d.driverUri || null,
     images: Array.isArray(d.images) ? d.images.map(i => ({ id: i.id, title: i.title || null })) : [],
     capabilities: d.capabilities || Object.keys(caps), caps, ui: d.ui || null,
+    battery: !!((d.energyObj && Array.isArray(d.energyObj.batteries) && d.energyObj.batteries.length) || (d.energy && Array.isArray(d.energy.batteries) && d.energy.batteries.length)),
   };
 }
 
@@ -141,6 +142,27 @@ class HomeyAdapter extends EventEmitter {
         this.emit('update', { kind: 'user', id: u.id, present: u.present, asleep: u.asleep });
       });
     });
+    // Controle direct bijwerken: flows, apps en apparaten (bereikbaarheid) die veranderen
+    const changed = what => () => this.emit('changed', what);
+    if (this._watchApi !== a) { this._watchApi = a; // maar één keer per verbinding koppelen
+    await this.safe(async () => {
+      await a.flow.connect();
+      for (const ev of ['flow.create', 'flow.update', 'flow.delete', 'advancedflow.create', 'advancedflow.update', 'advancedflow.delete']) a.flow.on(ev, changed('flow'));
+    });
+    await this.safe(async () => {
+      await a.apps.connect();
+      for (const ev of ['app.create', 'app.update', 'app.delete']) a.apps.on(ev, changed('app'));
+    });
+    // alleen als de bereikbaarheid verandert (device.update komt ook bij elke waarde-wijziging)
+    a.devices.on('device.update', dev => {
+      const c = dev && this.cache.devices.find(x => x.id === dev.id); const av = !dev || dev.available !== false;
+      if (c && c.available === av) return;
+      if (c) { c.available = av; c.unavailableMessage = (dev && dev.unavailableMessage) || null; }
+      this.emit('changed', 'device');
+    });
+    a.devices.on('device.create', changed('device'));
+    a.devices.on('device.delete', changed('device'));
+    }
     // vangnet: elke 10 minuten alles opnieuw ophalen
     clearInterval(this.timer);
     this.timer = setInterval(() => this.refresh().catch(() => {}), 10 * 60 * 1000);
