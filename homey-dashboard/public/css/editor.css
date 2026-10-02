@@ -342,9 +342,14 @@ button.info:hover { border-color: var(--accent); color: var(--accent); }
 .h-row.info .h-dot { background: #5aa9ff; }
 
 /* tekst gelijk maken: tegelsoorten */
-.unitypes { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 6px; }
-.unitypes .chk { display: inline-flex; align-items: center; gap: 6px; color: #cfd5de; font-size: 13px; cursor: pointer; }
-.unitypes input { accent-color: var(--accent); width: 16px; height: 16px; }
+.unihd { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.unihd .linkbtn { background: none; border: 0; color: var(--accent); font-size: 12px; padding: 2px 6px; cursor: pointer; }
+.unichips { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
+.unichip { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.04); color: #8a93a3; font-size: 13px; text-align: left; cursor: pointer; transition: background .15s, color .15s, border-color .15s; min-width: 0; }
+.unichip .ic { width: 16px; height: 16px; flex: none; opacity: .7; }
+.unichip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.unichip.on { background: color-mix(in srgb, var(--accent) 18%, transparent); border-color: color-mix(in srgb, var(--accent) 55%, transparent); color: #f2f4f7; }
+.unichip.on .ic { opacity: 1; color: var(--accent); }
 /* kleurfavorieten */
 .cfav { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; max-width: 150px; margin-right: 6px; }
 .cfav button { width: 17px; height: 17px; border-radius: 5px; border: 1px solid rgba(255,255,255,.25); padding: 0; cursor: pointer; }
@@ -353,3 +358,13 @@ button.info:hover { border-color: var(--accent); color: var(--accent); }
 .favlist .fv { position: relative; width: 36px; height: 36px; border-radius: 9px; border: 1px solid rgba(255,255,255,.2); }
 .favlist .fv b { position: absolute; right: -6px; top: -6px; width: 18px; height: 18px; border-radius: 50%; background: #2a303b; color: #fff; display: grid; place-items: center; font-size: 12px; line-height: 1; cursor: pointer; }
 .favlist .fv small { position: absolute; left: 0; right: 0; bottom: -16px; text-align: center; font-size: 10px; color: #7d8697; }
+
+/* tablet (Fully) */
+.tb-list { display: flex; flex-direction: column; gap: 6px; margin: 6px 0; }
+.tb-row { display: flex; align-items: flex-start; gap: 10px; }
+.tb-row .stat { flex: none; width: 96px; justify-content: center; padding: 4px 8px; font-size: 12px; }
+.tb-row b { display: block; font-size: 13px; font-weight: 600; }
+.tb-row small { display: block; color: #8a93a3; font-size: 12px; line-height: 1.35; }
+.tb-img { display: block; max-width: 100%; border-radius: 8px; margin-top: 8px; border: 1px solid rgba(255,255,255,.1); }
+.tb-conf { margin-top: 10px; }
+.tb-conf summary { cursor: pointer; color: var(--accent); font-size: 13px; margin-bottom: 6px; }

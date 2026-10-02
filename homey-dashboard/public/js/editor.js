@@ -541,7 +541,7 @@
     const draw = () => {
       const ok = r.widgets.filter(w => w.ok).length;
       $('#sheet').innerHTML = `<div class="sheet-hd"><div><h2>Widgets van je Homey-apps</h2><div class="sub">${r.widgets.length} gevonden, ${ok} op te halen</div></div><button class="xbtn" data-close>${icon('x')}</button></div>
-        <div class="pick-list">${r.widgets.map((w, i) => `<div class="awrow"><b>${esc(w.appName)} · ${esc(w.name)}</b>${w.installed ? '<span class="stat ok">Staat erop</span>' : w.ok ? `<button class="btn sm primary" data-awinst="${i}">${icon('plus')}Ophalen</button>` : '<span class="stat bad">Niet op te halen</span>'}<p class="note">${esc(w.tried.join(' · '))}</p></div>`).join('') || '<p class="note">Geen widgets gevonden.</p>'}</div>
+        <div class="pick-list">${r.widgets.map((w, i) => `<div class="awrow"><b>${esc(w.appName)} · ${esc(w.name)}</b>${w.installed ? '<span class="stat ok">Staat erop</span>' : w.ok ? `<button class="btn sm primary" data-awinst="${i}">${icon('plus')}Ophalen</button>` : '<span class="stat bad">Niet op te halen</span>'}<p class="note">${esc([...(w.urls || []).map(u => 'Homey: ' + u), ...w.tried].join(' · '))}</p></div>`).join('') || '<p class="note">Geen widgets gevonden.</p>'}</div>
         <p class="note">Dit is een proef: Homey zegt niet officieel waar de widgetbestanden staan. Opgehaalde widgets staan daarna onder <b>Eigen apps</b>. Of ze ook gegevens krijgen, zie je bij Systeem → Eigen apps.${r.notes.length ? '<br><small>' + r.notes.map(esc).join(' · ') + '</small>' : ''}</p>`;
       bind();
       $('#sheet').querySelectorAll('[data-awinst]').forEach(b => b.onclick = async () => {
@@ -1176,7 +1176,7 @@
         F.row('Kleur hoofdtekst', F.color(k + 'text', t.text, 'theme'), 'Namen, titels en waarden') + F.row('Kleur bijtekst', F.colorOpt(k + 'muted', t.muted, '#9aa3b2', 'theme'), 'Toestand, min/max, tijden') +
         F.row('Grootte namen', F.range(k + 'tsName', t.tsName || 1, 0.5, 2.5, 0.05, 'theme', 'x'), 'Bijv. "Woonkamer", "Lamp keuken"') + F.row('Grootte waarden', F.range(k + 'tsVal', t.tsVal || 1, 0.5, 2.5, 0.05, 'theme', 'x'), 'Bijv. 19,7 °C, de klok') +
         F.row('Grootte kleine tekst', F.range(k + 'tsSmall', t.tsSmall || 1, 0.5, 2.5, 0.05, 'theme', 'x'), 'Bijv. "Aan · 70%", min/max, "24 uur"') +
-        `<div class="f col"><label>Gelijk maken voor</label><div class="unitypes">${UNI_TYPES.map(([id, n]) => `<label class="chk"><input type="checkbox" data-uni="${id}" ${E._uni[id] === false ? '' : 'checked'}>${n}</label>`).join('')}</div></div>` +
+        `<div class="f col"><div class="unihd"><label>Gelijk maken voor</label><span><button type="button" class="linkbtn" data-uniall="1">Alles</button><button type="button" class="linkbtn" data-uniall="0">Niets</button></span></div><div class="unichips">${UNI_TYPES.map(([id, n, ic]) => `<button type="button" class="unichip${E._uni[id] === false ? '' : ' on'}" data-uni="${id}" aria-pressed="${E._uni[id] !== false}">${icon(ic)}<span>${n}</span></button>`).join('')}</div></div>` +
         `<div class="acts"><button class="btn sm primary" data-unify>${icon('check')}Alle tekst gelijk maken</button></div><p class="note">Haalt bij de aangevinkte tegels de eigen tekstkleur, tekstgrootte en doorzichtigheid weg (bij grafieken ook de eigen grootte van waarde, naam en min/max). Ongedaan maken kan met het pijltje linksboven.</p>`) +
       F.group('Tegels', F.row('Doorzichtigheid', F.range(k + 'tileOpacity', t.tileOpacity, 0, 1, 0.01, 'theme', '%')) + F.row('Glas-vervaging', F.range(k + 'tileBlur', t.tileBlur, 0, 40, 1, 'theme', 'px')) + F.row('Hoeken', F.range(k + 'radius', t.radius, 0, 48, 1, 'theme', 'px'))) +
       F.group('Standaard voor alle tegels en knoppen', `<p class="note">Geldt voor elke tegel. Per tegel kun je afwijken onder <b>Tegel → Stijl</b>.</p>` + E.fxControls('settings.theme.fx', t.fx, D.fxBase(), null)) +
@@ -1184,12 +1184,14 @@
         <div class="acts"><button class="btn sm" data-resettheme>${icon('refresh')}Uiterlijk terugzetten</button><button class="btn sm danger" data-resetlook>${icon('refresh')}Alles terugzetten, ook alle knoppen</button></div>
         <p class="note"><b>Uiterlijk terugzetten</b>: thema, kleuren, lettertype en de standaard voor alle tegels. Eigen instellingen per knop blijven.<br><b>Alles terugzetten</b>: daarnaast ook de eigen stijl en kleuren van alle tegels en knoppen.</p>`);
   };
-  const UNI_TYPES = [['button', 'Knoppen'], ['device', 'Apparaten'], ['zone', 'Zones'], ['insight', 'Grafieken'], ['notifications', 'Meldingen'], ['apps', 'Apps'], ['clock', 'Klok'], ['health', 'Controle'], ['other', 'Overige tegels']];
+  const UNI_TYPES = [['button', 'Knoppen', 'power'], ['device', 'Apparaten', 'bulb'], ['zone', 'Zones', 'home'], ['insight', 'Grafieken', 'activity'], ['notifications', 'Meldingen', 'bell'], ['apps', 'Apps', 'chip'], ['clock', 'Klok', 'clock'], ['health', 'Controle', 'check'], ['other', 'Overige tegels', 'shapes']];
   E._uni = E._uni || {};
   const DEFAULT_THEME = () => ({ preset: 'glas', accent: '#5aa9ff', text: '#ffffff', font: 'Inter', fontScale: 1, tileBg: '#141a24', tileOpacity: 0.5, tileBlur: 16, radius: 20, shadow: 0.35, border: 0.1, onColor: '#ffc34d' });
   E.wire.uiterlijk = root => {
     root.querySelectorAll('[data-delfav]').forEach(b => b.onclick = () => { const u = D.cfg.settings.colorUse || {}; delete u[b.dataset.delfav]; E.scheduleSave(); E.refreshPanel(); });
-    root.querySelectorAll('[data-uni]').forEach(c => c.onchange = () => { E._uni[c.dataset.uni] = c.checked; });
+    const uniSet = (c, on) => { E._uni[c.dataset.uni] = on; c.classList.toggle('on', on); c.setAttribute('aria-pressed', on); };
+    root.querySelectorAll('[data-uni]').forEach(c => c.onclick = () => uniSet(c, !c.classList.contains('on')));
+    root.querySelectorAll('[data-uniall]').forEach(b => b.onclick = () => root.querySelectorAll('[data-uni]').forEach(c => uniSet(c, b.dataset.uniall === '1')));
     const uni = root.querySelector('[data-unify]');
     if (uni) uni.onclick = async () => {
       const on = id => E._uni[id] !== false; const known = UNI_TYPES.map(x => x[0]);
@@ -1274,6 +1276,7 @@
       : st.connected ? `<span class="stat ok">Verbonden met Homey</span>` : `<span class="stat bad">Geen verbinding</span><p class="note">${esc(st.error || '')}</p>`;
     return F.group('Homey', stat + `<div class="counts">${[['Apparaten', L.devices.length], ['Zones', L.zones.length], ['Flows', L.flows.length + L.advancedFlows.length], ['Moods', L.moods.length], ['Variabelen', L.variables.length], ['Insights', L.insights.length], ['Apps', L.apps.length], ['Gebruikers', L.users.length]].map(([l, n]) => `<div><b>${n}</b><small>${l}</small></div>`).join('')}</div>
         <div class="acts"><button class="btn sm primary" data-manual>${icon('book')}Gebruiksaanwijzing</button><button class="btn sm" data-relib>${icon('refresh')}Bibliotheek vernieuwen</button><button class="btn sm" data-reload>${icon('refresh')}Dashboard herladen</button></div>`) +
+      F.group('Tablet (Fully Kiosk)', '<div id="tabbox"><div class="muted">Laden…</div></div>') +
       F.group('Eigen apps', '<div id="awstat"><div class="muted">Laden…</div></div>') +
       F.group('Back-ups', `<p class="note">Elke dag wordt automatisch een back-up gemaakt (14 dagen bewaard).</p><div class="acts"><button class="btn sm" data-bk>${icon('download')}Back-up maken</button><button class="btn sm" data-export>${icon('download')}Exporteren</button><label class="btn sm">${icon('upload')}Importeren<input type="file" accept=".json" id="impfile" hidden></label></div><div id="bklist" class="bklist"><div class="muted">Laden…</div></div>`) +
       F.group('Camera\'s', '<div id="cambox"><div class="muted">Laden…</div></div>') +
@@ -1288,6 +1291,68 @@
       F.group('Achterkant openen', F.row('Aantal tikken', F.num('settings.unlock.taps', u.taps, 3, 8, 'none')) + F.row('Binnen', F.range('settings.unlock.window', u.window, 800, 3000, 100, 'none', 'n'), 'milliseconden') + `<p class="note">Tik op een lege plek of op de tabbalk.</p>`) +
       F.group('Opnieuw beginnen', `<button class="btn sm danger" data-reset>${icon('trash')}Alles terugzetten naar begin</button>`) +
       `<p class="note center">Homey Dashboard · ${D.hasFully() ? 'Fully Kiosk' : 'browser'} · ${window.innerWidth}×${window.innerHeight}</p>`;
+  };
+  // ---------- tablet (Fully Kiosk) op afstand ----------
+  E.tabletBox = async box => {
+    let info;
+    try { info = await D.api('GET', '/api/tablet'); } catch (e) { box.innerHTML = `<p class="note">${esc(e.message)}</p>`; return; }
+    const form = `<div class="f col"><label>Adres van de tablet</label><input type="text" id="tb-host" value="${esc(info.host)}" placeholder="192.168.178.116" autocomplete="off"></div>
+      <div class="f col"><label>Wachtwoord van Fully Remote Admin</label><input type="password" id="tb-pass" placeholder="${info.hasPass ? 'Ingesteld (leeg laten om niet te wijzigen)' : 'Wachtwoord'}" autocomplete="new-password"></div>
+      <p class="note">Het wachtwoord blijft alleen op je NAS staan. In Fully moet <b>Remote Admin from Local Network</b> aan staan.</p>
+      <div class="acts"><button class="btn sm primary" data-tbsave>${icon('check')}Opslaan en verbinden</button></div>`;
+    const wireForm = () => {
+      const b = box.querySelector('[data-tbsave]'); if (!b) return;
+      b.onclick = async () => {
+        b.disabled = true;
+        try { await D.api('POST', '/api/tablet/conf', { host: box.querySelector('#tb-host').value, pass: box.querySelector('#tb-pass').value }); D.toast('Opgeslagen'); E.tabletBox(box); }
+        catch (e) { D.toast(e.message, true); b.disabled = false; }
+      };
+    };
+    if (!info.host || !info.hasPass) { box.innerHTML = `<p class="note">Koppel de tablet om hem vanaf hier te bedienen en de Fully-instellingen na te kijken.</p>` + form; wireForm(); return; }
+    const acts = [['screenOn', 'sun'], ['screenOff', 'moon'], ['loadStartURL', 'refresh'], ['restartApp', 'power']];
+    box.innerHTML = `<div id="tb-stat"><div class="muted">Verbinden met ${esc(info.host)}…</div></div>
+      <div class="acts">${acts.map(([c, ic]) => `<button class="btn sm" data-tbdo="${c}">${icon(ic)}${esc(info.actions[c])}</button>`).join('')}<button class="btn sm" data-tbshot>${icon('image')}Schermafdruk</button></div>
+      <div id="tb-shot"></div>
+      <p class="note">Helderheid en nachtstand stel je in bij <b>Scherm</b>; de tablet volgt die direct.</p>
+      <div id="tb-check"><div class="muted">Fully-instellingen nakijken…</div></div>
+      <details class="tb-conf"><summary>Verbinding wijzigen</summary>${form}</details>`;
+    wireForm();
+    const stat = box.querySelector('#tb-stat');
+    const loadStat = () => D.api('GET', '/api/tablet/status').then(s => {
+      const pct = v => (v === null || v === undefined) ? '–' : Math.round(Number(v) / 255 * 100) + '%';
+      const yn = v => v === null || v === undefined ? '–' : (v === true || v === 'true') ? 'aan' : 'uit';
+      stat.innerHTML = `<span class="stat ok">Verbonden${s.model ? ' · ' + esc(s.model) : ''}</span>
+        <div class="counts"><div><b>${s.battery ?? '–'}${s.battery != null ? '%' : ''}</b><small>Batterij${s.plugged === true || s.plugged === 'true' ? ' (laadt)' : ''}</small></div><div><b>${pct(s.brightness)}</b><small>Helderheid</small></div><div><b>${yn(s.screenOn)}</b><small>Scherm</small></div><div><b>${yn(s.kiosk)}</b><small>Kioskmodus</small></div></div>
+        ${s.version ? `<p class="note">Fully ${esc(String(s.version))}${s.page ? ' · ' + esc(String(s.page)) : ''}</p>` : ''}`;
+    }).catch(e => { stat.innerHTML = `<span class="stat bad">Niet verbonden</span><p class="note">${esc(e.message)}</p>`; });
+    loadStat();
+    box.querySelectorAll('[data-tbdo]').forEach(b => b.onclick = async () => {
+      b.disabled = true;
+      try { const r = await D.api('POST', '/api/tablet/do', { cmd: b.dataset.tbdo }); D.toast(r.label + ': verstuurd'); setTimeout(loadStat, 1500); }
+      catch (e) { D.toast(e.message, true); } finally { b.disabled = false; }
+    });
+    box.querySelector('[data-tbshot]').onclick = () => {
+      const sh = box.querySelector('#tb-shot');
+      sh.innerHTML = `<div class="muted">Schermafdruk ophalen…</div>`;
+      const img = new Image(); img.className = 'tb-img'; img.alt = 'Schermafdruk van de tablet';
+      img.onload = () => { sh.innerHTML = ''; sh.appendChild(img); };
+      img.onerror = async () => { let m = 'Geen schermafdruk ontvangen'; try { const r = await fetch(img.src); m = (await r.json()).error || m; } catch (e) { /* */ } sh.innerHTML = `<p class="note">${esc(m)}</p>`; };
+      img.src = '/api/tablet/screenshot?t=' + Date.now();
+    };
+    const chk = box.querySelector('#tb-check');
+    const loadCheck = () => D.api('GET', '/api/tablet/check').then(list => {
+      const bad = list.filter(x => !x.ok && !x.missing);
+      const show = v => v === null ? 'onbekend' : v === '' ? 'leeg' : (v === true || v === 'true') ? 'aan' : (v === false || v === 'false') ? 'uit' : String(v);
+      chk.innerHTML = `<div class="tb-list">${list.map(x => `<div class="tb-row"><span class="stat ${x.ok ? 'ok' : x.missing ? 'warn' : 'bad'}">${x.ok ? 'Goed' : x.missing ? '?' : 'Aanpassen'}</span><div><b>${esc(x.label)}</b><small>${esc(x.why)}${x.ok ? '' : ` · nu: ${esc(show(x.now))}, wordt: ${esc(show(x.want))}`}</small></div></div>`).join('')}</div>` +
+        (bad.length ? `<div class="acts"><button class="btn sm primary" data-tbapply>${icon('check')}${bad.length} aanbevolen instelling${bad.length > 1 ? 'en' : ''} toepassen</button></div>` : `<p class="note">Alle aanbevolen Fully-instellingen staan goed.</p>`);
+      const ap = chk.querySelector('[data-tbapply]');
+      if (ap) ap.onclick = async () => {
+        ap.disabled = true;
+        try { const r = await D.api('POST', '/api/tablet/apply'); D.toast(r.failed.length ? `Niet alles gelukt: ${r.failed.join('; ')}` : `${r.done.length} instelling${r.done.length > 1 ? 'en' : ''} aangepast`, !!r.failed.length); loadCheck(); }
+        catch (e) { D.toast(e.message, true); ap.disabled = false; }
+      };
+    }).catch(e => { chk.innerHTML = `<p class="note">Instellingen nakijken lukte niet: ${esc(e.message)}</p>`; });
+    loadCheck();
   };
   // ---------- bijwerken met één knop ----------
   const dt = d => d ? new Date(d).toLocaleString('nl-NL', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }) : '';
@@ -1335,6 +1400,7 @@
 
   E.wire.systeem = async root => {
     const ub = root.querySelector('#updbox'); if (ub) E.updateBox(ub);
+    const tbx = root.querySelector('#tabbox'); if (tbx) E.tabletBox(tbx);
     const cb = root.querySelector('#cambox'); if (cb) D.cam.settingsBox(cb);
     const pbx = root.querySelector('#pinbox');
     if (pbx) D.api('GET', '/api/flows/pin').then(st => {

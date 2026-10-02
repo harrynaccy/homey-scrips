@@ -27,21 +27,44 @@ class AppScan {
     const api = this.homey.api; if (!api) throw new Error('Nog geen verbinding met Homey (of demo-modus)');
     const out = []; const seen = new Set(); const notes = [];
     const push = (appId, appName, widgetId, name, settings) => { const k = appId + '/' + widgetId; if (seen.has(k)) return; seen.add(k); out.push({ appId, appName: appName || appId, widgetId, name: name || widgetId, settings: settings || [] }); };
+    const appNames = {};
     const nm = n => (n && typeof n === 'object' ? (n.nl || n.en || Object.values(n)[0]) : n) || '';
     try {
       const apps = await api.apps.getApps();
       for (const a of Object.values(apps || {})) {
+        appNames[a.id] = nm(a.name);
         const ws = a.widgets || (a.manifest && a.manifest.widgets);
         if (ws) for (const [wid, w] of Object.entries(ws)) push(a.id, nm(a.name), w.id || wid, nm(w.name), w.settings);
       }
     } catch (e) { notes.push('Apps: ' + (e.message || e)); }
-    for (const p of ['/api/manager/dashboards/widget', '/api/manager/dashboards/widgets', '/api/manager/dashboards/app-widget']) {
-      try {
-        const r = await this.homey.rawCall({ method: 'GET', path: p });
-        for (const w of Object.values(r || {})) { const appId = w.appId || (w.uri || '').replace('homey:app:', '') || (w.ownerUri || '').replace('homey:app:', ''); if (appId && (w.widgetId || w.id)) push(appId, w.appName, w.widgetId || w.id, nm(w.name), w.settings); }
-        notes.push(`${p}: gevonden`);
-        break;
-      } catch (e) { notes.push(`${p}: ${e.statusCode || e.status || e.message}`); }
+    // Officiële lijst van Homey: ManagerDashboards.getAppWidgets (GET /api/manager/dashboards/appwidget)
+    let list = null;
+    try { if (api.dashboards && api.dashboards.getAppWidgets) { list = await api.dashboards.getAppWidgets(); notes.push('dashboards.getAppWidgets: ' + Object.keys(list || {}).length + ' gevonden'); } } catch (e) { notes.push('dashboards.getAppWidgets: ' + (e.statusCode || e.status || e.message)); }
+    if (!list) {
+      try { list = await this.homey.rawCall({ method: 'GET', path: '/api/manager/dashboards/appwidget' }); notes.push('/api/manager/dashboards/appwidget: ' + Object.keys(list || {}).length + ' gevonden'); }
+      catch (e) { notes.push('/api/manager/dashboards/appwidget: ' + (e.statusCode || e.status || e.message)); }
+    }
+    let sample = null;
+    for (const [key, w0] of Object.entries(list || {})) {
+      const w = (w0 && typeof w0.toJSON === 'function') ? w0.toJSON() : w0; if (!w || typeof w !== 'object') continue;
+      if (!sample) sample = w;
+      const owner = String(w.ownerUri || w.uri || '');
+      const id = String(w.id || key);
+      // id is meestal "homey:app:<appId>:<widgetId>" of "<appId>:<widgetId>"
+      let appId = w.appId || (owner.startsWith('homey:app:') ? owner.slice(10) : '');
+      let widgetId = w.widgetId || '';
+      const parts = id.replace(/^homey:app:/, '').split(':');
+      if (!appId && parts.length > 1) appId = parts[0];
+      if (!widgetId) widgetId = parts.length > 1 ? parts[parts.length - 1] : id;
+      if (!appId || !widgetId) continue;
+      // eventuele adressen die Homey meegeeft
+      const urls = Object.entries(w).filter(([, v]) => typeof v === 'string' && /^(https?:\/\/|\/)/.test(v) && !/^homey:/.test(v)).map(([k, v]) => k + '=' + v);
+      push(appId, w.appName || (w.app && nm(w.app.name)) || appNames[appId], widgetId, nm(w.name), w.settings);
+      const it = out.find(x => x.appId === appId && x.widgetId === widgetId); if (it) it.urls = urls;
+    }
+    if (sample) {
+      const short = {}; for (const [k, v] of Object.entries(sample)) short[k] = typeof v === 'string' ? v.slice(0, 120) : (Array.isArray(v) ? `[${v.length}]` : (v && typeof v === 'object' ? '{…}' : v));
+      notes.push('Voorbeeld van Homey: ' + JSON.stringify(short).slice(0, 700));
     }
     return { widgets: out, notes };
   }
@@ -52,7 +75,13 @@ class AppScan {
     for (const w of widgets) {
       w.installed = fs.existsSync(path.join(this.dir, w.appId, w.widgetId, 'index.html'));
       w.tried = [];
-      for (let i = 0; i < CANDIDATES.length; i++) {
+      // adres dat Homey zelf meegaf (eindigend op index.html of een map) eerst proberen
+      const given = (w.urls || []).map(x => x.slice(x.indexOf('=') + 1)).find(u => /index\.html$|\/$/.test(u));
+      if (given) {
+        const base = given.replace(/index\.html$/, '');
+        try { await this.getFile(base.startsWith('http') ? base.replace(/^https?:\/\/[^/]+/, '') + 'index.html' : base + 'index.html'); w.base = base.replace(/^https?:\/\/[^/]+/, ''); w.route = -1; w.tried.push(given + ': ok'); } catch (e) { w.tried.push(given + ': ' + (e.status || e.message)); }
+      }
+      for (let i = 0; w.route === undefined && i < CANDIDATES.length; i++) {
         const p = CANDIDATES[i](w.appId, w.widgetId, 'index.html');
         try { await this.getFile(p); w.route = i; w.tried.push(p + ': ok'); break; } catch (e) { w.tried.push(p + ': ' + (e.status || e.message)); }
       }
@@ -67,7 +96,7 @@ class AppScan {
     if (!/^[\w.-]+$/.test(appId) || !/^[\w.-]+$/.test(widgetId)) throw new Error('Ongeldige naam');
     const w = (this.last && this.last.widgets.find(x => x.appId === appId && x.widgetId === widgetId)) || (await this.scan()).widgets.find(x => x.appId === appId && x.widgetId === widgetId);
     if (!w || !w.ok) throw new Error('Deze widget kan niet worden opgehaald van je Homey');
-    const mk = f => CANDIDATES[w.route](appId, widgetId, f);
+    const mk = f => (w.route === -1 ? w.base + f : CANDIDATES[w.route](appId, widgetId, f));
     const dest = path.join(this.dir, appId, widgetId); fs.mkdirSync(dest, { recursive: true });
     const html = (await this.getFile(mk('index.html'))).toString('utf8');
     fs.writeFileSync(path.join(dest, 'index.html'), html);

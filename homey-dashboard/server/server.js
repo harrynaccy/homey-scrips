@@ -93,6 +93,8 @@ const bridge = new AppBridge(homey, AW_DIR);
 bridge.on('event', e => broadcast('appevent', e));
 const { Extra } = require('./extra');
 const extra = new Extra({ homey, dataDir: DATA, broadcast });
+const { Fully } = require('./fully');
+const fully = new Fully(extra);
 const { AppScan } = require('./appscan');
 const appscan = new AppScan(homey, AW_DIR);
 
@@ -192,6 +194,15 @@ app.get('/api/assistant/job/:id', (req, res) => {
   if (!j) return res.status(404).json({ error: 'Deze vraag is niet meer bekend (is het dashboard op de NAS opnieuw gestart?). Probeer het opnieuw.' });
   res.json({ status: j.status, progress: j.progress, seconds: Math.round((Date.now() - j.started) / 1000), result: j.result, error: j.error });
 });
+
+// ---------- tablet (Fully Kiosk) ----------
+app.get('/api/tablet', wrap(() => fully.info()));
+app.post('/api/tablet/conf', wrap(req => { const b = req.body || {}; fully.setConf({ host: b.host, pass: b.pass }); return fully.info(); }));
+app.get('/api/tablet/status', wrap(() => fully.status()));
+app.get('/api/tablet/check', wrap(() => fully.check()));
+app.post('/api/tablet/apply', wrap(() => fully.apply()));
+app.post('/api/tablet/do', wrap(req => fully.action(String((req.body || {}).cmd || ''))));
+app.get('/api/tablet/screenshot', async (req, res) => { try { const s = await fully.screenshot(); res.set('Content-Type', s.type).set('Cache-Control', 'no-store').send(s.buf); } catch (e) { res.status(502).json({ error: e.message }); } });
 
 // ---------- extra tegels: gegevens van buiten en van NAS/Homey ----------
 const xr = fn => async (req, res) => { try { res.json(await fn(req)); } catch (e) { res.status(502).json({ error: String(e.message || e) }); } };
