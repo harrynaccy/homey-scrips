@@ -38,11 +38,11 @@ body.editing .tile .inner { pointer-events: none; }
 .f label { flex: 1; min-width: 0; color: #cfd5de; }
 .f label small { display: block; color: #6f7888; font-size: 11.5px; margin-top: 1px; }
 .f .c { flex: none; display: flex; align-items: center; justify-content: flex-end; max-width: 62%; }
-#panel input[type=text], #panel input[type=search], #panel input[type=number], #panel input[type=time], #panel select, #panel textarea { background: #1b212b; color: #eef1f6; border: 1px solid rgba(255,255,255,.08); border-radius: 10px; height: 36px; padding: 0 10px; outline: none; max-width: 100%; }
+#panel input[type=text], #panel input[type=password], #panel input[type=url], #panel input[type=search], #panel input[type=number], #panel input[type=time], #panel select, #panel textarea { background: #1b212b; color: #eef1f6; border: 1px solid rgba(255,255,255,.08); border-radius: 10px; height: 36px; padding: 0 10px; outline: none; max-width: 100%; }
 #panel select { max-width: 100%; min-width: 0; }
 .f .c { min-width: 0; }
 #panel textarea { width: 100%; height: auto; padding: 10px; resize: vertical; user-select: text; }
-#panel input[type=text], #panel input[type=search] { width: 190px; user-select: text; }
+#panel input[type=text], #panel input[type=password], #panel input[type=url], #panel input[type=search] { width: 190px; user-select: text; }
 #panel input:focus, #panel select:focus, #panel textarea:focus { border-color: var(--accent); }
 #panel input[type=color] { -webkit-appearance: none; appearance: none; width: 44px; height: 32px; border: 1px solid rgba(255,255,255,.15); border-radius: 9px; padding: 0; background: none; cursor: pointer; }
 #panel input[type=color]::-webkit-color-swatch-wrapper { padding: 3px; } #panel input[type=color]::-webkit-color-swatch { border: 0; border-radius: 6px; }

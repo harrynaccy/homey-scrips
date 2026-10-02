@@ -197,42 +197,90 @@ class Extra {
   }
 }
 
-// ---------- eenvoudige iCal-lezer (VEVENT met DTSTART/DTEND/SUMMARY/LOCATION; wekelijks/jaarlijks herhalen) ----------
-function parseIcal(txt) {
+// ---------- eenvoudige iCal-lezer ----------
+// VEVENT met DTSTART/DTEND/SUMMARY/LOCATION; herhalen dagelijks/wekelijks/maandelijks/jaarlijks,
+// ook op meerdere weekdagen (BYDAY=MO,WE,FR) en "2e dinsdag van de maand" (BYDAY=2TU).
+// Afgezegde keren (EXDATE), verplaatste keren (RECURRENCE-ID) en geannuleerde afspraken worden overgeslagen.
+const WD = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
+function parseIcal(txt, now = Date.now()) {
   const lines = String(txt).replace(/\r?\n[ \t]/g, '').split(/\r?\n/);
-  const out = []; let ev = null;
-  const dt = (v, p) => {
+  const dt = v => {
     const m = /^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})(Z)?)?/.exec(v || ''); if (!m) return null;
     if (!m[4]) return { t: new Date(+m[1], +m[2] - 1, +m[3]).getTime(), allDay: true };
     return { t: m[7] ? Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) : new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]).getTime(), allDay: false };
   };
   const unesc = s => String(s || '').replace(/\\n/gi, ' ').replace(/\\([,;\\])/g, '$1');
+
+  // 1. alle afspraken inlezen
+  const raw = []; let ev = null;
   for (const l of lines) {
-    if (l === 'BEGIN:VEVENT') { ev = {}; continue; }
-    if (l === 'END:VEVENT') {
-      if (ev && ev.start) {
-        const s = ev.start, e = ev.end || { t: s.t + (s.allDay ? 864e5 : 3600e3) };
-        const base = { title: unesc(ev.summary) || '(geen titel)', where: unesc(ev.location), allDay: s.allDay };
-        const rr = ev.rrule || ''; const freq = (/FREQ=(\w+)/.exec(rr) || [])[1];
-        const add = (st, en) => out.push({ ...base, start: st, end: en });
-        if (freq === 'WEEKLY' || freq === 'YEARLY' || freq === 'DAILY' || freq === 'MONTHLY') {
-          const until = (/UNTIL=(\w+)/.exec(rr) || [])[1]; const lim = until ? (dt(until) || {}).t : Infinity; const cnt = Number((/COUNT=(\d+)/.exec(rr) || [])[1]) || 400;
-          const iv = Number((/INTERVAL=(\d+)/.exec(rr) || [])[1]) || 1; const d0 = new Date(s.t); const dur = e.t - s.t;
-          for (let i = 0; i < cnt; i++) {
-            const d = new Date(d0);
-            if (freq === 'DAILY') d.setDate(d.getDate() + i * iv); else if (freq === 'WEEKLY') d.setDate(d.getDate() + 7 * i * iv); else if (freq === 'MONTHLY') d.setMonth(d.getMonth() + i * iv); else d.setFullYear(d.getFullYear() + i * iv);
-            if (d.getTime() > lim || d.getTime() > Date.now() + 90 * 864e5) break;
-            if (d.getTime() + dur >= Date.now() - 864e5) add(d.getTime(), d.getTime() + dur);
-          }
-        } else add(s.t, e.t);
-      }
-      ev = null; continue;
-    }
+    if (l === 'BEGIN:VEVENT') { ev = { ex: [] }; continue; }
+    if (l === 'END:VEVENT') { if (ev && ev.start) raw.push(ev); ev = null; continue; }
     if (!ev) continue;
     const i = l.indexOf(':'); if (i < 0) continue;
     const key = l.slice(0, i).split(';')[0].toUpperCase(); const val = l.slice(i + 1);
     if (key === 'DTSTART') ev.start = dt(val); else if (key === 'DTEND') ev.end = dt(val);
     else if (key === 'SUMMARY') ev.summary = val; else if (key === 'LOCATION') ev.location = val; else if (key === 'RRULE') ev.rrule = val;
+    else if (key === 'UID') ev.uid = val; else if (key === 'STATUS') ev.status = val.toUpperCase();
+    else if (key === 'RECURRENCE-ID') ev.recur = dt(val);
+    else if (key === 'EXDATE') for (const v of val.split(',')) { const d = dt(v.trim()); if (d) ev.ex.push(d.t); }
+  }
+  // 2. keren die apart zijn aangepast of verplaatst: die komen niet uit de reeks maar uit hun eigen VEVENT
+  const moved = new Map();
+  for (const e of raw) if (e.uid && e.recur) { if (!moved.has(e.uid)) moved.set(e.uid, new Set()); moved.get(e.uid).add(e.recur.t); }
+
+  // 3. uitschrijven
+  const out = []; const horizon = now + 90 * 864e5;
+  for (const e of raw) {
+    if (e.status === 'CANCELLED') continue;
+    const s = e.start, en = e.end || { t: s.t + (s.allDay ? 864e5 : 3600e3) };
+    const base = { title: unesc(e.summary) || '(geen titel)', where: unesc(e.location), allDay: s.allDay };
+    const dur = en.t - s.t;
+    const freq = (/FREQ=(\w+)/.exec(e.rrule || '') || [])[1];
+    if (e.recur || !['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'].includes(freq)) { out.push({ ...base, start: s.t, end: en.t }); continue; }
+    const rr = e.rrule;
+    const until = (/UNTIL=(\w+)/.exec(rr) || [])[1]; const lim = until ? ((dt(until) || {}).t ?? Infinity) : Infinity;
+    const count = Number((/COUNT=(\d+)/.exec(rr) || [])[1]) || Infinity;
+    const iv = Number((/INTERVAL=(\d+)/.exec(rr) || [])[1]) || 1;
+    const byday = ((/BYDAY=([^;]+)/.exec(rr) || [])[1] || '').split(',').map(x => /^([+-]?\d+)?(SU|MO|TU|WE|TH|FR|SA)$/.exec(x.trim())).filter(Boolean).map(m => ({ n: m[1] ? Number(m[1]) : 0, wd: WD[m[2]] }));
+    const skip = new Set([...e.ex, ...((e.uid && moved.get(e.uid)) || [])]);
+    const d0 = new Date(s.t);
+    // alle kandidaten binnen één periode (dag, week, maand of jaar), op volgorde
+    const period = p => {
+      const d = new Date(d0);
+      if (freq === 'DAILY') { d.setDate(d0.getDate() + p * iv); return [d]; }
+      if (freq === 'WEEKLY') {
+        d.setDate(d0.getDate() + 7 * p * iv);
+        if (!byday.length) return [d];
+        const mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // maandag van die week
+        return byday.map(b => { const x = new Date(mon); x.setDate(mon.getDate() + ((b.wd + 6) % 7)); return x; }).sort((a, b) => a - b);
+      }
+      if (freq === 'MONTHLY') {
+        d.setDate(1); d.setMonth(d0.getMonth() + p * iv);
+        if (!byday.length) { const x = new Date(d); x.setDate(d0.getDate()); return x.getMonth() === d.getMonth() ? [x] : []; }
+        const res = [];
+        for (const b of byday) {
+          const days = []; const x = new Date(d);
+          while (x.getMonth() === d.getMonth()) { if (x.getDay() === b.wd) days.push(new Date(x)); x.setDate(x.getDate() + 1); }
+          if (!b.n) res.push(...days); else { const pick = b.n > 0 ? days[b.n - 1] : days[days.length + b.n]; if (pick) res.push(pick); }
+        }
+        return res.sort((a, b) => a - b);
+      }
+      d.setFullYear(d0.getFullYear() + p * iv); return [d];
+    };
+    let n = 0;
+    for (let p = 0; p < 20000 && n < count; p++) {
+      const list = period(p);
+      if (list.length && list[0].getTime() > Math.min(lim, horizon)) break;
+      for (const d of list) {
+        const t = d.getTime();
+        if (t < s.t) continue;                 // vóór de eerste keer telt niet mee
+        if (t > lim || n >= count) break;
+        n++;
+        if (skip.has(t)) continue;
+        if (t + dur >= now - 864e5 && t <= horizon) out.push({ ...base, start: t, end: t + dur });
+      }
+    }
   }
   return out;
 }

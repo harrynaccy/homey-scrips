@@ -44,10 +44,15 @@
   D.zoneName = id => (D.lib.zones.find(z => z.id === id) || {}).name || '';
 
   D.setCap = async (deviceId, cap, value) => {
-    const d = D.dev(deviceId);
-    if (d && d.caps[cap]) { d.caps[cap].value = value; D.refreshDevice(deviceId); }
+    const d = D.dev(deviceId); const c = d && d.caps[cap];
+    const before = c ? c.value : undefined; // om terug te zetten als het niet lukt
+    if (c) { c.value = value; D.refreshDevice(deviceId); }
     try { await D.api('POST', `/api/device/${encodeURIComponent(deviceId)}/${encodeURIComponent(cap)}`, { value }); }
-    catch (e) { D.toast('Mislukt: ' + e.message, true); }
+    catch (e) {
+      // alleen terugzetten als er intussen geen nieuwere waarde is binnengekomen of ingesteld
+      if (c && c.value === value) { c.value = before; D.refreshDevice(deviceId); }
+      D.toast('Mislukt: ' + e.message, true);
+    }
   };
 
   // ---------- live-berichten voor widgets van eigen apps (één verbinding voor alle tegels) ----------

@@ -120,6 +120,11 @@ class HomeyAdapter extends EventEmitter {
       }
     }
     const a = this.api;
+    // Luisteraars hieronder maar één keer per verbinding koppelen. subscribe() wordt na elk nieuw of
+    // verwijderd apparaat opnieuw aangeroepen; zonder deze grens stapelden de luisteraars zich op
+    // (steeds vaker alles ophalen, variabelen en aanwezigheid dubbel doorgeven).
+    if (this._watchApi === a) { this.startRefreshTimer(); return; }
+    this._watchApi = a;
     const relib = debounce(() => this.refresh().then(() => this.subscribe()).catch(() => {}), 3000);
     await this.safe(async () => {
       await a.devices.connect();
@@ -144,7 +149,6 @@ class HomeyAdapter extends EventEmitter {
     });
     // Controle direct bijwerken: flows, apps en apparaten (bereikbaarheid) die veranderen
     const changed = what => () => this.emit('changed', what);
-    if (this._watchApi !== a) { this._watchApi = a; // maar één keer per verbinding koppelen
     await this.safe(async () => {
       await a.flow.connect();
       for (const ev of ['flow.create', 'flow.update', 'flow.delete', 'advancedflow.create', 'advancedflow.update', 'advancedflow.delete']) a.flow.on(ev, changed('flow'));
@@ -162,8 +166,10 @@ class HomeyAdapter extends EventEmitter {
     });
     a.devices.on('device.create', changed('device'));
     a.devices.on('device.delete', changed('device'));
-    }
-    // vangnet: elke 10 minuten alles opnieuw ophalen
+    this.startRefreshTimer();
+  }
+  // vangnet: elke 10 minuten alles opnieuw ophalen
+  startRefreshTimer() {
     clearInterval(this.timer);
     this.timer = setInterval(() => this.refresh().catch(() => {}), 10 * 60 * 1000);
   }
