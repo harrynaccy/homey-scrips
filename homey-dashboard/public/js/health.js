@@ -123,7 +123,7 @@
       if (!d && !H.loading && !H.err) H.load(false);
       const st = !d ? (H.err ? 'bad' : 'wait') : d.errors ? 'bad' : d.warnings ? 'warn' : 'ok';
       el.classList.remove('h-ok', 'h-warn', 'h-bad', 'h-wait'); el.classList.add('h-' + st);
-      inner.innerHTML = `<div class="h-tile"><span class="h-big">${icon(st === 'ok' ? 'check' : st === 'wait' ? 'refresh' : 'bell')}</span><div><b>${esc(d ? summary(d) : H.err ? 'Controle lukt niet' : 'Controleren…')}</b><small>${d ? 'Om ' + time(d.at) + ' · tik voor details' : esc(H.err || '')}</small></div></div>`;
+      inner.innerHTML = `<div class="h-tile"><span class="h-big">${icon(st === 'ok' ? 'check' : st === 'wait' ? 'refresh' : 'bell')}</span><div><b>${esc(d ? (st === 'ok' && String((t.opts || {}).okText || '').trim() ? String(t.opts.okText).trim() : summary(d)) : H.err ? 'Controle lukt niet' : 'Controleren…')}</b><small>${d ? 'Om ' + time(d.at) + ' · tik voor details' : esc(H.err || '')}</small></div></div>`;
       D.pressable(el, { tap: () => H.openSheet() });
     },
   };

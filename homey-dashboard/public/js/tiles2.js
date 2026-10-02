@@ -421,6 +421,7 @@
     timer: (t, P, F) => F.row('Standaard (min)', F.num(`${P}.opts.dflt`, t.opts.dflt || 5, 1, 180, 'tile')),
     departures: (t, P, F) => `<div class="f col"><label>Halte<small>${esc(t.opts.stopName || 'Nog geen halte gekozen')}</small></label><div class="x-ovsearch"><input type="search" placeholder="Zoek: Enschede, Station" data-ovq><div data-ovres></div></div></div>` +
       F.row('Alleen lijnen', F.text(`${P}.opts.lines`, t.opts.lines, 'tile', 'bijv. 1, 9'), 'Leeg = alle lijnen') + '<p class="note">Bus, tram en metro (OVapi). Treinen van de NS zitten hier niet in.</p>',
+    health: (t, P, F) => F.row('Tekst als alles goed is', F.text(`${P}.opts.okText`, (t.opts || {}).okText, 'tile', 'Alles in orde'), 'Leeg = "Alles in orde"'),
     p2000: (t, P, F) => F.row('Brandweer', F.toggle(`${P}.opts.fire`, t.opts.fire !== false, 'tile')) + F.row('Ambulance', F.toggle(`${P}.opts.ambu`, t.opts.ambu !== false, 'tile')) + F.row('Politie', F.toggle(`${P}.opts.pol`, t.opts.pol !== false, 'tile')) +
       F.row('Alleen spoed', F.toggle(`${P}.opts.urgent`, !!t.opts.urgent, 'tile'), 'A1, P1 en prio 1') +
       F.row('Alleen plaatsen', F.text(`${P}.opts.places`, t.opts.places, 'tile', 'bijv. Enschede, Hengelo'), 'Leeg = heel Twente') +
