@@ -18,7 +18,7 @@
     try { res = await fetch(url, { method, headers: { 'Content-Type': 'application/json', 'X-Client-Id': D.clientId }, body: body === undefined ? undefined : JSON.stringify(body) }); }
     catch (e) { throw new Error(D.NO_NAS); }
     const j = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(j.error || ({ 404: 'Dit bestaat niet (meer).', 413: 'Het bestand is te groot.', 502: D.NO_NAS, 503: 'Het dashboard op de NAS start net op. Probeer het over een minuut opnieuw.', 504: D.NO_NAS }[res.status]) || `Er ging iets mis op de NAS (fout ${res.status}).`);
+    if (!res.ok) throw Object.assign(new Error(j.error || ({ 404: 'Dit bestaat niet (meer).', 413: 'Het bestand is te groot.', 502: D.NO_NAS, 503: 'Het dashboard op de NAS start net op. Probeer het over een minuut opnieuw.', 504: D.NO_NAS }[res.status]) || `Er ging iets mis op de NAS (fout ${res.status}).`), { status: res.status });
     return j;
   };
   D.loadLibrary = async () => { const l = await D.api('GET', '/api/library'); for (const k of ['devices', 'zones', 'flows', 'advancedFlows', 'moods', 'variables', 'insights', 'apps', 'users', 'alarms']) l[k] = l[k] || []; D.lib = l; D.devById = new Map(D.lib.devices.map(d => [d.id, d])); };
@@ -40,6 +40,28 @@
       dispatch(d) { for (const e of [...subs]) if (e.appId === d.appId) { try { e.fn(d.event, d.data); } catch (err) { subs.delete(e); } } },
     };
   })();
+
+  // ---------- instellingen gelijk houden tussen apparaten ----------
+  D.cfgBase = null; // de versie zoals laatst geladen of opgeslagen
+  D.setCfg = cfg => { D.cfg = cfg; D.cfgBase = JSON.stringify(cfg); D.baseSavedAt = cfg.savedAt || null; };
+  D.cfgDirty = () => !!D.cfg && D.cfgBase !== null && JSON.stringify(D.cfg) !== D.cfgBase; // eigen wijziging die nog niet is opgeslagen
+  let syncing = null;
+  D.syncCfg = (force) => syncing || (syncing = (async () => {
+    try {
+      if (!D.cfg) return;
+      if (!force) {
+        const st = await D.api('GET', '/api/config/stamp').catch(() => null);
+        if (!st || !st.savedAt || st.savedAt === D.cfg.savedAt) return;
+        if (D.cfgDirty()) return; // eigen wijziging gaat voor; bij opslaan volgt de controle
+      }
+      const cfg = await D.api('GET', '/api/config');
+      if (!force && D.cfgDirty()) return;
+      D.setCfg(cfg);
+      if (D.editing && D.editor.remoteLoaded) D.editor.remoteLoaded(); else D.applyAll();
+    } catch (e) { /* volgende keer opnieuw */ } finally { syncing = null; }
+  })());
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && D.cfg) { D.syncCfg(); D.applyBrightness(); } });
+  setInterval(() => { if (document.visibilityState === 'visible') D.syncCfg(); }, 60000); // vangnet
 
   // ---------- live updates ----------
   D.capHooks = []; // extra reacties op live-waarden (bijv. camera-pop-up bij beweging)
@@ -63,14 +85,14 @@
     });
     es.addEventListener('library', async () => { await D.loadLibrary(); D.renderAll(); if (D.editing) D.editor.refreshPanel(); });
     es.addEventListener('status', ev => { D.status = JSON.parse(ev.data); if (D.editing) D.editor.refreshPanel('systeem'); });
-    es.addEventListener('config', async ev => {
+    es.addEventListener('config', ev => {
       const m = JSON.parse(ev.data);
-      if (m.by === D.clientId || D.editing) return;
-      D.cfg = await D.api('GET', '/api/config'); D.applyAll();
+      if (m.by === D.clientId) return;
+      D.syncCfg();
     });
     // verbindingsbalk: hartslag van de NAS en status van Homey
     const seen = () => { D.conn.nasAt = Date.now(); D.conn.nasErr = false; D.connbar && D.connbar.update(); };
-    es.onopen = seen;
+    es.onopen = () => { seen(); D.syncCfg(); }; // na een onderbreking: gemiste wijzigingen alsnog ophalen
     es.addEventListener('hb', seen);
     es.addEventListener('hello', ev => {
       const v = JSON.parse(ev.data).version;

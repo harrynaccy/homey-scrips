@@ -246,7 +246,13 @@ app.get('/api/events', (req, res) => {
 });
 
 app.get('/api/config', wrap(() => readConfig()));
-app.put('/api/config', wrap(req => {
+app.get('/api/config/stamp', wrap(() => ({ savedAt: (readConfig() || {}).savedAt || null })));
+// Opslaan alleen als het apparaat van de nieuwste versie uitging; anders 409 (zo overschrijft een tablet met een oude versie nooit wat op de laptop is gewijzigd)
+app.put('/api/config', (req, res, next) => {
+  const cfg = req.body; const cur = readConfig();
+  if (cfg && cfg.savedAt && cur && cur.savedAt && cfg.savedAt !== cur.savedAt) return res.status(409).json({ error: 'Intussen op een ander apparaat gewijzigd', conflict: true, savedAt: cur.savedAt });
+  next();
+}, wrap(req => {
   const cfg = req.body;
   if (!cfg || !Array.isArray(cfg.tabs)) throw new Error('Ongeldige configuratie');
   if (cfg.tabs.filter(t => !t.sub).length > 10) throw new Error('Maximaal 10 tabbladen');

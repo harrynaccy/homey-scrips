@@ -64,9 +64,29 @@
   // volgende wijziging als eigen stap (niet samenvoegen met de vorige)
   E.breakMerge = () => { lastKey = null; if (E.log && E.log[0]) E.log[0].sealed = true; };
   E.scheduleSave = () => { clearTimeout(saveT); E.setSaved('Opslaan…'); saveT = setTimeout(E.saveNow, 700); };
-  E.saveNow = async () => {
+  let saving = Promise.resolve();
+  E.saveNow = () => (saving = saving.then(async () => {
     clearTimeout(saveT); saveT = null;
-    try { await D.api('PUT', '/api/config', D.cfg); E.setSaved('Opgeslagen'); } catch (e) { E.setSaved('Niet opgeslagen!'); D.toast('Opslaan mislukt: ' + e.message, true); }
+    if (!D.cfgDirty()) { E.setSaved('Opgeslagen'); return; } // niets gewijzigd: niet opslaan, dus ook nooit een oudere versie terugzetten
+    D.cfg.savedAt = D.baseSavedAt; // ook na ongedaan maken: uitgaan van de laatst bekende versie
+    const sent = JSON.parse(JSON.stringify(D.cfg));
+    try {
+      const r = await D.api('PUT', '/api/config', sent);
+      sent.savedAt = r.savedAt; D.cfg.savedAt = r.savedAt; D.baseSavedAt = r.savedAt; D.cfgBase = JSON.stringify(sent);
+      E.setSaved(D.cfgDirty() ? 'Opslaan…' : 'Opgeslagen'); if (D.cfgDirty()) E.scheduleSave();
+    } catch (e) {
+      if (e.status === 409) {
+        E.setSaved('Nieuwste versie geladen');
+        D.toast('Er was intussen op een ander apparaat iets gewijzigd. De nieuwste versie is geladen; doe je laatste wijziging zo nodig opnieuw.', true);
+        await D.syncCfg(true);
+      } else { E.setSaved('Niet opgeslagen!'); D.toast('Opslaan mislukt: ' + e.message, true); }
+    }
+  }));
+  // wijziging van een ander apparaat binnengekomen terwijl de achterkant open is (en hier niets openstaat)
+  E.remoteLoaded = () => {
+    E.undo = []; E.redo = [];
+    if (E.sel && !D.findTile(E.sel)) E.sel = null;
+    D.applyAll(); E.refreshPanel(); if (E.updateHeader) E.updateHeader(); E.setSaved('Bijgewerkt vanaf ander apparaat');
   };
   E.setSaved = txt => { const s = $('#p-saved'); if (s) s.textContent = txt; };
   E.doUndo = () => { if (!E.undo.length) return; E.redo.push(JSON.stringify(D.cfg)); D.cfg = JSON.parse(E.undo.pop()); lastKey = null; E.afterHistory(); };

@@ -6,7 +6,7 @@
   const boot = async () => {
     try {
       const [cfg, status] = await Promise.all([D.api('GET', '/api/config'), D.api('GET', '/api/status')]);
-      D.cfg = cfg; D.status = status;
+      D.setCfg(cfg); D.status = status;
       await D.loadLibrary().catch(() => {});
       D.activeTab = null; D.applyAll(); D.connectEvents();
       if (location.hash === '#edit') D.editor.open();
