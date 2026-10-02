@@ -372,20 +372,25 @@
   }
 
   /* ---------- Nu speelt light ---------- */
-  /* Geen afspeellijst-knoppen, geen ＋, geen "Volgende"; vorige/play/volgende/shuffle als één groep in het midden. */
+  /* Geen afspeellijst-knoppen, geen ＋, geen "Volgende". Vorige/play/volgende in het midden van de widget, shuffle eronder.
+     Volumebalk rechts stopt op de hoogte van de voortgangsbalk; het onderste vak loopt door tot rechts (zelfde marge als links). */
   .namesRow, .nextUp, .addCurBtn, .sheetBackdrop{ display:none !important; }
   .controls{
-    margin:auto 0 !important;            /* midden tussen hoes en voortgangsbalk */
-    align-self:center;
+    margin:auto -2em 0 0 !important;   /* -2em: compenseert de extra ruimte rechts voor de volumebalk, zodat play in het midden van de widget staat */
+    justify-content:center;
     gap:clamp(8px, 3.5vw, 22px);
   }
   .controls .ctrlBtn{ width:clamp(38px, 13vw, 52px); height:clamp(38px, 13vw, 52px); }
   .controls .ctrlBtn svg{ width:46%; height:46%; }
   .controls .ctrlBtn.play{ width:clamp(48px, 17vw, 68px); height:clamp(48px, 17vw, 68px); }
   .controls .ctrlBtn.play svg{ width:38%; height:38%; }
-  .controls .shuffleBtn{ width:clamp(38px, 13vw, 52px); height:clamp(38px, 13vw, 52px); border-radius:50%; }
-  .controls .shuffleBtn svg{ width:62%; height:40%; }
+  .shuffleRow{ display:flex; justify-content:center; margin:clamp(10px, 3vw, 18px) -2em auto 0; }
+  .shuffleRow .shuffleBtn{ width:clamp(46px, 15vw, 60px); height:clamp(30px, 9vw, 36px); }
+  .shuffleRow .shuffleBtn svg{ width:55%; height:50%; }
   #progressRange{ margin:0 0 12px 0 !important; }
+  .bottomBar{ margin-right:-2em; }
+  .volumeWrap{ top:var(--vol-top, 0px) !important; bottom:var(--vol-bottom, 90px) !important; }
+  #volumeRange{ width:var(--vol-light, var(--vol-len,304px)) !important; }
 </style>
 
 </head>
@@ -416,6 +421,8 @@
       <button class="ctrlBtn" id="nextBtn" title="Volgende">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2zM6 6l9 6-9 6z"/></svg>
       </button>
+    </div>
+    <div class="shuffleRow">
       <button class="shuffleBtn" id="shuffleBtn" title="Afspeelvolgorde">
           <svg id="shuffleIcon" viewBox="0 0 100 60">
             <path d="M4,16 C30,16 35,30 50,30 C65,30 70,16 80,16" stroke="currentColor" stroke-width="10" fill="none" stroke-linecap="round"/>
@@ -911,6 +918,27 @@
   };
 })();
 
+</script>
+<script>
+/* Nu speelt light: volumebalk laten eindigen boven het onderste vak (ter hoogte van de voortgangsbalk) */
+(function(){
+  function placeVolume(){
+    var wrap = document.querySelector(".wrap"), pr = document.getElementById("progressRange"), vw = document.querySelector(".volumeWrap");
+    if(!wrap || !pr || !vw) return;
+    var wr = wrap.getBoundingClientRect(), r = pr.getBoundingClientRect();
+    if(!wr.height || !r.height) return;
+    var top = Math.round(wr.height * 0.06);                          // bovenkant zoals voorheen
+    var end = Math.round(r.top + r.height / 2 - wr.top);              // onderkant = midden van de voortgangsbalk
+    var root = document.documentElement.style;
+    root.setProperty("--vol-top", top + "px");
+    root.setProperty("--vol-bottom", Math.max(0, Math.round(wr.height - end)) + "px");
+    root.setProperty("--vol-light", Math.max(80, end - top) + "px");
+  }
+  window.addEventListener("load", placeVolume);
+  window.addEventListener("resize", placeVolume);
+  if(window.ResizeObserver){ var ro = new ResizeObserver(placeVolume); var go = function(){ var w = document.querySelector(".wrap"), b = document.getElementById("bottomBar"); if(w) ro.observe(w); if(b) ro.observe(b); var p = document.getElementById("progressRange"); if(p) ro.observe(p); placeVolume(); }; if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", go); else go(); }
+  setInterval(placeVolume, 3000);
+})();
 </script>
 </body>
 </html>
