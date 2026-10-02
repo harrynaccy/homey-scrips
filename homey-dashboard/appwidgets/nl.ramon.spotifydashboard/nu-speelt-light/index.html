@@ -953,7 +953,7 @@
     if(!wrap || !pr || !vw) return;
     var wr = wrap.getBoundingClientRect(), r = pr.getBoundingClientRect();
     if(!wr.height || !r.height) return;
-    var top = Math.round(wr.height * 0.06);                          // bovenkant zoals voorheen
+    var top = Math.round(wr.height * 0.06) + 10;                     // bovenkant: 10 px lager dan oorspronkelijk
     var end = Math.round(r.top + r.height / 2 - wr.top);              // onderkant = midden van de voortgangsbalk
     var root = document.documentElement.style;
     root.setProperty("--vol-top", top + "px");
