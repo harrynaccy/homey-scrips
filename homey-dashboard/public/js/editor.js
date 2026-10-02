@@ -28,6 +28,7 @@
   };
   E.open = async () => {
     if (D.editing || E._opening) return;
+    if (D.offline) { D.toast('De NAS is niet bereikbaar. De achterkant kan pas weer open als de NAS terug is.', true); return; }
     E._opening = true; const ok = await E.mayOpen().catch(() => false); E._opening = false;
     if (!ok || D.editing) return;
     D.editing = true; document.body.classList.add('editing');
@@ -74,7 +75,7 @@
     const sent = JSON.parse(JSON.stringify(D.cfg));
     try {
       const r = await D.api('PUT', '/api/config' + (E._voor ? '?voor=' + E._voor : ''), sent); E._voor = null;
-      sent.savedAt = r.savedAt; D.cfg.savedAt = r.savedAt; D.baseSavedAt = r.savedAt; D.cfgBase = JSON.stringify(sent);
+      sent.savedAt = r.savedAt; D.cfg.savedAt = r.savedAt; D.baseSavedAt = r.savedAt; D.cfgBase = JSON.stringify(sent); D.cache('cfg', { at: Date.now(), cfg: sent });
       E.setSaved(D.cfgDirty() ? 'Opslaan…' : 'Opgeslagen'); if (D.cfgDirty()) E.scheduleSave();
     } catch (e) {
       if (e.status === 409) {
@@ -185,7 +186,7 @@
       <div class="p-main"><header class="p-head"><div><h1>${title}</h1><small id="p-saved">${saveT ? 'Opslaan…' : 'Opgeslagen'}</small></div>
       <button class="ib" data-history title="Laatste wijzigingen">${icon('clock')}</button><button class="ib" data-undo title="Ongedaan maken">${icon('undo')}</button><button class="ib" data-redo title="Opnieuw">${icon('redo')}</button>
       <button class="btn primary sm" data-done>${icon('check')}Klaar</button></header><div class="p-body">${E.render[E.section]()}</div></div>`;
-    p.querySelectorAll('[data-sec]').forEach(b => b.onclick = () => { E.section = b.dataset.sec; E.refreshPanel(); });
+    p.querySelectorAll('[data-sec]').forEach(b => b.onclick = () => { E.section = b.dataset.sec; E.refreshPanel(); if (D.isNight()) { D.applyTheme(); D.applyBackground(); } });
     p.querySelector('[data-undo]').onclick = E.doUndo; p.querySelector('[data-redo]').onclick = E.doRedo; p.querySelector('[data-history]').onclick = E.openHistory;
     p.querySelector('[data-done]').onclick = E.close;
     E.updateHeader(); E.bind(p.querySelector('.p-body'));
@@ -1117,7 +1118,9 @@
       F.group('Helderheid', F.row('Schermhelderheid', F.range('settings.display.brightness', S.display.brightness, 1, 255, 1, 'bright', 'b')) + `<p class="note">${D.hasFully() ? '✓ Fully Kiosk gevonden: de echte schermhelderheid wordt geregeld.' : 'Fully Kiosk niet gevonden (bijv. op de laptop): er wordt een donkere laag gebruikt.'}</p>`) +
       F.group('Nachtmodus', F.row('Aan', F.toggle('settings.night.enabled', n.enabled, 'panel')) + (n.enabled ? F.row('Wanneer', F.seg('settings.night.mode', n.mode, [['time', 'Vaste tijden'], ['sun', 'Zon onder → op']], 'bright')) +
         (n.mode === 'time' ? F.row('Van', `<input type="time" data-k="settings.night.from" data-fx="bright" value="${n.from}">`) + F.row('Tot', `<input type="time" data-k="settings.night.to" data-fx="bright" value="${n.to}">`) : sun) +
-        F.row('Helderheid \'s nachts', F.range('settings.night.brightness', n.brightness, 1, 255, 1, 'bright', 'b')) + F.row('Extra dimmen', F.range('settings.night.dim', n.dim || 0, 0, 0.8, 0.01, 'bright', '%')) + `<p class="note">Nu: ${D.isNight() ? '🌙 nacht' : '☀️ dag'}</p>` : '')) +
+        F.row('Helderheid \'s nachts', F.range('settings.night.brightness', n.brightness, 1, 255, 1, 'bright', 'b')) + F.row('Extra dimmen', F.range('settings.night.dim', n.dim || 0, 0, 0.8, 0.01, 'bright', '%')) + F.row('Thema \'s nachts', `<select data-nighttheme><option value="">Zelfde als overdag</option>${Object.entries(PRESETS).map(([id, p]) => `<option value="p:${id}"${n.themeName === p.name ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}${(D.cfg.themes || []).map((p, i) => `<option value="o:${i}"${n.themeName === p.name ? ' selected' : ''}>${esc(p.name)} (eigen)</option>`).join('')}</select>`, 'Wisselt mee met de nachtstand') +
+        F.row('Achtergrond \'s nachts', `<select data-nightbg><option value="">Zelfde als overdag</option><option value="c:#000000"${n.bg && n.bg.type === 'color' && n.bg.color === '#000000' ? ' selected' : ''}>Zwart</option><option value="g:#05070d:#141a2b"${n.bg && n.bg.type === 'gradient' ? ' selected' : ''}>Donker verloop</option>${n.bg && n.bg.type === 'image' ? `<option value="i:${esc(n.bg.image)}" selected>${esc(n.bg.image.split('/').pop())}</option>` : ''}</select>`, 'Foto\'s uit je achtergronden komen erbij na laden') +
+        '<p class="note">Tijdens het aanpassen van Scherm en Uiterlijk zie je altijd het dagthema.</p>' + `<p class="note">Nu: ${D.isNight() ? '🌙 nacht' : '☀️ dag'}</p>` : '')) +
       F.group('Screensaver', F.row('Aan', F.toggle('settings.screensaver.enabled', S.screensaver.enabled, 'panel')) + (S.screensaver.enabled ? F.row('Na', F.range('settings.screensaver.after', S.screensaver.after, 1, 60, 1, 'none', 'min')) +
         F.row('Soort', F.select('settings.screensaver.type', S.screensaver.type, [['clock', 'Grote klok'], ['photos', "Foto's (je achtergronden)"], ['black', 'Zwart'], ['off', 'Scherm uit (Fully)']], 'panel')) +
         (S.screensaver.type === 'photos' ? F.row('Wissel elke', F.range('settings.screensaver.interval', S.screensaver.interval, 5, 120, 5, 'none', 's')) : '') + `<button class="btn sm" data-preview>${icon('eye')}Voorbeeld</button>` : '')) +
@@ -1128,6 +1131,24 @@
     const own = root.querySelector('[data-ownbg]'); if (own) own.onclick = () => E.commit(null, () => { D.currentTab().background = D.clone(D.cfg.settings.background); }, () => { D.applyBackground(); E.refreshPanel(); });
     const drop = root.querySelector('[data-dropbg]'); if (drop) drop.onclick = () => E.commit(null, () => { D.currentTab().background = null; }, () => { D.applyBackground(); E.refreshPanel(); });
     const pv = root.querySelector('[data-preview]'); if (pv) pv.onclick = () => D.startSaver(true);
+    const nt = root.querySelector('[data-nighttheme]');
+    if (nt) nt.onchange = () => E.commit(null, () => {
+      const n = D.cfg.settings.night; const v = nt.value;
+      const src = v.startsWith('p:') ? PRESETS[v.slice(2)] : v.startsWith('o:') ? (D.cfg.themes || [])[Number(v.slice(2))] : null;
+      if (!src) { delete n.theme; delete n.themeName; return; }
+      const { name, fx, ...rest } = D.clone(src); n.theme = rest; n.themeName = name; // effecten (fx) blijven van het dagthema
+    }, () => { D.applyTheme(); });
+    const nb = root.querySelector('[data-nightbg]');
+    if (nb) {
+      D.api('GET', '/api/backgrounds').then(list => { const cur = nb.value; for (const u of list) { if ([...nb.options].some(o => o.value === 'i:' + u)) continue; const o = document.createElement('option'); o.value = 'i:' + u; o.textContent = 'Foto: ' + u.split('/').pop(); nb.appendChild(o); } nb.value = cur; }).catch(() => {});
+      nb.onchange = () => E.commit(null, () => {
+        const n = D.cfg.settings.night; const v = nb.value;
+        if (!v) delete n.bg;
+        else if (v.startsWith('c:')) n.bg = { type: 'color', color: v.slice(2), dim: 0 };
+        else if (v.startsWith('g:')) { const [, a, b] = v.split(':'); n.bg = { type: 'gradient', gradient: [a, b], angle: 160, dim: 0 }; }
+        else if (v.startsWith('i:')) n.bg = { type: 'image', image: v.slice(2), dim: 0.25, blur: 0 };
+      }, () => D.applyBackground());
+    }
     root.querySelector('[data-bgall]').onclick = async () => {
       const tab = D.currentTab(); const src = (E.bgScope === 'tab' && tab.background) || D.cfg.settings.background;
       const from = E.bgScope === 'tab' && tab.background ? `van "${tab.name}"` : 'die nu is ingesteld';

@@ -39,7 +39,7 @@
     if (!res.ok) throw Object.assign(new Error(j.error || ({ 404: 'Dit bestaat niet (meer).', 413: 'Het bestand is te groot.', 502: D.NO_NAS, 503: 'Het dashboard op de NAS start net op. Probeer het over een minuut opnieuw.', 504: D.NO_NAS }[res.status]) || `Er ging iets mis op de NAS (fout ${res.status}).`), { status: res.status });
     return j;
   };
-  D.loadLibrary = async () => { const l = await D.api('GET', '/api/library'); for (const k of ['devices', 'zones', 'flows', 'advancedFlows', 'moods', 'variables', 'insights', 'apps', 'users', 'alarms']) l[k] = l[k] || []; D.lib = l; D.devById = new Map(D.lib.devices.map(d => [d.id, d])); };
+  D.loadLibrary = async () => { const l = await D.api('GET', '/api/library'); for (const k of ['devices', 'zones', 'flows', 'advancedFlows', 'moods', 'variables', 'insights', 'apps', 'users', 'alarms']) l[k] = l[k] || []; D.lib = l; D.cache('lib', l); D.devById = new Map(D.lib.devices.map(d => [d.id, d])); };
   D.dev = id => D.devById && D.devById.get(id);
   D.zoneName = id => (D.lib.zones.find(z => z.id === id) || {}).name || '';
 
@@ -61,7 +61,9 @@
 
   // ---------- instellingen gelijk houden tussen apparaten ----------
   D.cfgBase = null; // de versie zoals laatst geladen of opgeslagen
-  D.setCfg = cfg => { D.cfg = cfg; D.cfgBase = JSON.stringify(cfg); D.baseSavedAt = cfg.savedAt || null; };
+  // laatste bekende versie op dit apparaat bewaren, zodat het dashboard blijft staan als de NAS even weg is
+  D.cache = (k, v) => { try { if (v === undefined) { const x = localStorage.getItem('hd-cache-' + k); return x ? JSON.parse(x) : null; } localStorage.setItem('hd-cache-' + k, JSON.stringify(v)); } catch (e) { /* vol of geblokkeerd: dan maar zonder */ } return null; };
+  D.setCfg = cfg => { D.cfg = cfg; D.cfgBase = JSON.stringify(cfg); D.baseSavedAt = cfg.savedAt || null; if (!D.offline) D.cache('cfg', { at: Date.now(), cfg }); };
   D.cfgDirty = () => !!D.cfg && D.cfgBase !== null && JSON.stringify(D.cfg) !== D.cfgBase; // eigen wijziging die nog niet is opgeslagen
   let syncing = null;
   D.syncCfg = (force) => syncing || (syncing = (async () => {
@@ -146,8 +148,11 @@
   // ---------- thema ----------
   const FONTS = { Inter: 'Inter:wght@300;400;500;600;700', Nunito: 'Nunito:wght@300;400;600;700;800', Roboto: 'Roboto:wght@300;400;500;700', Poppins: 'Poppins:wght@300;400;500;600;700', Montserrat: 'Montserrat:wght@300;400;500;600;700', 'Space Grotesk': 'Space+Grotesk:wght@300;400;500;600;700', Quicksand: 'Quicksand:wght@400;500;600;700', Systeem: null };
   D.FONTS = Object.keys(FONTS);
+  // nachtthema/-achtergrond actief? (tijdens het aanpassen van Uiterlijk/Scherm altijd het dagthema tonen)
+  D.nightLook = () => { const n = D.cfg.settings.night || {}; return D.isNight() && !(D.editing && D.editor && ['uiterlijk', 'scherm'].includes(D.editor.section)) ? n : null; };
   D.applyTheme = () => {
-    const t = D.cfg.settings.theme; const r = document.documentElement.style;
+    const nl = D.nightLook();
+    const t = nl && nl.theme ? { ...D.cfg.settings.theme, ...nl.theme } : D.cfg.settings.theme; const r = document.documentElement.style;
     r.setProperty('--accent', t.accent); r.setProperty('--on', t.onColor || t.accent);
     r.setProperty('--text', t.text); r.setProperty('--muted', t.muted || D.hexA(t.text, 0.62));
     r.setProperty('--tile', D.hexA(t.tileBg, t.tileOpacity)); r.setProperty('--tile-solid', t.tileBg);
@@ -163,7 +168,8 @@
 
   // ---------- achtergrond ----------
   D.applyBackground = () => {
-    const tab = D.currentTab(); const g = D.cfg.settings.background; const b = (tab && tab.background) || g;
+    const nl = D.nightLook();
+    const tab = D.currentTab(); const g = (nl && nl.bg) || D.cfg.settings.background; const b = (tab && tab.background && !(nl && nl.bg)) ? tab.background : g;
     const img = $('#bg-img'); const dim = $('#bg-dim');
     let css = '';
     if (b.type === 'image' && b.image) css = `url("${b.image}") center/cover no-repeat`;
@@ -193,6 +199,8 @@
       dim.style.opacity = D.clamp(o, 0, 0.92);
     }
     document.body.classList.toggle('night', night);
+    if (D._wasNight !== undefined && D._wasNight !== night) { D.applyTheme(); D.applyBackground(); } // dag ↔ nacht: thema en achtergrond wisselen mee
+    D._wasNight = night;
   };
 
   // zonsopkomst/-ondergang (NOAA-benadering)
