@@ -1077,7 +1077,7 @@
         <button class="ib sm" data-deltab="${i}">${icon('trash')}</button></div>`).join('') || '<p class="note">Nog geen subpagina\'s.</p>'}</div>
         <button class="btn sm" data-addsub ${subs.length >= D.MAX_SUB ? 'disabled' : ''}>${icon('plus')}Subpagina toevoegen (${subs.length}/${D.MAX_SUB})</button>
         ${D.isSub(D.currentTab()) ? `<button class="btn sm ghost" data-backsub>${icon('left')}Terug naar ${esc((D.cfg.tabs.find(t => t.id === D._subFrom) || D.mainTabs()[0]).name)}</button>` : ''}`) +
-      F.group('Tabbalk onderaan', F.row('Hoogte', F.range('settings.tabbar.height', S.tabbar.height, 32, 72, 1, 'tabbar', 'px')) + F.row('Iconen tonen', F.toggle('settings.tabbar.showIcons', S.tabbar.showIcons, 'tabbar')) + F.row('Namen tonen', F.toggle('settings.tabbar.showNames', S.tabbar.showNames, 'tabbar')) + F.row('Donkerte balk', F.range('settings.tabbar.opacity', S.tabbar.opacity, 0, 1, 0.01, 'tabbar', '%')));
+      F.group('Tabbalk onderaan', F.row('Hoogte', F.range('settings.tabbar.height', S.tabbar.height, 32, 72, 1, 'tabbar', 'px')) + F.row('Iconen tonen', F.toggle('settings.tabbar.showIcons', S.tabbar.showIcons, 'tabbar')) + F.row('Namen tonen', F.toggle('settings.tabbar.showNames', S.tabbar.showNames, 'tabbar')) + F.row('Donkerte balk', F.range('settings.tabbar.opacity', S.tabbar.opacity, 0, 1, 0.01, 'tabbar', '%')) + F.row('Volle breedte', F.toggle('settings.tabbar.full', !!S.tabbar.full, 'tabbar'), 'Balk over de hele breedte, tabbladen gelijk verdeeld'));
   };
   E.wire.tabs = root => {
     root.querySelectorAll('[data-opensub]').forEach(b => b.onclick = () => { D.openPage(b.dataset.opensub); E.refreshPanel(); });

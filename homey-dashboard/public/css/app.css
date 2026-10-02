@@ -444,3 +444,9 @@ body.editing #connbar { left: 10px; bottom: 10px; }
 #connbar.bk-warn .cb-bk i { background: #ffb347; }
 #connbar.bk-bad .cb-bk i { background: #ff5d4d; }
 #connbar.bk-bad { border-color: rgba(255,93,77,.45); }
+/* tabbalk over de volle breedte (Tabbladen → Volle breedte); begint rechts naast de statusbalk */
+body.tabs-full #tabbar { justify-content: stretch; padding-left: max(16px, calc(var(--cbw, 0px) + 18px)); padding-right: 16px; }
+body.tabs-full #tabs { flex: 1; }
+body.tabs-full .tab { flex: 1 1 0; min-width: 0; justify-content: center; }
+body.tabs-full .tab .tn { overflow: hidden; text-overflow: ellipsis; }
+body.editing.tabs-full #tabbar { padding-left: 16px; }

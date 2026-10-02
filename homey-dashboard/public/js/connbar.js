@@ -76,7 +76,7 @@
     bar.innerHTML = `<span class="cb-node" title="Dit scherm">${icon('tv')}</span><span class="cb-link l1"><i></i><b>✕</b></span><span class="cb-node" title="NAS">${icon('server')}</span><span class="cb-link l2"><i></i><b>✕</b></span><span class="cb-node" title="Homey">${icon('home')}</span><span class="cb-sep"></span><span class="cb-bk" title="Back-up"><i></i>${icon('download')}</span><span class="cb-msg"></span>`;
     bar.onclick = e => { e.stopPropagation(); C.details(); };
     bar.addEventListener('pointerdown', e => e.stopPropagation());
-    document.body.appendChild(bar);
+    document.body.appendChild(bar); if (D.watchConnbar) D.watchConnbar();
     C.update();
   };
   // reactietijd naar de NAS meten

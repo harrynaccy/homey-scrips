@@ -169,6 +169,14 @@
     r.setProperty('--font', fam);
     if (FONTS[t.font]) { const href = `https://fonts.googleapis.com/css2?family=${FONTS[t.font]}&display=swap`; const l = $('#fontlink'); if (l.href !== href) l.href = href; }
     const tb = D.cfg.settings.tabbar; r.setProperty('--tabbar-h', tb.height + 'px'); r.setProperty('--tabbar-a', tb.opacity);
+    document.body.classList.toggle('tabs-full', !!tb.full);
+  };
+
+  // breedte van de statusbalk linksonder (connbar.js) als CSS-variabele, voor de tabbalk op volle breedte
+  D.watchConnbar = () => {
+    const cb = document.getElementById('connbar'); if (!cb || cb._watched || !window.ResizeObserver) return;
+    cb._watched = true;
+    new ResizeObserver(() => document.documentElement.style.setProperty('--cbw', (cb.getClientRects().length ? cb.offsetWidth : 0) + 'px')).observe(cb);
   };
 
   // ---------- achtergrond ----------
