@@ -831,7 +831,6 @@
       F.row('Richting', F.seg(k('shD'), v.shD, [['down', 'Onder'], ['diag', 'Schuin'], ['around', 'Rondom']], fx)) + F.row('Schaduwkleur', F.color(k('shC'), v.shC, fx) + reset('shC')) +
       F.row('Gloed', F.seg(k('glW'), v.glW, [['auto', 'Standaard'], ['never', 'Nooit'], ['on', 'Als aan'], ['always', 'Altijd'], ['alarm', 'Bij alarm']], fx), 'Standaard = de gloed van de knopstijl. Nooit = helemaal geen gloed. Bij alarm = bijv. raam open of beweging') +
       F.row('Knipperen bij alarm', F.seg(k('blink'), v.blink || 'auto', [['auto', 'Standaard'], ['on', 'Altijd'], ['off', 'Nooit']], fx), 'Standaard = alleen pictogram- en paniekknoppen (en gloed "Bij alarm"). Altijd = elke knopstijl knippert bij alarm') +
-      F.row('Lijndikte pictogrammen', F.range(k('icw'), v.icw || 1.6, 0.5, 3.5, 0.1, fx, 'n'), 'Voor lijn-pictogrammen (sets Lijn en Deuren & ramen) en de eigen lijnpictogrammen') +
       F.row('Kleurt mee als aan', F.seg(k('tint'), v.tint === 0 || v.tint === false ? 0 : 1, [[1, 'Ja'], [0, 'Nee']], fx), 'Nee = knop en pictogram houden hun gewone kleur, aan of uit') +
       (!['never', 'auto'].includes(v.glW) ? F.row('Gloed op', F.seg(k('glT'), v.glT, [['tile', 'Tegel'], ['face', 'Knop'], ['text', 'Tekst']], fx)) +
         F.row('Gloedkleur', F.colorOpt(k('glC'), v.glC, th.onColor, t ? 'tilepanel' : 'theme'), 'Standaard: de aan-kleur') +
@@ -844,7 +843,7 @@
       F.row('Klikgeluid', F.select(k('snd'), v.snd, D.SOUNDS, fx).replace('<select', '<select data-refresh') + `<button class="ib sm" data-sndtest title="Proberen">${icon('play')}</button>`) +
       (v.snd !== 'none' ? F.row('Volume', F.range(k('vol'), v.vol, 0, 1, 0.01, fx, '%') + reset('vol')) : '') +
       (t ? F.row('Eerst bevestigen', F.toggle(k('confirm'), raw.confirm, 'tile'), 'Vraagt "Weet je het zeker?"') : '');
-    return (colors ? F.fold('Kleuren', colors, 'kleuren') : '') + F.fold('Vorm en rand', shape, 'vorm') + F.fold('Schaduw en gloed', fxb, 'schaduw') + F.fold('Tekst', text, 'tekst') + F.fold('Bediening: diepte en geluid', ctrl, 'bediening');
+    return (colors ? F.fold('Kleuren', colors, 'kleuren') : '') + F.fold('Vorm en rand', shape, 'vorm') + F.fold('Schaduw en gloed', fxb, 'schaduw') + F.fold('Pictogram', F.row('Lijndikte pictogrammen', F.range(k('icw'), v.icw || 1.6, 0.5, 3.5, 0.1, fx, 'n'), 'Voor lijn-pictogrammen (sets Lijn en Deuren & ramen) en de eigen lijnpictogrammen'), 'picto') + F.fold('Tekst', text, 'tekst') + F.fold('Bediening: diepte en geluid', ctrl, 'bediening');
   };
   // gedeelde knoppen in de stijl-groepjes (tegel en standaard)
   E.wireFx = (root, getV) => {
