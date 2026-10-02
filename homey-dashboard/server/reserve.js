@@ -90,9 +90,37 @@ De map "spotify homey" staat in de zip onder extra/spotify-homey; zet die terug 
     return { installatie: ls(INST), backup: ls(BK) };
   }
 
+  // nieuwste wijzigtijd in een map (voor "laatst bijgewerkt" van de Homey-app op de NAS)
+  newest(dir, depth = 0, best = 0) {
+    if (depth > 6) return best;
+    let list; try { list = fs.readdirSync(dir, { withFileTypes: true }); } catch (e) { return best; }
+    for (const e of list) {
+      if (SKIPDIR.has(e.name) || e.name === 'node_modules') continue;
+      const full = path.join(dir, e.name);
+      try { if (e.isDirectory()) best = this.newest(full, depth + 1, best); else { const m = fs.statSync(full).mtimeMs; if (m > best) best = m; } } catch (err) { /* */ }
+    }
+    return best;
+  }
+
+  // controle in één oogopslag: wat is er mis met de reserve?
+  issues(st) {
+    const s = st || this.state(); const f = this.files(); const out = [];
+    const exe = f.installatie.some(x => /\.exe$/i.test(x.name));
+    const age = s.lastCheck ? Date.now() - new Date(s.lastCheck).getTime() : Infinity;
+    if (s.lastError) out.push({ sev: 'error', problem: 'Back-up mislukt', detail: s.lastError });
+    if (!s.lastBackup || !f.backup.some(x => /met-sleutels\.zip$/.test(x.name))) out.push({ sev: 'error', problem: 'Er is nog geen back-up', detail: 'Klik op Systeem → Reserve → Nu een back-up maken.' });
+    else if (age > 48 * 3600 * 1000) out.push({ sev: 'warn', problem: 'Al meer dan 2 dagen geen controle', detail: 'Normaal gebeurt dat elke 24 uur. Draait het dashboard wel?' });
+    if (!exe) out.push({ sev: 'warn', problem: 'Installatiebestand ontbreekt', detail: 'Zet het .exe-bestand in reserve/1 Installatie.' });
+    if (!listExtra().length) out.push({ sev: 'warn', problem: 'Map "spotify homey" niet gekoppeld', detail: 'De regel voor /volume1/spotify homey ontbreekt in docker-compose.yml; die map gaat nu niet mee in de back-up.' });
+    return out;
+  }
+
   status() {
-    const s = this.state(); const f = this.files();
-    return { ...s, busy: this.busy, extra: listExtra(), exe: f.installatie.filter(x => /\.exe$/i.test(x.name)).map(x => x.name), files: f, folder: 'docker/Homey Dashboard/reserve' };
+    const s = this.state(); const f = this.files(); const items = this.issues(s);
+    const app = listExtra().includes('spotify-homey') ? this.newest(path.join(EXTRA, 'spotify-homey', 'homey-app')) : 0;
+    return { ...s, busy: this.busy, extra: listExtra(), exe: f.installatie.filter(x => /\.exe$/i.test(x.name)).map(x => x.name), files: f, folder: 'docker/Homey Dashboard/reserve',
+      appUpdated: app ? new Date(app).toISOString() : null,
+      health: { level: items.some(x => x.sev === 'error') ? 'bad' : items.length ? 'warn' : 'ok', items } };
   }
 
   async check(force) {

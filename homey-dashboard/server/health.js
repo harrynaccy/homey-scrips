@@ -129,6 +129,8 @@ class Health {
           problem: bad.length === 1 ? `Fully-instelling "${bad[0].label}" staat verkeerd` : `${bad.length} Fully-instellingen staan verkeerd`, detail: 'Zet ze met één knop goed via Systeem → Tablet.', fix: null });
       } catch (e) { devices.push({ sev: 'error', kind: 'tablet', id: 'fully', title: 'Tablet', problem: 'Niet bereikbaar', detail: String(e.message || e), fix: null }); }
     }
+    // back-up / reserve
+    if (this.reserve) { try { for (const x of this.reserve.issues()) devices.push({ sev: x.sev, kind: 'backup', id: 'reserve-' + x.problem, title: 'Back-up', problem: x.problem, detail: x.detail, fix: null }); } catch (e) { /* */ } }
     const flows = checkFlows(data);
     const sevOrder = { error: 0, warn: 1 };
     const sort = l => l.sort((a, b) => sevOrder[a.sev] - sevOrder[b.sev] || a.title.localeCompare(b.title));

@@ -1329,7 +1329,7 @@
       ${bk.length ? `<div class="bklist">${bk.slice(0, 6).map(f => `<div class="bk"><span>${esc(f.name.replace('.zip', ''))}<small>${mb(f.size)}</small></span></div>`).join('')}</div>` : ''}
       <div class="acts"><button class="btn sm primary" data-resrun ${r.busy ? 'disabled' : ''}>${icon('refresh')}${r.busy ? 'Bezig…' : 'Nu een back-up maken'}</button></div>`;
     const b = box.querySelector('[data-resrun]');
-    if (b) b.onclick = async () => { b.disabled = true; b.textContent = 'Bezig… (kan een minuut duren)'; try { const x = await D.api('POST', '/api/reserve/run'); D.toast(x.lastError ? 'Back-up mislukt: ' + x.lastError : 'Back-up klaar', !!x.lastError); E.reserveBox(box, x); } catch (e) { D.toast(e.message, true); E.reserveBox(box); } };
+    if (b) b.onclick = async () => { b.disabled = true; b.textContent = 'Bezig… (kan een minuut duren)'; try { const x = await D.api('POST', '/api/reserve/run'); D.toast(x.lastError ? 'Back-up mislukt: ' + x.lastError : 'Back-up klaar', !!x.lastError); E.reserveBox(box, x); if (D.connbar && D.connbar.loadReserve) D.connbar.loadReserve(); } catch (e) { D.toast(e.message, true); E.reserveBox(box); } };
   };
   // ---------- tablet (Fully Kiosk) op afstand ----------
   E.tabletBox = async box => {

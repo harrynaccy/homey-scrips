@@ -108,6 +108,7 @@ const { Extra } = require('./extra');
 const extra = new Extra({ homey, dataDir: DATA, broadcast });
 const { Reserve } = require('./reserve');
 const reserve = new Reserve({ dataDir: DATA, broadcast }); reserve.start();
+health.reserve = reserve;
 const { Fully } = require('./fully');
 const fully = new Fully(extra);
 health.fully = fully;

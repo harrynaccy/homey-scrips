@@ -31,10 +31,11 @@
     const s = state();
     if (s.nas !== lastState.nas) D.conn.nasSince = Date.now();
     lastState = s;
-    bar.className = `connbar nas-${s.nas} homey-${s.homey}`;
+    const bk = C.reserve && C.reserve.health ? C.reserve.health.level : 'unknown';
+    bar.className = `connbar nas-${s.nas} homey-${s.homey} bk-${bk}`;
     const bad = s.nas === 'down' ? 'NAS niet bereikbaar' : s.homey === 'down' ? 'Homey reageert niet' : '';
     bar.querySelector('.cb-msg').textContent = bad;
-    bar.title = `Scherm ↔ NAS: ${label[s.nas]} · NAS ↔ Homey: ${label[s.homey]}`;
+    bar.title = `Scherm ↔ NAS: ${label[s.nas]} · NAS ↔ Homey: ${label[s.homey]} · Back-up: ${{ ok: 'goed', warn: 'let op', bad: 'probleem', unknown: 'onbekend' }[bk]}`;
   };
 
   C.details = () => {
@@ -53,6 +54,18 @@
         !st.connected && st.mode !== 'demo' && st.error ? 'Melding: ' + st.error : '',
         s.homey === 'down' ? 'Staat Homey aan en heeft hij netwerk? Klopt HOMEY_ADDRESS in docker-compose.yml?' : '',
       ])}
+      ${(() => {
+        const r = C.reserve; if (!r) return row('Back-up', 'unknown', ['Nog niet bekend']);
+        const lv = { ok: 'ok', warn: 'slow', bad: 'down' }[r.health.level];
+        const when = d => d ? new Date(d).toLocaleString('nl-NL', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }) : 'nog nooit';
+        const zip = (r.files.backup || []).find(x => /met-sleutels\.zip$/.test(x.name));
+        return `<div class="cb-row ${lv}"><i class="cb-dot"></i><div><b>Back-up: ${{ ok: 'goed', warn: 'let op', bad: 'probleem' }[r.health.level]}</b>
+          <small>Laatste controle: ${esc(when(r.lastCheck))} · laatste back-up: ${esc(when(r.lastBackup))}${zip ? ' (' + (zip.size / 1048576).toFixed(1) + ' MB)' : ''}</small>
+          <small>Installatiebestand: ${r.exe.length ? esc(r.exe[0]) : 'ontbreekt'} · extra mappen: ${r.extra.length ? esc(r.extra.join(', ')) : 'geen'}</small>
+          ${r.appUpdated ? `<small>Spotify-app op de NAS laatst gewijzigd: ${esc(when(r.appUpdated))}</small>` : ''}
+          ${r.health.items.map(x => `<small>⚠ ${esc(x.problem)}: ${esc(x.detail)}</small>`).join('')}
+          <small>Of de back-ups op je laptop en tablet aankomen, zie je in Synology Drive Client en FolderSync zelf.</small></div></div>`;
+      })()}
       <p class="note">Groen met bewegende puntjes = goed. Oranje = traag of bezig opnieuw te verbinden. Rood met ✕ = geen verbinding.</p>`, 'small');
     const box = document.getElementById('sheet'); box.querySelector('[data-close]').onclick = () => D.closeSheet();
   };
@@ -60,7 +73,7 @@
   const build = () => {
     bar = document.createElement('button');
     bar.id = 'connbar'; bar.type = 'button';
-    bar.innerHTML = `<span class="cb-node" title="Dit scherm">${icon('tv')}</span><span class="cb-link l1"><i></i><b>✕</b></span><span class="cb-node" title="NAS">${icon('server')}</span><span class="cb-link l2"><i></i><b>✕</b></span><span class="cb-node" title="Homey">${icon('home')}</span><span class="cb-msg"></span>`;
+    bar.innerHTML = `<span class="cb-node" title="Dit scherm">${icon('tv')}</span><span class="cb-link l1"><i></i><b>✕</b></span><span class="cb-node" title="NAS">${icon('server')}</span><span class="cb-link l2"><i></i><b>✕</b></span><span class="cb-node" title="Homey">${icon('home')}</span><span class="cb-sep"></span><span class="cb-bk" title="Back-up"><i></i>${icon('download')}</span><span class="cb-msg"></span>`;
     bar.onclick = e => { e.stopPropagation(); C.details(); };
     bar.addEventListener('pointerdown', e => e.stopPropagation());
     document.body.appendChild(bar);
@@ -75,5 +88,9 @@
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', build); else build();
   setInterval(C.update, 3000);
+  // back-upstatus van de NAS (elke 10 minuten)
+  const loadReserve = async () => { try { C.reserve = await D.api('GET', '/api/reserve'); } catch (e) { /* */ } C.update(); };
+  setTimeout(loadReserve, 3000); setInterval(loadReserve, 10 * 60 * 1000);
+  C.loadReserve = loadReserve;
   setInterval(ping, 30000); setTimeout(ping, 1500);
 })();
