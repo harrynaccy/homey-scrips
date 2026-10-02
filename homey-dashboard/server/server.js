@@ -36,6 +36,9 @@ const homey = (isSet(process.env.HOMEY_ADDRESS) && isSet(process.env.HOMEY_TOKEN
 
 // Claude-assistent (alleen actief met ANTHROPIC_API_KEY; ASSISTANT_FAKE = testbestand zonder echte API)
 const flows = new FlowService(homey, DATA);
+const { Auth } = require('./auth');
+const auth = new Auth({ dataDir: DATA, flows, readConfig: () => readConfig() });
+const guard = auth.guard;
 const health = new Health(homey, DATA);
 const cameras = new Cameras({ homey, dataDir: DATA });
 health.cameras = cameras;
@@ -56,6 +59,16 @@ function writeConfig(cfg) {
 if (!readConfig()) writeConfig(defaultConfig());
 autocheck = new AutoCheck({ health, homey, dataDir: DATA, readConfig });
 
+// back-up van de indeling vlak vóór een grote actie (terugzetten, importeren, alles terugzetten); laatste 10 bewaard
+function preBackup(reason) {
+  try {
+    if (!fs.existsSync(CFG)) return;
+    const st = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    fs.copyFileSync(CFG, path.join(BK_DIR, `voor-${reason}-${st}.json`));
+    const list = fs.readdirSync(BK_DIR).filter(n => n.startsWith('voor-')).sort((x, y) => x.slice(-24).localeCompare(y.slice(-24)));
+    while (list.length > 10) fs.unlinkSync(path.join(BK_DIR, list.shift()));
+  } catch (e) { console.error('[back-up] vooraf mislukt:', e.message); }
+}
 function autoBackup() {
   const day = new Date().toISOString().slice(0, 10);
   const f = path.join(BK_DIR, `auto-${day}.json`);
@@ -95,6 +108,7 @@ const { Extra } = require('./extra');
 const extra = new Extra({ homey, dataDir: DATA, broadcast });
 const { Fully } = require('./fully');
 const fully = new Fully(extra);
+health.fully = fully;
 const { AppScan } = require('./appscan');
 const appscan = new AppScan(homey, AW_DIR);
 
@@ -137,7 +151,10 @@ app.get('/api/assistant', wrap(() => ({ ...assistant.status(), flows: flows.supp
 // flows in Homey (alleen via een voorstel van de assistent; aanpassen van bestaande flows vraagt de pincode)
 const fail = (res, err) => { console.error('[fout]', err.message || err); res.status(400).json({ error: nl(err) }); };
 app.get('/api/flows/pin', wrap(() => ({ set: flows.pinSet() })));
-app.post('/api/pin/check', (req, res) => { try { flows.checkPin(req.body.pin); res.json({ ok: true }); } catch (e) { fail(res, e); } });
+app.post('/api/pin/check', (req, res) => { try { const b = req.body || {}; flows.checkPin(b.pin); res.json({ ok: true, token: auth.issue(!!b.trust, b.name) }); } catch (e) { fail(res, e); } });
+app.get('/api/auth/state', wrap(req => auth.state(req)));
+app.post('/api/auth/logout', wrap(req => { auth.drop(auth.tokenOf(req)); return { ok: true }; }));
+app.post('/api/auth/revoke', guard, wrap(() => { auth.revokeAll(); return { ok: true }; }));
 app.post('/api/flows/pin', (req, res) => { try { flows.setPin(req.body.old, req.body.pin); res.json({ ok: true }); } catch (e) { fail(res, e); } });
 // controle van apparaten en flows
 app.get('/api/health', async (req, res) => {
@@ -150,9 +167,9 @@ app.get('/api/health/usage/:id', async (req, res) => { try { res.json(await heal
 app.post('/api/health/delete-device/:id', async (req, res) => { try { res.json(await health.deleteDevice(req.params.id, flows, req.body.pin)); } catch (e) { fail(res, e); } });
 // camera's (wachtwoorden blijven op de NAS)
 app.get('/api/cameras', wrap(() => cameras.list()));
-app.post('/api/cameras', (req, res) => { try { res.json(cameras.saveCam(req.body || {})); } catch (e) { fail(res, e); } });
-app.delete('/api/cameras/:id', (req, res) => { try { res.json(cameras.removeCam(req.params.id)); } catch (e) { fail(res, e); } });
-app.post('/api/cameras/ss', async (req, res) => { try { res.json(await cameras.saveSS(req.body || {})); } catch (e) { fail(res, e); } });
+app.post('/api/cameras', guard, (req, res) => { try { res.json(cameras.saveCam(req.body || {})); } catch (e) { fail(res, e); } });
+app.delete('/api/cameras/:id', guard, (req, res) => { try { res.json(cameras.removeCam(req.params.id)); } catch (e) { fail(res, e); } });
+app.post('/api/cameras/ss', guard, async (req, res) => { try { res.json(await cameras.saveSS(req.body || {})); } catch (e) { fail(res, e); } });
 app.get('/api/cameras/ss', async (req, res) => { try { res.json(await cameras.ssCameras()); } catch (e) { fail(res, e); } });
 app.get('/api/camera/:id/snapshot', async (req, res) => {
   try { const s = await cameras.snapshot(req.params.id); res.set({ 'Content-Type': s.type, 'Cache-Control': 'no-store' }); res.end(s.data); }
@@ -167,16 +184,16 @@ app.get('/api/camera/:id/live', async (req, res) => { try { await cameras.live(r
 // automatische controle met melding
 app.get('/api/autocheck', wrap(() => ({ settings: autocheck.settings(), last: autocheck.last })));
 app.post('/api/autocheck/run', async (req, res) => { try { res.json(await autocheck.tick(true)); } catch (e) { fail(res, e); } });
-app.post('/api/autocheck/test', async (req, res) => { try { await autocheck.notify('Testmelding van Homey Dashboard: meldingen van de Controle komen goed aan.'); res.json({ ok: true }); } catch (e) { fail(res, e); } });
+app.post('/api/autocheck/test', guard, async (req, res) => { try { await autocheck.notify('Testmelding van Homey Dashboard: meldingen van de Controle komen goed aan.'); res.json({ ok: true }); } catch (e) { fail(res, e); } });
 app.get('/api/autocheck/users', async (req, res) => { try { res.json(await autocheck.users()); } catch (e) { fail(res, e); } });
-app.post('/api/health/restart-app/:id', async (req, res) => { try { res.json(await health.restartApp(req.params.id)); } catch (e) { fail(res, e); } });
+app.post('/api/health/restart-app/:id', guard, async (req, res) => { try { res.json(await health.restartApp(req.params.id)); } catch (e) { fail(res, e); } });
 app.post('/api/flows/needpin', wrap(req => ({ pin: flows.needsPin(req.body.acties) })));
-app.post('/api/flows/apply', async (req, res) => { try { res.json(await flows.apply(req.body.acties, req.body.pin)); } catch (e) { fail(res, e); } });
-app.post('/api/flows/undo/:id', async (req, res) => { try { res.json(await flows.undo(req.params.id)); } catch (e) { fail(res, e); } });
+app.post('/api/flows/apply', guard, async (req, res) => { try { res.json(await flows.apply(req.body.acties, req.body.pin)); } catch (e) { fail(res, e); } });
+app.post('/api/flows/undo/:id', guard, async (req, res) => { try { res.json(await flows.undo(req.params.id)); } catch (e) { fail(res, e); } });
 // De assistent werkt op de achtergrond: POST start een taak, de browser vraagt de voortgang op.
 // Zo maakt een wegvallende verbinding niets uit (het antwoord blijft 30 minuten bewaard).
 const jobs = new Map();
-app.post('/api/assistant', wrap(req => {
+app.post('/api/assistant', guard, wrap(req => {
   const b = req.body || {};
   const id = 'j' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const job = { status: 'busy', progress: 'Claude denkt na…', started: Date.now() };
@@ -197,12 +214,12 @@ app.get('/api/assistant/job/:id', (req, res) => {
 
 // ---------- tablet (Fully Kiosk) ----------
 app.get('/api/tablet', wrap(() => fully.info()));
-app.post('/api/tablet/conf', wrap(req => { const b = req.body || {}; fully.setConf({ host: b.host, pass: b.pass }); return fully.info(); }));
+app.post('/api/tablet/conf', guard, wrap(req => { const b = req.body || {}; fully.setConf({ host: b.host, pass: b.pass }); return fully.info(); }));
 app.get('/api/tablet/status', wrap(() => fully.status()));
 app.get('/api/tablet/check', wrap(() => fully.check()));
-app.post('/api/tablet/apply', wrap(() => fully.apply()));
-app.post('/api/tablet/do', wrap(req => fully.action(String((req.body || {}).cmd || ''))));
-app.get('/api/tablet/screenshot', async (req, res) => { try { const s = await fully.screenshot(); res.set('Content-Type', s.type).set('Cache-Control', 'no-store').send(s.buf); } catch (e) { res.status(502).json({ error: e.message }); } });
+app.post('/api/tablet/apply', guard, wrap(() => fully.apply()));
+app.post('/api/tablet/do', guard, wrap(req => fully.action(String((req.body || {}).cmd || ''))));
+app.get('/api/tablet/screenshot', guard, async (req, res) => { try { const s = await fully.screenshot(); res.set('Content-Type', s.type).set('Cache-Control', 'no-store').send(s.buf); } catch (e) { res.status(502).json({ error: e.message }); } });
 
 // ---------- extra tegels: gegevens van buiten en van NAS/Homey ----------
 const xr = fn => async (req, res) => { try { res.json(await fn(req)); } catch (e) { res.status(502).json({ error: String(e.message || e) }); } };
@@ -216,14 +233,14 @@ app.get('/api/x/ov/search', xr(r => extra.ovSearch(r.query.q)));
 app.get('/api/x/ov/departures', xr(r => extra.ovDepartures(r.query.code)));
 app.post('/api/x/travel', xr(r => extra.travel(r.body || {})));
 app.get('/api/x/nas', xr(() => extra.nas()));
-app.post('/api/x/nas/setup', xr(r => { extra.setNas(r.body || {}); return extra.hasSecrets(); }));
-app.post('/api/x/key', xr(r => { const b = r.body || {}; if (!['tomtom'].includes(b.name)) throw new Error('Onbekende sleutel'); extra.setKey(b.name, b.value); return extra.hasSecrets(); }));
+app.post('/api/x/nas/setup', guard, xr(r => { extra.setNas(r.body || {}); return extra.hasSecrets(); }));
+app.post('/api/x/key', guard, xr(r => { const b = r.body || {}; if (!['tomtom'].includes(b.name)) throw new Error('Onbekende sleutel'); extra.setKey(b.name, b.value); return extra.hasSecrets(); }));
 app.get('/api/x/secrets', xr(() => extra.hasSecrets()));
 app.get('/api/x/homey', xr(() => extra.homeyInfo()));
 app.get('/api/x/notes/:id', xr(r => extra.notes(String(r.params.id))));
 app.post('/api/x/notes/:id', xr(r => extra.setNotes(String(r.params.id), (r.body || {}).list)));
-app.post('/api/appwidgets/scan', async (req, res) => { try { res.json(await appscan.scan()); } catch (e) { fail(res, e); } });
-app.post('/api/appwidgets/install', async (req, res) => { try { const b = req.body || {}; res.json(await appscan.install(String(b.appId || ''), String(b.widgetId || ''))); } catch (e) { fail(res, e); } });
+app.post('/api/appwidgets/scan', guard, async (req, res) => { try { res.json(await appscan.scan()); } catch (e) { fail(res, e); } });
+app.post('/api/appwidgets/install', guard, async (req, res) => { try { const b = req.body || {}; res.json(await appscan.install(String(b.appId || ''), String(b.widgetId || ''))); } catch (e) { fail(res, e); } });
 app.get('/api/appwidgets', wrap(() => ({ widgets: bridge.list(), status: bridge.status(), demo: homey.status.mode === 'demo' })));
 app.post('/api/aw/call', async (req, res) => {
   const { app: appId, widget, method, path: p, body } = req.body || {};
@@ -259,13 +276,14 @@ app.get('/api/events', (req, res) => {
 app.get('/api/config', wrap(() => readConfig()));
 app.get('/api/config/stamp', wrap(() => ({ savedAt: (readConfig() || {}).savedAt || null })));
 // Opslaan alleen als het apparaat van de nieuwste versie uitging; anders 409 (zo overschrijft een tablet met een oude versie nooit wat op de laptop is gewijzigd)
-app.put('/api/config', (req, res, next) => {
+app.put('/api/config', guard, (req, res, next) => {
   const cfg = req.body; const cur = readConfig();
   if (cfg && cfg.savedAt && cur && cur.savedAt && cfg.savedAt !== cur.savedAt) return res.status(409).json({ error: 'Intussen op een ander apparaat gewijzigd', conflict: true, savedAt: cur.savedAt });
   next();
 }, wrap(req => {
   const cfg = req.body;
   if (!cfg || !Array.isArray(cfg.tabs)) throw new Error('Ongeldige configuratie');
+  if (req.query.voor === 'importeren') preBackup('importeren');
   if (cfg.tabs.filter(t => !t.sub).length > 10) throw new Error('Maximaal 10 tabbladen');
   if (cfg.tabs.filter(t => t.sub).length > 20) throw new Error("Maximaal 20 subpagina's");
   writeConfig(cfg);
@@ -275,7 +293,7 @@ app.put('/api/config', (req, res, next) => {
 
 // achtergronden
 app.get('/api/backgrounds', wrap(() => fs.readdirSync(BG_DIR).filter(n => /\.(jpe?g|png|webp)$/i.test(n)).sort().map(n => '/bg/' + n)));
-app.post('/api/backgrounds', wrap(req => {
+app.post('/api/backgrounds', guard, wrap(req => {
   const m = /^data:image\/(jpeg|png|webp);base64,(.+)$/.exec(req.body.dataUrl || '');
   if (!m) throw new Error('Geen geldige afbeelding');
   const base = String(req.body.name || 'achtergrond').replace(/\.[^.]+$/, '').replace(/[^a-z0-9_-]+/gi, '-').slice(0, 40) || 'achtergrond';
@@ -283,14 +301,14 @@ app.post('/api/backgrounds', wrap(req => {
   fs.writeFileSync(path.join(BG_DIR, file), Buffer.from(m[2], 'base64'));
   return { url: '/bg/' + file };
 }));
-app.delete('/api/backgrounds/:file', wrap(req => {
+app.delete('/api/backgrounds/:file', guard, wrap(req => {
   const f = path.join(BG_DIR, path.basename(req.params.file));
   if (fs.existsSync(f)) fs.unlinkSync(f);
 }));
 
 // back-ups
 // volledige back-up (map + data + docker-compose.yml + projectgegevens) voor een nieuwe NAS
-app.get('/api/fullbackup', (req, res) => {
+app.get('/api/fullbackup', guard, (req, res) => {
   try {
     const keys = req.query.keys !== '0';
     const buf = fullBackup({ dataDir: DATA, keys });
@@ -303,22 +321,23 @@ app.get('/api/fullbackup', (req, res) => {
 // bijwerken met één knop
 app.get('/api/update/check', async (req, res) => { try { res.json(await updater.check(req.query.force === '1')); } catch (e) { res.json({ error: 'Kan niet kijken of er een nieuwe versie is. ' + nl(e) }); } });
 app.get('/api/update/status', wrap(() => updater.status));
-app.post('/api/update/run', (req, res) => { try { res.json(updater.start()); } catch (e) { fail(res, e); } });
-app.post('/api/update/rollback', (req, res) => { try { res.json(updater.requestRollback()); } catch (e) { fail(res, e); } });
+app.post('/api/update/run', guard, (req, res) => { try { res.json(updater.start()); } catch (e) { fail(res, e); } });
+app.post('/api/update/rollback', guard, (req, res) => { try { res.json(updater.requestRollback()); } catch (e) { fail(res, e); } });
 app.get('/api/backups', wrap(() => fs.readdirSync(BK_DIR).filter(n => n.endsWith('.json')).sort().reverse()
   .map(n => ({ name: n, size: fs.statSync(path.join(BK_DIR, n)).size, date: fs.statSync(path.join(BK_DIR, n)).mtime }))));
-app.post('/api/backups', wrap(() => {
+app.post('/api/backups', guard, wrap(() => {
   const name = `handmatig-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.json`;
   fs.copyFileSync(CFG, path.join(BK_DIR, name)); return { name };
 }));
-app.get('/api/backups/:name', (req, res) => res.download(path.join(BK_DIR, path.basename(req.params.name))));
-app.post('/api/restore/:name', wrap(req => {
+app.get('/api/backups/:name', guard, (req, res) => res.download(path.join(BK_DIR, path.basename(req.params.name))));
+app.post('/api/restore/:name', guard, wrap(req => {
   const f = path.join(BK_DIR, path.basename(req.params.name));
   const cfg = JSON.parse(fs.readFileSync(f, 'utf8'));
+  preBackup('terugzetten');
   writeConfig(cfg); broadcast('config', { savedAt: cfg.savedAt }); return cfg;
 }));
-app.delete('/api/backups/:name', wrap(req => fs.unlinkSync(path.join(BK_DIR, path.basename(req.params.name)))));
-app.post('/api/reset', wrap(() => { const c = defaultConfig(); writeConfig(c); broadcast('config', { savedAt: c.savedAt }); return c; }));
+app.delete('/api/backups/:name', guard, wrap(req => fs.unlinkSync(path.join(BK_DIR, path.basename(req.params.name)))));
+app.post('/api/reset', guard, wrap(() => { preBackup('alles-terugzetten'); const c = defaultConfig(); writeConfig(c); broadcast('config', { savedAt: c.savedAt }); return c; }));
 
 app.listen(PORT, () => {
   console.log(`Homey Dashboard draait op poort ${PORT} (${homey.status.mode === 'demo' ? 'DEMO-modus' : 'Homey ' + process.env.HOMEY_ADDRESS})`);

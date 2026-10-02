@@ -14,6 +14,8 @@
   E.trusted = v => (v === undefined ? store('hd-vertrouwd') === '1' : store('hd-vertrouwd', v ? '1' : null));
   let unlockedAt = 0;
   E.mayOpen = async () => {
+    const st = await D.api('GET', '/api/auth/state').catch(() => null);
+    if (st && st.active) return st.valid ? true : D.login('Pincode voor de achterkant');
     const lock = D.cfg.settings.lock;
     if (!lock || !lock.enabled || E.trusted() || Date.now() - unlockedAt < 5 * 60 * 1000) return true;
     for (let i = 0; i < 3; i++) {
@@ -71,7 +73,7 @@
     D.cfg.savedAt = D.baseSavedAt; // ook na ongedaan maken: uitgaan van de laatst bekende versie
     const sent = JSON.parse(JSON.stringify(D.cfg));
     try {
-      const r = await D.api('PUT', '/api/config', sent);
+      const r = await D.api('PUT', '/api/config' + (E._voor ? '?voor=' + E._voor : ''), sent); E._voor = null;
       sent.savedAt = r.savedAt; D.cfg.savedAt = r.savedAt; D.baseSavedAt = r.savedAt; D.cfgBase = JSON.stringify(sent);
       E.setSaved(D.cfgDirty() ? 'Opslaan…' : 'Opgeslagen'); if (D.cfgDirty()) E.scheduleSave();
     } catch (e) {
@@ -1283,7 +1285,7 @@
       F.group('Bijwerken', '<div id="updbox"><div class="muted">Kijken of er een nieuwe versie is…</div></div>') +
       F.group('Volledige back-up (voor een nieuwe NAS)', `<p class="note">Eén zip met alles om het dashboard op een andere NAS weer op te zetten: de hele map uit <b>docker</b>, je indeling, achtergronden, back-ups, pincode, <b>docker-compose.yml</b> en de projectgegevens voor Container Manager. Uitleg: handleiding, hoofdstuk <b>Voorbereiding</b>.</p>` +
         F.row('Met sleutels', F.toggle('settings.backup.keys', fullKeys(), 'panel'), fullKeys() ? 'Sneller terugzetten; bewaar de zip veilig' : 'Sleutels vul je bij het terugzetten zelf in') +
-        `<div class="acts"><a class="btn sm primary" href="/api/fullbackup?keys=${fullKeys() ? 1 : 0}" download>${icon('download')}Volledige back-up downloaden</a></div>`) +
+        `<div class="acts"><a class="btn sm primary" href="${D.withToken('/api/fullbackup?keys=' + (fullKeys() ? 1 : 0))}" download>${icon('download')}Volledige back-up downloaden</a></div>`) +
       F.group('Adressen invullen', F.row('Standaardbegin', F.text('settings.urls.prefix', E.urls().prefix, 'none', 'http://192.168.178.79:'), 'Staat al ingevuld bij een nieuw adres') +
         `<p class="note">Snelknoppen boven het adresveld:</p><div class="urlq-list">${E.urls().quick.map((q, i) => `<div class="urlq-row"><input type="text" class="nm" data-k="settings.urls.quick.${i}.0" data-fx="none" value="${esc(q[0])}" placeholder="Naam"><input type="text" data-k="settings.urls.quick.${i}.1" data-fx="none" value="${esc(q[1])}" placeholder="http://…"><button class="ib sm" data-delurl="${i}" title="Verwijderen">${icon('trash')}</button></div>`).join('')}</div>
         <div class="acts"><button class="btn sm" data-addurl>${icon('plus')}Snelknop toevoegen</button><button class="btn sm ghost" data-reseturl>${icon('refresh')}Standaard terugzetten</button></div>`) +
@@ -1336,7 +1338,7 @@
       const img = new Image(); img.className = 'tb-img'; img.alt = 'Schermafdruk van de tablet';
       img.onload = () => { sh.innerHTML = ''; sh.appendChild(img); };
       img.onerror = async () => { let m = 'Geen schermafdruk ontvangen'; try { const r = await fetch(img.src); m = (await r.json()).error || m; } catch (e) { /* */ } sh.innerHTML = `<p class="note">${esc(m)}</p>`; };
-      img.src = '/api/tablet/screenshot?t=' + Date.now();
+      img.src = D.withToken('/api/tablet/screenshot?t=' + Date.now());
     };
     const chk = box.querySelector('#tb-check');
     const loadCheck = () => D.api('GET', '/api/tablet/check').then(list => {
@@ -1402,14 +1404,23 @@
     const tbx = root.querySelector('#tabbox'); if (tbx) E.tabletBox(tbx);
     const cb = root.querySelector('#cambox'); if (cb) D.cam.settingsBox(cb);
     const pbx = root.querySelector('#pinbox');
-    if (pbx) D.api('GET', '/api/flows/pin').then(st => {
+    if (pbx) Promise.all([D.api('GET', '/api/flows/pin'), D.api('GET', '/api/auth/state').catch(() => ({}))]).then(([st, au]) => {
       const lock = D.cfg.settings.lock || {};
       pbx.innerHTML = `<p class="note">Eén pincode voor de achterkant, voor het aanpassen of verwijderen van flows en voor het verwijderen van apparaten. ${st.set ? '<b>Ingesteld.</b>' : '<b>Nog niet ingesteld.</b>'}</p>
         <div class="acts"><button class="btn sm" data-pinset>${icon('lock')}${st.set ? 'Pincode wijzigen' : 'Pincode instellen'}</button></div>` +
         (st.set ? F.row('Achterkant op slot', F.toggle('settings.lock.enabled', !!lock.enabled, 'panel'), 'Vraagt de pincode na 4× tikken') +
-          F.row('Dit apparaat vertrouwen', `<button class="switch${E.trusted() ? ' on' : ''}" data-trust><i></i></button>`, 'Op dit scherm (bijv. je pc) nooit om de pincode vragen') : '');
+          F.row('Dit apparaat vertrouwen', `<button class="switch${E.trusted() ? ' on' : ''}" data-trust><i></i></button>`, 'Op dit scherm (bijv. je pc) nooit om de pincode vragen') : '') +
+        `<p class="note">${au.active ? '<span class="stat ok">Beveiligd op de NAS</span><br>Opslaan, terugzetten, bijwerken, sleutels, camera-instellingen en de tablet-bediening kunnen alleen na de pincode of vanaf een vertrouwd apparaat. Lampen, flows en camera op de voorkant blijven gewoon werken.' : st.set ? '<span class="stat warn">Nog niet beveiligd op de NAS</span><br>Zet <b>Achterkant op slot</b> aan. Dan controleert ook de NAS de pincode, zodat niemand via je wifi de indeling of instellingen kan wijzigen.' : '<span class="stat warn">Nog niet beveiligd</span><br>Stel een pincode in en zet daarna <b>Achterkant op slot</b> aan.'}</p>` +
+        (au.trusted ? `<div class="acts"><button class="btn sm ghost" data-revoke>${icon('lock')}Vertrouwde apparaten afmelden (${au.trusted})</button></div>` : '');
       pbx.querySelector('[data-pinset]').onclick = () => E.ai.changePin();
-      const tr = pbx.querySelector('[data-trust]'); if (tr) tr.onclick = () => { E.trusted(!E.trusted()); tr.classList.toggle('on', E.trusted()); D.toast(E.trusted() ? 'Dit apparaat vraagt niet meer om de pincode' : 'Dit apparaat vraagt weer om de pincode'); };
+      const tr = pbx.querySelector('[data-trust]'); if (tr) tr.onclick = async () => {
+        if (!E.trusted()) {
+          E.trusted(true);
+          if (!(await D.login('Pincode om dit apparaat te vertrouwen'))) { E.trusted(false); return; }
+        } else { E.trusted(false); await D.api('POST', '/api/auth/logout').catch(() => {}); D.token = ''; D.tokenStore(''); }
+        tr.classList.toggle('on', E.trusted()); D.toast(E.trusted() ? 'Dit apparaat vraagt niet meer om de pincode' : 'Dit apparaat vraagt weer om de pincode'); E.refreshPanel('systeem');
+      };
+      const rv = pbx.querySelector('[data-revoke]'); if (rv) rv.onclick = async () => { if (!(await D.confirm('Alle vertrouwde apparaten afmelden? Ze vragen daarna weer om de pincode.', 'Afmelden'))) return; await D.api('POST', '/api/auth/revoke'); E.trusted(false); D.token = ''; D.tokenStore(''); D.toast('Alle apparaten afgemeld'); E.refreshPanel('systeem'); };
       E.bind(pbx);
     }).catch(() => { pbx.innerHTML = '<div class="muted">Kon de pincode-instellingen niet laden</div>'; });
     root.querySelector('[data-manual]').onclick = () => D.openManual();
@@ -1421,7 +1432,7 @@
     root.querySelector('[data-bk]').onclick = async () => { await E.saveNow(); await D.api('POST', '/api/backups'); D.toast('Back-up gemaakt'); E.refreshPanel(); };
     root.querySelector('[data-export]').onclick = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(D.cfg, null, 2)], { type: 'application/json' })); a.download = `homey-dashboard-${new Date().toISOString().slice(0, 10)}.json`; a.click(); };
     root.querySelector('#impfile').onchange = async e => {
-      try { const cfg = JSON.parse(await e.target.files[0].text()); if (!Array.isArray(cfg.tabs)) throw new Error('Geen dashboard-bestand'); if (!(await D.confirm('Huidige indeling vervangen door dit bestand?', 'Vervangen'))) return; E.commit(null, () => { D.cfg = cfg; }, () => { D.applyAll(); E.refreshPanel(); }); }
+      try { const cfg = JSON.parse(await e.target.files[0].text()); if (!Array.isArray(cfg.tabs)) throw new Error('Geen dashboard-bestand'); if (!(await D.confirm('Huidige indeling vervangen door dit bestand?', 'Vervangen'))) return; E._voor = 'importeren'; E.commit(null, () => { D.cfg = cfg; }, () => { D.applyAll(); E.refreshPanel(); }); }
       catch (err) { D.toast('Importeren mislukt: ' + err.message, true); }
     };
     root.querySelector('[data-reset]').onclick = async () => { if (!(await D.confirm('Echt alles terugzetten? Tegels, tabbladen en instellingen gaan weg (back-ups blijven).', 'Terugzetten'))) return; const c = await D.api('POST', '/api/reset'); E.undo.push(JSON.stringify(D.cfg)); D.cfg = c; D.activeTab = null; D.applyAll(); E.refreshPanel(); };
@@ -1434,8 +1445,8 @@
           : `<span class="stat warn">Nog niet geprobeerd</span><p class="note">Zet een widget van deze app op het dashboard; daarna zie je hier of het werkt.</p>`) + '</div>').join('') || '<p class="note">Geen app-widgets gevonden.</p>';
     });
     const list = await D.api('GET', '/api/backups').catch(() => []); const box = root.querySelector('#bklist'); if (!box) return;
-    box.innerHTML = list.map(b => `<div class="bk"><span>${esc(b.name.replace('.json', ''))}<small>${new Date(b.date).toLocaleString('nl-NL')}</small></span><button class="ib sm" data-rs="${esc(b.name)}" title="Terugzetten">${icon('undo')}</button><a class="ib sm" href="/api/backups/${encodeURIComponent(b.name)}" title="Downloaden">${icon('download')}</a><button class="ib sm" data-rm="${esc(b.name)}" title="Verwijderen">${icon('trash')}</button></div>`).join('') || '<div class="muted">Nog geen back-ups</div>';
-    box.querySelectorAll('[data-rs]').forEach(b => b.onclick = async () => { if (!(await D.confirm(`Back-up "${b.dataset.rs}" terugzetten?`, 'Terugzetten'))) return; E.undo.push(JSON.stringify(D.cfg)); D.cfg = await D.api('POST', '/api/restore/' + encodeURIComponent(b.dataset.rs)); D.applyAll(); E.refreshPanel(); D.toast('Back-up teruggezet'); });
+    box.innerHTML = list.map(b => `<div class="bk"><span>${esc(b.name.replace('.json', ''))}<small>${new Date(b.date).toLocaleString('nl-NL')}</small></span><button class="ib sm" data-rs="${esc(b.name)}" title="Terugzetten">${icon('undo')}</button><a class="ib sm" href="${D.withToken('/api/backups/' + encodeURIComponent(b.name))}" title="Downloaden">${icon('download')}</a><button class="ib sm" data-rm="${esc(b.name)}" title="Verwijderen">${icon('trash')}</button></div>`).join('') || '<div class="muted">Nog geen back-ups</div>';
+    box.querySelectorAll('[data-rs]').forEach(b => b.onclick = async () => { if (!(await D.confirm(`Back-up "${b.dataset.rs}" terugzetten?`, 'Terugzetten'))) return; E.undo = []; E.redo = []; D.setCfg(await D.api('POST', '/api/restore/' + encodeURIComponent(b.dataset.rs))); D.applyAll(); E.refreshPanel(); D.toast('Back-up teruggezet'); });
     box.querySelectorAll('[data-rm]').forEach(b => b.onclick = async () => { if (!(await D.confirm('Deze back-up verwijderen?', 'Verwijderen'))) return; await D.api('DELETE', '/api/backups/' + encodeURIComponent(b.dataset.rm)); E.refreshPanel(); });
   };
 })();

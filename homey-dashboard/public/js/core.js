@@ -13,11 +13,29 @@
 
   // ---------- API ----------
   D.NO_NAS = 'Geen verbinding met het dashboard op de NAS. Staat de NAS aan en is de wifi goed?';
-  D.api = async (method, url, body) => {
+  // sessie voor beheer-acties (zie server/auth.js)
+  D.tokenStore = v => { try { if (v === undefined) return localStorage.getItem('hd-token') || ''; if (!v) localStorage.removeItem('hd-token'); else localStorage.setItem('hd-token', v); } catch (e) { /* */ } return ''; };
+  D.token = D.tokenStore();
+  let loginP = null;
+  D.login = msg => loginP || (loginP = (async () => {
+    try {
+      const E = D.editor; const ask = E && E.ai && E.ai.askPin; if (!ask) return false;
+      for (let i = 0; i < 3; i++) {
+        const pin = await ask(i ? 'Verkeerde pincode. Probeer het nog eens.' : (msg || 'Pincode nodig'));
+        if (pin === null) return false;
+        try { const r = await D.api('POST', '/api/pin/check', { pin, trust: !!(E.trusted && E.trusted()), name: (navigator.userAgent.match(/\(([^)]+)\)/) || [, ''])[1] }); D.token = r.token || ''; D.tokenStore(D.token); return true; }
+        catch (e) { if (!/Verkeerde/.test(e.message)) { D.toast(e.message, true); return false; } }
+      }
+      D.toast('Drie keer een verkeerde pincode', true); return false;
+    } finally { loginP = null; }
+  })());
+  D.withToken = url => D.token ? url + (url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(D.token) : url;
+  D.api = async (method, url, body, again) => {
     let res;
-    try { res = await fetch(url, { method, headers: { 'Content-Type': 'application/json', 'X-Client-Id': D.clientId }, body: body === undefined ? undefined : JSON.stringify(body) }); }
+    try { res = await fetch(url, { method, headers: { 'Content-Type': 'application/json', 'X-Client-Id': D.clientId, 'X-Dash-Token': D.token || '' }, body: body === undefined ? undefined : JSON.stringify(body) }); }
     catch (e) { throw new Error(D.NO_NAS); }
     const j = await res.json().catch(() => ({}));
+    if (res.status === 401 && j.needPin && !again && await D.login('Pincode nodig voor deze actie')) return D.api(method, url, body, true);
     if (!res.ok) throw Object.assign(new Error(j.error || ({ 404: 'Dit bestaat niet (meer).', 413: 'Het bestand is te groot.', 502: D.NO_NAS, 503: 'Het dashboard op de NAS start net op. Probeer het over een minuut opnieuw.', 504: D.NO_NAS }[res.status]) || `Er ging iets mis op de NAS (fout ${res.status}).`), { status: res.status });
     return j;
   };

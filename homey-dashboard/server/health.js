@@ -117,6 +117,18 @@ class Health {
         devices.push({ sev: 'error', kind: 'camera', id: c.id, title: `Camera ${c.name}`, problem: 'Geeft geen beeld', detail: String(e.message || e), fix: null });
       })));
     }
+    // tablet (Fully Kiosk), als die onder Systeem → Tablet gekoppeld is
+    const fc = this.fully && this.fully.conf();
+    if (fc && fc.host && fc.pass) {
+      try {
+        const s = await this.fully.status();
+        const bat = Number(s.battery); const plugged = s.plugged === true || s.plugged === 'true';
+        if (s.battery !== null && !isNaN(bat) && bat < 20 && !plugged) devices.push({ sev: 'warn', kind: 'tablet', id: 'fully-bat', title: 'Tablet', problem: `Batterij bijna leeg (${Math.round(bat)}%)`, detail: 'Leg de tablet aan de lader.', fix: null });
+        const bad = ((await this.fully.check().catch(() => null)) || []).filter(x => !x.ok && !x.missing);
+        if (bad.length) devices.push({ sev: bad.some(x => x.key === 'websiteIntegration') ? 'error' : 'warn', kind: 'tablet', id: 'fully-set', title: 'Tablet',
+          problem: bad.length === 1 ? `Fully-instelling "${bad[0].label}" staat verkeerd` : `${bad.length} Fully-instellingen staan verkeerd`, detail: 'Zet ze met één knop goed via Systeem → Tablet.', fix: null });
+      } catch (e) { devices.push({ sev: 'error', kind: 'tablet', id: 'fully', title: 'Tablet', problem: 'Niet bereikbaar', detail: String(e.message || e), fix: null }); }
+    }
     const flows = checkFlows(data);
     const sevOrder = { error: 0, warn: 1 };
     const sort = l => l.sort((a, b) => sevOrder[a.sev] - sevOrder[b.sev] || a.title.localeCompare(b.title));
