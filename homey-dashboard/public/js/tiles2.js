@@ -322,6 +322,18 @@
     },
   };
 
+  // ---------- Verbindingen (zelfde als de balk linksonder) ----------
+  T.conn = {
+    label: 'Verbindingen', icon: 'server', size: [3, 1], title: t => t.opts.title || 'Verbindingen',
+    render(t, inner, el) {
+      const C = D.connbar; if (!C || !C.markup) { inner.innerHTML = '<div class="empty">Laden…</div>'; return; }
+      const big = t.h >= 2 && t.opts.info !== false;
+      inner.innerHTML = `<div class="cb-tile" data-base="cb-tile">${C.markup()}</div>${big ? `<div class="cb-tinfo" data-cbinfo>${C.info()}</div>` : ''}`;
+      C.update();
+      pressOpen(el, () => C.details());
+    },
+  };
+
   // ---------- 19. reistijd ----------
   T.travel = {
     label: 'Reistijd naar werk', icon: 'play', size: [3, 2], title: t => t.opts.title || 'Naar ' + (t.opts.label || 'werk'),
@@ -407,10 +419,10 @@
     ['waste', 'Afvalkalender', 'Welke container wanneer (Twente Milieu)'], ['agenda', 'Agenda', 'Afspraken uit Google of iCloud'], ['countdown', 'Afteller', 'Aantal dagen tot …'],
     ['notes', 'Boodschappen en notities', 'Lijstje, gedeeld met alle schermen'], ['timer', 'Kookwekker', 'Timer met geluid'],
     ['departures', 'Vertrektijden bus en tram', 'Bij jouw halte'], ['travel', 'Reistijd naar werk', 'Met de auto'], ['p2000', 'P2000 Twente', 'Meldingen brandweer, ambulance en politie'],
-    ['nas', 'NAS-status', 'Schijven, temperatuur, opslag'], ['homeyinfo', 'Homey-status', 'Versie, geheugen, aantallen'],
+    ['conn', 'Verbindingen', 'Scherm, NAS, Homey en back-up (zoals de balk linksonder)'], ['nas', 'NAS-status', 'Schijven, temperatuur, opslag'], ['homeyinfo', 'Homey-status', 'Versie, geheugen, aantallen'],
     ['heading', 'Kop of scheidingslijn', 'Tabblad in blokken verdelen'], ['spacer', 'Lege ruimte', 'Onzichtbare tegel als ruimte'], ['photos', 'Fotolijst', 'Diashow van je eigen foto\'s'], ['wifiqr', 'Wifi voor gasten', 'QR-code om te scannen'],
   ];
-  D.EXTRA2_DEFAULTS = { heading: { opts: { text: 'Kop', line: 'under', size: 1.4 }, style: { frameless: true, hideTitle: true } }, spacer: { style: { frameless: true, hideTitle: true, opacity: 0 } }, photos: { style: { hideTitle: true } }, wifiqr: { opts: { enc: 'WPA' } } };
+  D.EXTRA2_DEFAULTS = { conn: { style: { hideTitle: true } }, heading: { opts: { text: 'Kop', line: 'under', size: 1.4 }, style: { frameless: true, hideTitle: true } }, spacer: { style: { frameless: true, hideTitle: true, opacity: 0 } }, photos: { style: { hideTitle: true } }, wifiqr: { opts: { enc: 'WPA' } } };
 
   // ---------- opties bij Tegel ----------
   const devSel = (P, F, cur, filter, label = 'Apparaat') => F.row(label, F.select(`${P}.opts.deviceId`, cur || '', [['', 'Kies…'], ...D.lib.devices.filter(filter).sort((a, b) => a.name.localeCompare(b.name)).map(d => [d.id, d.name])], 'tilepanel'));
@@ -430,6 +442,8 @@
     departures: (t, P, F) => `<div class="f col"><label>Halte<small>${esc(t.opts.stopName || 'Nog geen halte gekozen')}</small></label><div class="x-ovsearch"><input type="search" placeholder="Zoek: Enschede, Station" data-ovq><div data-ovres></div></div></div>` +
       F.row('Alleen lijnen', F.text(`${P}.opts.lines`, t.opts.lines, 'tile', 'bijv. 1, 9'), 'Leeg = alle lijnen') + '<p class="note">Bus, tram en metro (OVapi). Treinen van de NS zitten hier niet in.</p>',
     health: (t, P, F) => F.row('Tekst als alles goed is', F.text(`${P}.opts.okText`, (t.opts || {}).okText, 'tile', 'Alles in orde'), 'Leeg = "Alles in orde"'),
+    conn: (t, P, F) => F.row('Tekst eronder', F.toggle(`${P}.opts.info`, t.opts.info !== false, 'tile'), 'Reactietijden en back-up; vanaf 2 hoog') +
+      '<p class="note">De vaste balk linksonder stel je in bij Scherm → Statusbalk linksonder.</p>',
     p2000: (t, P, F) => F.row('Brandweer', F.toggle(`${P}.opts.fire`, t.opts.fire !== false, 'tile')) + F.row('Ambulance', F.toggle(`${P}.opts.ambu`, t.opts.ambu !== false, 'tile')) + F.row('Politie', F.toggle(`${P}.opts.pol`, t.opts.pol !== false, 'tile')) +
       F.row('Alleen spoed', F.toggle(`${P}.opts.urgent`, !!t.opts.urgent, 'tile'), 'A0/A1, P 1 en prio 1. Politiemeldingen hebben meestal geen spoedcode en vallen dan weg.') +
       F.row('Alleen plaatsen', F.text(`${P}.opts.places`, t.opts.places, 'tile', 'bijv. Enschede, Hengelo'), 'Leeg = heel Twente') +

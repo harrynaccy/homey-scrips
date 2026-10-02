@@ -235,6 +235,7 @@
     bright: () => D.applyBrightness(),
     panel: () => { D.applyBrightness(); E.refreshPanel(); },
     none: () => {},
+    connbar: () => { if (D.connbar) D.connbar.update(); },
   };
   // ---------- kleurfavorieten ----------
   E.favUse = hex => {
@@ -1114,7 +1115,10 @@
     bgBody += `<div class="acts"><button class="btn sm" data-bgall>${icon('copy')}Deze achtergrond op alle tabbladen</button></div><p class="note">${nOwn ? `${nOwn} ${nOwn === 1 ? 'tabblad heeft' : 'tabbladen hebben'} nu een eigen achtergrond. Met deze knop krijgen alle tabbladen dezelfde achtergrond.` : 'Alle tabbladen gebruiken nu dezelfde achtergrond.'}</p>`;
     const n = S.night; let sun = '';
     if (n.mode === 'sun') { const st = D.sunTimes(new Date(), n.lat, n.lon); const f = d => d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }); sun = `<p class="note">Vandaag: donker vanaf ${f(st.set)} tot ${f(st.rise)}</p>`; }
+    const cbMode = (S.connbar && S.connbar.show) || 'auto';
     return F.group('Achtergrond', bgBody) +
+      F.group('Statusbalk linksonder', F.row('Tonen', F.seg('settings.connbar.show', cbMode, [['auto', 'Automatisch'], ['always', 'Altijd'], ['problem', 'Bij storing'], ['never', 'Nooit']], 'connbar')) +
+        '<p class="note"><b>Automatisch</b>: altijd, maar alleen bij storing zodra je een tegel <b>Verbindingen</b> gebruikt (Toevoegen → Overig). <b>Bij storing</b>: alleen als de NAS of Homey wegvalt of de back-up niet in orde is. Op de achterkant staat de balk er altijd.</p>') +
       F.group('Helderheid', F.row('Schermhelderheid', F.range('settings.display.brightness', S.display.brightness, 1, 255, 1, 'bright', 'b')) + `<p class="note">${D.hasFully() ? '✓ Fully Kiosk gevonden: de echte schermhelderheid wordt geregeld.' : 'Fully Kiosk niet gevonden (bijv. op de laptop): er wordt een donkere laag gebruikt.'}</p>`) +
       F.group('Nachtmodus', F.row('Aan', F.toggle('settings.night.enabled', n.enabled, 'panel')) + (n.enabled ? F.row('Wanneer', F.seg('settings.night.mode', n.mode, [['time', 'Vaste tijden'], ['sun', 'Zon onder → op']], 'bright')) +
         (n.mode === 'time' ? F.row('Van', `<input type="time" data-k="settings.night.from" data-fx="bright" value="${n.from}">`) + F.row('Tot', `<input type="time" data-k="settings.night.to" data-fx="bright" value="${n.to}">`) : sun) +

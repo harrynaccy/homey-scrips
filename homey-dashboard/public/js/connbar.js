@@ -26,16 +26,39 @@
   };
   const label = { ok: 'goed', slow: 'traag of bezig', down: 'geen verbinding', unknown: 'onbekend' };
 
+  const BK = { ok: 'goed', warn: 'let op', bad: 'probleem', unknown: 'onbekend' };
+  C.markup = () => `<span class="cb-node" title="Dit scherm">${icon('tv')}</span><span class="cb-link l1"><i></i><b>✕</b></span><span class="cb-node" title="NAS">${icon('server')}</span><span class="cb-link l2"><i></i><b>✕</b></span><span class="cb-node" title="Homey">${icon('home')}</span><span class="cb-sep"></span><span class="cb-bk" title="Back-up"><i></i>${icon('download')}</span><span class="cb-msg"></span>`;
+  // vaste balk linksonder: altijd, alleen bij storing of nooit (Scherm → Statusbalk). Standaard: alleen bij storing zodra er een tegel Verbindingen is.
+  C.mode = () => {
+    const m = D.cfg && D.cfg.settings && D.cfg.settings.connbar && D.cfg.settings.connbar.show;
+    if (m === 'always' || m === 'problem' || m === 'never') return m;
+    return D.cfg && D.cfg.tabs.some(t => t.tiles.some(x => x.type === 'conn')) ? 'problem' : 'always';
+  };
+  const paint = (el, s, bk) => {
+    el.className = `connbar ${el.dataset.base || ''} nas-${s.nas} homey-${s.homey} bk-${bk}`.replace(/\s+/g, ' ');
+    const msg = el.querySelector('.cb-msg'); if (msg) msg.textContent = s.nas === 'down' ? 'NAS niet bereikbaar' : s.homey === 'down' ? 'Homey reageert niet' : '';
+    el.title = `Scherm ↔ NAS: ${label[s.nas]} · NAS ↔ Homey: ${label[s.homey]} · Back-up: ${BK[bk]}`;
+  };
   C.update = () => {
     if (!bar) return;
     const s = state();
     if (s.nas !== lastState.nas) D.conn.nasSince = Date.now();
     lastState = s;
     const bk = C.reserve && C.reserve.health ? C.reserve.health.level : 'unknown';
-    bar.className = `connbar nas-${s.nas} homey-${s.homey} bk-${bk}`;
-    const bad = s.nas === 'down' ? 'NAS niet bereikbaar' : s.homey === 'down' ? 'Homey reageert niet' : '';
-    bar.querySelector('.cb-msg').textContent = bad;
-    bar.title = `Scherm ↔ NAS: ${label[s.nas]} · NAS ↔ Homey: ${label[s.homey]} · Back-up: ${{ ok: 'goed', warn: 'let op', bad: 'probleem', unknown: 'onbekend' }[bk]}`;
+    paint(bar, s, bk);
+    const trouble = s.nas === 'down' || s.homey === 'down' || bk === 'bad' || bk === 'warn';
+    const m = C.mode(); bar.classList.toggle('cb-hide', m === 'never' || (m === 'problem' && !trouble));
+    document.querySelectorAll('.cb-tile').forEach(el => paint(el, s, bk));
+    document.querySelectorAll('[data-cbinfo]').forEach(el => { el.innerHTML = C.info(s, bk); });
+  };
+  // korte tekst voor de grotere tegel
+  C.info = (s = state(), bk = (C.reserve && C.reserve.health ? C.reserve.health.level : 'unknown')) => {
+    const h = D.conn.homey; const st = D.status || {};
+    const nas = s.nas === 'down' ? 'NAS weg' : `NAS <b>${rtt ? rtt + ' ms' : label[s.nas]}</b>`;
+    const hom = s.homey === 'down' ? 'Homey weg' : st.mode === 'demo' ? 'Homey <b>demo</b>' : `Homey <b>${h && h.ok ? h.ms + ' ms' : label[s.homey]}</b>`;
+    const r = C.reserve; const lb = r && r.lastBackup ? new Date(r.lastBackup) : null;
+    const when = lb ? (Date.now() - lb < 864e5 && lb.getDate() === new Date().getDate() ? 'vandaag ' : lb.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' }) + ' ') + lb.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }) : 'nog geen';
+    return `${nas} · ${hom}<br>Back-up <b>${BK[bk]}</b> · ${esc(when)}`;
   };
 
   C.details = () => {
@@ -73,7 +96,7 @@
   const build = () => {
     bar = document.createElement('button');
     bar.id = 'connbar'; bar.type = 'button';
-    bar.innerHTML = `<span class="cb-node" title="Dit scherm">${icon('tv')}</span><span class="cb-link l1"><i></i><b>✕</b></span><span class="cb-node" title="NAS">${icon('server')}</span><span class="cb-link l2"><i></i><b>✕</b></span><span class="cb-node" title="Homey">${icon('home')}</span><span class="cb-sep"></span><span class="cb-bk" title="Back-up"><i></i>${icon('download')}</span><span class="cb-msg"></span>`;
+    bar.innerHTML = C.markup();
     bar.onclick = e => { e.stopPropagation(); C.details(); };
     bar.addEventListener('pointerdown', e => e.stopPropagation());
     document.body.appendChild(bar); if (D.watchConnbar) D.watchConnbar();
