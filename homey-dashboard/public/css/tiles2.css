@@ -117,7 +117,6 @@ body.editing .tile.x-spacer { outline: 1px dashed rgba(255,255,255,.2); }
 .x-p2k.p1 .x-ptxt { font-weight: 600; }
 .x-p2k b { color: var(--muted); font-weight: 500; }
 .x-spoed { color: #ff7a6b; font-weight: 700; text-transform: uppercase; font-size: .72em; letter-spacing: .04em; margin-right: .35em; }
-.x-src { font-size: .62em; color: var(--muted); opacity: .7; text-align: right; margin-top: .3em; }
 .x-sheetlist .x-p2k .x-ptxt { white-space: normal; }
 .x-p2r { display: flex; align-items: flex-start; gap: .55em; padding: .4em 0; border-bottom: 1px solid color-mix(in srgb, var(--text) 8%, transparent); }
 .x-p2r .x-dot { margin-top: .42em; }

@@ -306,7 +306,7 @@
       const stale = r.v.error || r.err;
       const sub = stale ? `<span class="x-warn">${esc(r.v.error || 'Geen verbinding')}</span>` : `${all.length} in 24 uur${lastHour ? ` · ${lastHour} laatste uur` : ''}`;
       const rows = all.slice(0, 40).map(x => p2kRow(x)).join('') || `<div class="empty">${r.v.ok || (r.v.items || []).length ? 'Geen meldingen in de afgelopen 24 uur' : 'Nog geen gegevens'}</div>`;
-      inner.innerHTML = hd(t, 'siren', sub) + `<div class="list">${rows}</div><div class="x-src">bron: alarmeringen.nl</div>`;
+      inner.innerHTML = hd(t, 'siren', sub) + `<div class="list">${rows}</div>`; // bron staat in het venster (tik op de tegel)
       pressOpen(el, () => {
         const list = p2kFilter(t, (r.v && r.v.items) || []);
         sheet(D.titleOf(t), `${list.length} meldingen in de afgelopen 24 uur · bron: alarmeringen.nl`, `<div class="x-sheetlist">${list.map(x => p2kRow(x, true)).join('') || '<div class="empty">Geen meldingen</div>'}</div>`);
