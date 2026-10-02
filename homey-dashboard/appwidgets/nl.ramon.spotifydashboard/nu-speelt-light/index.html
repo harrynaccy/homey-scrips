@@ -933,7 +933,12 @@
     var cs = getComputedStyle(ov), pl = parseFloat(cs.paddingLeft), pr = parseFloat(cs.paddingRight), pt = parseFloat(cs.paddingTop), pb = parseFloat(cs.paddingBottom);
     var h = function(id){ var e = document.querySelector(id); if(!e) return 0; var c = getComputedStyle(e); return e.offsetHeight + parseFloat(c.marginTop) + parseFloat(c.marginBottom); };
     var below = h(".controls") - parseFloat(getComputedStyle(document.querySelector(".controls")).marginTop) + h(".shuffleRow") + h("#progressRange") + h("#bottomBar") + 14;
-    var w = ov.clientWidth - pl - pr, avail = ov.clientHeight - pt - pb - below;
+    // bovenkant van de hoes gelijk met de bovenkant van de volumebalk (zie placeVolume)
+    var wrap = document.querySelector(".wrap"), volTop = wrap ? volTopPx(wrap.clientHeight) : pt;
+    var ovTop = wrap ? ov.getBoundingClientRect().top - wrap.getBoundingClientRect().top : 0;
+    var shift = Math.max(0, Math.round(volTop - ovTop - pt));
+    var topEl = document.getElementById("topBlock"); if(topEl) topEl.style.marginTop = shift + "px";
+    var w = ov.clientWidth - pl - pr, avail = ov.clientHeight - pt - pb - below - shift;
     document.documentElement.style.setProperty("--art-size", Math.max(60, Math.floor(Math.min(w, avail))) + "px");
     requestAnimationFrame(placeBadge);
   }
@@ -947,13 +952,14 @@
     b.style.right = Math.round(wr.right - ar.right + gap) + "px";
     b.style.left = "auto";
   }
+  function volTopPx(h){ return Math.round(h * 0.06) + 10; }   // bovenkant volumebalk (en hoes)
   function placeVolume(){
     sizeArt();
     var wrap = document.querySelector(".wrap"), pr = document.getElementById("progressRange"), vw = document.querySelector(".volumeWrap");
     if(!wrap || !pr || !vw) return;
     var wr = wrap.getBoundingClientRect(), r = pr.getBoundingClientRect();
     if(!wr.height || !r.height) return;
-    var top = Math.round(wr.height * 0.06) + 10;                     // bovenkant: 10 px lager dan oorspronkelijk
+    var top = volTopPx(wr.height);                                   // bovenkant: 10 px lager dan oorspronkelijk; hoes staat op dezelfde hoogte
     var end = Math.round(r.top + r.height / 2 - wr.top);              // onderkant = midden van de voortgangsbalk
     var root = document.documentElement.style;
     root.setProperty("--vol-top", top + "px");
