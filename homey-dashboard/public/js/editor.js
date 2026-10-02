@@ -558,7 +558,7 @@
     }
     else if (kind === 'webw') { const x = E.WEBW.find(w => w[0] === id); if (!x) return; tile = { type: 'web', opts: { url: x[5](LOC()), title: x[1], interactive: true }, style: { frameless: true, hideTitle: true }, w: x[4][0], h: x[4][1] }; }
     else if (kind === 'insight') { const [uri, lid] = id.split('|'); tile = { type: 'insight', ref: { uri, id: lid }, opts: { resolution: 'last24Hours' } }; }
-    else { tile = { type: id, opts: id === 'clock' ? { date: true } : id === 'text' ? { text: 'Nieuwe tekst', size: 1.2 } : id === 'web' ? { url: '', interactive: true } : {} }; const dx = (D.EXTRA2_DEFAULTS || {})[id]; if (dx) tile = { ...tile, opts: { ...tile.opts, ...D.clone(dx.opts || {}) }, style: D.clone(dx.style || {}) }; }
+    else { tile = { type: id, opts: id === 'clock' ? { date: true } : id === 'text' ? { text: 'Nieuwe tekst', size: 1.2 } : id === 'web' ? { url: '', interactive: true } : {} }; const dx = (D.EXTRA2_DEFAULTS || {})[id]; if (dx) tile = { ...tile, opts: { ...tile.opts, ...D.clone(dx.opts || {}) }, style: D.clone(dx.style || {}) }; if (id === 'web') tile.style = { frameless: true, hideTitle: true, ...(tile.style || {}) }; }
     const T = D.tiles[tile.type]; const tab = D.currentTab();
     const spot = tile.x !== undefined ? { x: tile.x, y: tile.y, w: tile.w, h: tile.h } : E.firstFree(tab, tile.w || T.size[0], tile.h || T.size[1]);
     if (!spot) { D.toast('Geen ruimte meer op dit tabblad. Maak ruimte of vergroot het raster.', true); return; }
