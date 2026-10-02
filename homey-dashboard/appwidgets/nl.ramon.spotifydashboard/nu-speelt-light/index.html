@@ -375,6 +375,7 @@
   /* Geen afspeellijst-knoppen, geen ＋, geen "Volgende". Vorige/play/volgende in het midden van de widget, shuffle eronder.
      Volumebalk rechts stopt op de hoogte van de voortgangsbalk; het onderste vak loopt door tot rechts (zelfde marge als links). */
   .namesRow, .nextUp, .addCurBtn, .sheetBackdrop{ display:none !important; }
+  .serviceBadge{ z-index:5; }
   .info{ display:none !important; }   /* artiest- en albumnaam weg; het nummer staat in de lichtkrant */
   .top{ justify-content:center; }
   .art{ width:var(--art-size, min(35vw, 140px)) !important; height:var(--art-size, min(35vw, 140px)) !important; border-radius:14px; }
@@ -934,6 +935,17 @@
     var below = h(".controls") - parseFloat(getComputedStyle(document.querySelector(".controls")).marginTop) + h(".shuffleRow") + h("#progressRange") + h("#bottomBar") + 14;
     var w = ov.clientWidth - pl - pr, avail = ov.clientHeight - pt - pb - below;
     document.documentElement.style.setProperty("--art-size", Math.max(60, Math.floor(Math.min(w, avail))) + "px");
+    requestAnimationFrame(placeBadge);
+  }
+  /* Spotify-knopje rechtsboven ín de hoes, boven en rechts dezelfde ruimte */
+  function placeBadge(){
+    var wrap = document.querySelector(".wrap"), art = document.getElementById("art"), b = document.getElementById("spotifyStartBtn");
+    if(!wrap || !art || !b) return;
+    var wr = wrap.getBoundingClientRect(), ar = art.getBoundingClientRect(); if(!ar.width) return;
+    var gap = Math.round(Math.max(8, Math.min(14, ar.width * 0.04)));
+    b.style.top = Math.round(ar.top - wr.top + gap) + "px";
+    b.style.right = Math.round(wr.right - ar.right + gap) + "px";
+    b.style.left = "auto";
   }
   function placeVolume(){
     sizeArt();
