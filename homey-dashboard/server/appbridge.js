@@ -56,12 +56,15 @@ class AppBridge extends EventEmitter {
       for (const widgetId of fs.readdirSync(ad)) {
         const wd = path.join(ad, widgetId);
         if (!fs.statSync(wd).isDirectory() || !fs.existsSync(path.join(wd, 'index.html'))) continue;
-        let name = widgetId, settings = [];
+        let name = widgetId, settings = [], apiWidget = null, naadloos = true;
         try {
           const c = JSON.parse(fs.readFileSync(path.join(wd, 'widget.compose.json'), 'utf8'));
           name = (c.name && (c.name.nl || c.name.en)) || widgetId; settings = c.settings || [];
+          // apiWidget: eigen dashboardvariant die de API van een bestaande widget van de app gebruikt (bijv. nu-speelt-light → nu-speelt)
+          if (c.apiWidget && /^[\w-]+$/.test(c.apiWidget)) apiWidget = c.apiWidget;
+          if (c.naadloos === false) naadloos = false;
         } catch (e) { /* */ }
-        out.push({ appId, appName, widgetId, name, defaults: Object.fromEntries(settings.filter(s => s.id).map(s => [s.id, s.value])) });
+        out.push({ appId, appName, widgetId, name, apiWidget, naadloos, defaults: Object.fromEntries(settings.filter(s => s.id).map(s => [s.id, s.value])) });
       }
     }
     return out;
@@ -78,7 +81,9 @@ class AppBridge extends EventEmitter {
   // Eén aanroep van Homey.api(method, path, body) uit een widget.
   async call(appId, widgetId, method, p, body, internal = false) {
     if (!this.homey.rawCall) throw new Error('Demo-modus: geen Homey gekoppeld');
-    if (!this.known(appId, widgetId)) throw new Error('Onbekende widget');
+    const known = this.list().find(w => w.appId === appId && w.widgetId === widgetId);
+    if (!known) throw new Error('Onbekende widget');
+    if (known.apiWidget) widgetId = known.apiWidget; // light-variant praat met de app als de gewone widget
     method = String(method || 'GET').toUpperCase();
     if (!/^(GET|POST|PUT|DELETE)$/.test(method)) throw new Error('Ongeldige methode');
     p = '/' + String(p || '').replace(/^\/+/, '');
@@ -143,7 +148,7 @@ class AppBridge extends EventEmitter {
   async pollFallback() {
     for (const [appId, s] of Object.entries(this.state)) {
       if (this.polling[appId] || !s.route || !s.lastCallAt || Date.now() - s.lastCallAt > 75000) continue;
-      const w = this.list().find(x => x.appId === appId); if (!w) continue;
+      const w = this.list().find(x => x.appId === appId && !x.apiWidget); if (!w) continue;
       this.polling[appId] = true;
       try {
         const st = await this.call(appId, w.widgetId, 'GET', '/state', undefined, true);

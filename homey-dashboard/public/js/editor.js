@@ -512,7 +512,7 @@
       else {
         const apps = [...new Set(aw.widgets.map(w => w.appId))];
         for (const a of apps) {
-          const ws = aw.widgets.filter(w => w.appId === a); const ORDER = ['nu-speelt', 'afspeellijst', 'platenkast', 'aura'];
+          const ws = aw.widgets.filter(w => w.appId === a); const ORDER = ['nu-speelt', 'nu-speelt-light', 'afspeellijst', 'platenkast', 'aura'];
           ws.sort((x, y) => (ORDER.indexOf(x.widgetId) + 1 || 99) - (ORDER.indexOf(y.widgetId) + 1 || 99));
           body += `<div class="lib-zone">${esc(ws[0].appName)}</div>` + item(`awall:${a}`, 'layers', 'Alle widgets naadloos', 'Naast elkaar, één doorlopende achtergrond') +
             ws.filter(w => m(w.name)).map(w => item(`aw:${a}:${w.widgetId}`, 'apps', w.name, 'Losse widget')).join('');
@@ -570,7 +570,7 @@
       const tab0 = D.currentTab();
       if (kind === 'awall') {
         const ORDER = ['nu-speelt', 'afspeellijst', 'platenkast', 'aura'];
-        const list = ws.map(w => w.widgetId).sort((x, y) => (ORDER.indexOf(x) + 1 || 99) - (ORDER.indexOf(y) + 1 || 99));
+        const list = ws.filter(w => w.naadloos !== false).map(w => w.widgetId).sort((x, y) => (ORDER.indexOf(x) + 1 || 99) - (ORDER.indexOf(y) + 1 || 99));
         const full = { x: 0, y: 0, w: tab0.grid.cols, h: tab0.grid.rows };
         if (!E.fits(tab0, full)) { D.toast('Voor naadloos is een leeg tabblad nodig. Maak een nieuw tabblad aan.', true); return; }
         tile = { type: 'appgeheel', ref: { appId, widgets: list, name: ws[0] ? ws[0].appName : appId }, style: { frameless: true, hideTitle: true, radius: 0 }, ...full };

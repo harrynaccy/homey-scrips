@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Nu speelt light</title>
+<style>
+
+  :root{ --vol-c1:#000; --vol-c2:#fff; --ticker-bg-img:none; --ticker-stroke:#000; --dominant-color:#333; --lightest-color:#fff; --title-color:#fff; --bottombar-color:#000; --common-light-color:#fff; --panorama-width:1280px; --panorama-height:420px; --panorama-offset:0px; }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0;
+    width:100%; height:100%;
+    overflow:hidden;
+    background:#0b0d0f;
+    font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-user-select:none; user-select:none;
+    -webkit-touch-callout:none;
+  }
+  .wrap{
+    position:relative;
+    width:100%; height:100%;
+    overflow:hidden;
+    color:#fff;
+  }
+  .bg{
+    position:absolute; inset:-20px;
+    background-repeat:no-repeat;
+    background-size:var(--panorama-width) var(--panorama-height);
+    background-position:var(--panorama-offset) center;
+    filter:blur(10px) brightness(.55);
+    transform:scale(1.15);
+    transition:background-image 250ms ease, background-position 250ms ease;
+  }
+  .overlay{
+    position:absolute; inset:0;
+    display:flex; flex-direction:column;
+    padding:1.2em;
+    padding-right:3.2em;
+  }
+  .top{
+    display:flex; align-items:center; gap:1em;
+  }
+  .controls{
+    display:flex; align-items:center; justify-content:center; gap:1em;
+    margin-top:.8em;
+    margin-left:calc(min(35vw, 140px) + 1em); /* zelfde breedte als de albumhoes + gap in .top, zodat dit rijtje gecentreerd staat t.o.v. de artiest-/albumnaam i.p.v. de hele widget */
+  }
+  .art{
+    width:min(35vw, 140px); height:min(35vw, 140px);
+    border-radius:10px;
+    background-size:cover; background-position:center;
+    background-color:#222;
+    box-shadow:0 20px 40px -8px rgba(0,0,0,.7), 0 8px 16px rgba(0,0,0,.4);
+    flex-shrink:0;
+  }
+  .info{ min-width:0; flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; }
+  .track{ font-size:clamp(16px,3.5vw,26px); font-weight:700; color:#FFD54A; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .artist{ font-size:clamp(24px,9vw,65px); font-weight:700; color:var(--title-color,#fff); -webkit-text-stroke:0.2px var(--common-light-color,#fff); text-stroke:0.2px var(--common-light-color,#fff); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; transition:color 400ms ease; }
+  .album{ font-size:clamp(13px,2.6vw,18px); font-weight:500; opacity:.85; margin-top:.2em; color:var(--common-light-color,#fff); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; transition:color 400ms ease; }
+
+  .bottomBar{
+    margin-top:0; /* voortgangsbalk erboven neemt de lege ruimte (margin-top:auto) */
+    display:flex;
+    align-items:center;
+    gap:.8em;
+    background:rgba(0,0,0,.15);
+    border:0.5px solid var(--common-light-color,#fff);
+    border-radius:10px;
+    padding:.5em .7em;
+    overflow:hidden;
+    min-height:56px;
+    transition:background 400ms ease, border-color 400ms ease;
+  }
+  .nextUp{
+    margin-top:.5em;
+    display:flex;
+    justify-content:center;
+  }
+  .nextUp span{
+    display:inline-block;
+    max-width:90%;
+    background:rgba(0,0,0,.4);
+    padding:.35em .9em;
+    border-radius:999px;
+    color:#1DB954;
+    font-size:11px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .miniArt{
+    width:44px; height:44px;
+    border-radius:6px;
+    background-size:cover; background-position:center;
+    background-color:#222;
+    flex-shrink:0;
+  }
+  .miniTicker{
+    position:relative;
+    flex:1;
+    min-width:0;
+    height:1.8em;
+    display:flex;
+    align-items:center;
+    overflow:hidden;
+    -webkit-mask-image:linear-gradient(to right, transparent, #000 10px, #000 calc(100% - 10px), transparent);
+    mask-image:linear-gradient(to right, transparent, #000 10px, #000 calc(100% - 10px), transparent);
+  }
+  .ticker-inner{
+    position:relative;
+    display:inline-block;
+    white-space:nowrap;
+    color:var(--common-light-color,#fff);
+    font-family:system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-weight:400;
+    font-size:clamp(14px,3.5vw,20px);
+    padding-left:100%;
+    animation:ticker-scroll 12s linear infinite;
+    -webkit-text-stroke:0.2px var(--title-color,#000);
+    text-stroke:0.2px var(--title-color,#000);
+    transition:color 400ms ease;
+  }
+  @keyframes ticker-scroll{
+    from{ transform:translateX(0); }
+    to{ transform:translateX(-100%); }
+  }
+  .state{
+    display:inline-block; margin-top:.6em;
+    font-size:11px; letter-spacing:.05em; text-transform:uppercase;
+    padding:.25em .7em; border-radius:999px;
+    background:rgba(255,255,255,.15);
+  }
+  .ctrlBtn{
+    width:38px; height:38px; border-radius:50%;
+    border:0.5px solid var(--common-light-color,#fff); background:rgba(0,0,0,.4);
+    color:var(--lightest-color,#fff); display:flex; align-items:center; justify-content:center;
+    cursor:pointer; flex-shrink:0;
+    box-shadow:0 20px 40px -8px rgba(0,0,0,.7), 0 8px 16px rgba(0,0,0,.4);
+    transition:background 150ms ease, transform 100ms ease, border-color 400ms ease, color 400ms ease;
+  }
+  .ctrlBtn:active{ background:rgba(0,0,0,.6); transform:scale(.92); }
+  /* Groter aanraakvlak (onzichtbaar, 14px rondom) en geen tik-vertraging,
+     zodat vorige/play/volgende op de tablet makkelijker te raken zijn. */
+  .ctrlBtn{ position:relative; touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
+  .ctrlBtn::after{ content:""; position:absolute; inset:-14px; border-radius:50%; }
+  .ctrlBtn svg{ width:16px; height:16px; }
+  .ctrlBtn.play{ width:46px; height:46px; background:var(--common-light-color,#fff); border:0.5px solid var(--title-color,#111); color:var(--title-color,#111); box-shadow:0 20px 40px -8px rgba(0,0,0,.7), 0 8px 16px rgba(0,0,0,.4); transition:background 400ms ease, color 400ms ease, border-color 400ms ease; }
+  .ctrlBtn.play svg{ width:18px; height:18px; }
+  .ctrlBtn.play:active{ background:var(--common-light-color,#ddd); filter:brightness(.9); }
+  .namesRow{
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    align-items:flex-start;
+    gap:.5em;
+    margin-top:.6em;
+  }
+  /* Houdt de shuffleknop op dezelfde horizontale positie als voorheen
+     (gecentreerd onder de playknop, zelfde margin-left-truc als .controls),
+     maar nu op gelijke hoogte met de Ramon-knop i.p.v. er los boven. Los
+     gepositioneerd (absolute) t.o.v. namesRow, zodat de Ramon/Tamara/Mirthe-
+     kolom zelf niet van vorm verandert. */
+  .shuffleAnchor{
+    position:absolute;
+    top:0; left:calc(min(35vw, 140px) + 1em); right:0;
+    display:flex;
+    justify-content:center;
+    pointer-events:none;
+  }
+  .shuffleAnchor .shuffleBtn{ pointer-events:auto; }
+  .shuffleAnchor{ gap:.6em; }
+  .shuffleBtn.addCurBtn{ width:46px; font-size:22px; font-weight:300; line-height:1; }
+  .nameBtn{
+    width:min(35vw, 140px);
+    background:rgba(0,0,0,.4);
+    border:0.5px solid var(--common-light-color,#fff);
+    border-radius:999px;
+    padding:.5em .6em;
+    color:var(--common-light-color,#fff);
+    box-shadow:0 20px 40px -8px rgba(0,0,0,.7), 0 8px 16px rgba(0,0,0,.4);
+    font-family:system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size:13px; font-weight:600;
+    text-align:center;
+    cursor:pointer;
+    transition:background 150ms ease, border-color 400ms ease, color 400ms ease, transform 100ms ease;
+  }
+  .nameBtn:active{ background:rgba(0,0,0,.6); transform:scale(.96); }
+  .nameBtn.active{ color:#1DB954; border-color:#1DB954; }
+  .shuffleBtn{
+    width:63px; height:38px;
+    border-radius:999px;
+    border:0.5px solid var(--common-light-color,#fff);
+    background:rgba(0,0,0,.4);
+    color:var(--lightest-color,#fff);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    box-shadow:0 20px 40px -8px rgba(0,0,0,.7), 0 8px 16px rgba(0,0,0,.4);
+    transition:background 150ms ease, transform 100ms ease, color 150ms ease, border-color 400ms ease;
+  }
+  .shuffleBtn:active{ background:rgba(0,0,0,.6); transform:scale(.96); }
+  .shuffleBtn.active{ color:#1DB954; }
+  .shuffleBtn svg{ width:28px; height:17px; }
+
+  .volumeWrap{
+    position:absolute;
+    top:0; right:0; bottom:0;
+    width:3.2em;
+  }
+  #volumeRange{
+    position:absolute;
+    top:50%; left:50%;
+    width:var(--vol-len,304px); /* 80% van de widget-hoogte */
+    transform:translate(-50%,-50%) rotate(-90deg);
+    -webkit-appearance:none;
+    appearance:none;
+    height:10px;
+    border-radius:10px;
+    background:transparent;
+    outline:none;
+    z-index:2;
+  }
+  #volumeRange::-webkit-slider-runnable-track{
+    height:10px;
+    border-radius:10px;
+    /* to right = eindigt na de rotate(-90deg) bovenin, dus donkerste kleur
+       rechts (wordt boven) en lichtste kleur links (wordt onder) */
+    background:linear-gradient(to right, var(--lightest-color,#fff), var(--title-color,#000));
+    border:0.5px solid transparent;
+    border-image:linear-gradient(to right, var(--title-color,#000), var(--lightest-color,#fff)) 1;
+    transition:background 400ms ease, border-color 400ms ease;
+  }
+  #volumeRange::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:20px; height:20px; border-radius:50%;
+    background:var(--common-light-color,#fff);
+    border:2px solid var(--title-color,#000);
+    box-shadow:0 0 6px rgba(0,0,0,.6);
+    margin-top:-5px;
+  }
+  #volumeRange::-moz-range-thumb{
+    width:20px; height:20px; border-radius:50%;
+    background:var(--common-light-color,#fff); border:2px solid var(--title-color,#000);
+    box-shadow:0 0 6px rgba(0,0,0,.6);
+  }
+  #volumeRange::-moz-range-track{
+    height:10px; border-radius:10px;
+    background:linear-gradient(to right, var(--lightest-color,#fff), var(--title-color,#000));
+  }
+  /* Voortgangsbalk: zelfde stijl als de volumeschuif, maar horizontaal
+     (geen rotatie nodig) en dezelfde breedte als de lichtkrant eronder.
+     Links = lichtste kleur, rechts = donkerste kleur. */
+  #progressRange{
+    -webkit-appearance:none;
+    appearance:none;
+    display:block;
+    width:100%;
+    height:6px;
+    border-radius:10px;
+    background:transparent;
+    outline:none;
+    /* Alle lege ruimte BOVEN de balk, zodat hij altijd vlak boven de
+       lichtkrant staat (ook op 245 % in het dashboard). */
+    margin:auto 0 12px 0;
+  }
+  #progressRange:disabled{
+    opacity:.5;
+    cursor:default;
+  }
+  #progressRange::-webkit-slider-runnable-track{
+    height:6px;
+    border-radius:10px;
+    background:linear-gradient(to right, var(--lightest-color,#fff), var(--title-color,#000));
+    border:0.5px solid transparent;
+    border-image:linear-gradient(to right, var(--title-color,#000), var(--lightest-color,#fff)) 1;
+    transition:background 400ms ease;
+  }
+  #progressRange::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:14px; height:14px; border-radius:50%;
+    background:var(--common-light-color,#fff);
+    border:2px solid var(--title-color,#000);
+    box-shadow:0 0 6px rgba(0,0,0,.6);
+    margin-top:-4px;
+  }
+  #progressRange::-moz-range-thumb{
+    width:14px; height:14px; border-radius:50%;
+    background:var(--common-light-color,#fff); border:2px solid var(--title-color,#000);
+    box-shadow:0 0 6px rgba(0,0,0,.6);
+  }
+  #progressRange::-moz-range-track{
+    height:6px; border-radius:10px;
+    background:linear-gradient(to right, var(--lightest-color,#fff), var(--title-color,#000));
+  }
+  .serviceBadge{
+    position:absolute; top:10px; right:3.5em;
+    display:flex; align-items:center; gap:.4em;
+    background:rgba(0,0,0,.4);
+    border:0.5px solid var(--common-light-color,#fff);
+    padding:.3em .6em;
+    border-radius:999px;
+    z-index:20;
+    cursor:pointer;
+    transition:background 150ms ease, transform 100ms ease, border-color 400ms ease;
+  }
+  .serviceBadge:active{ background:rgba(0,0,0,.6); transform:scale(.96); }
+  .closeBtn{
+    position:absolute; top:10px; right:0.8em;
+    width:24px; height:24px;
+    border-radius:50%;
+    border:none;
+    background:linear-gradient(135deg, var(--lightest-color,#fff), var(--title-color,#000));
+    color:#fff;
+    font-size:16px; line-height:1;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    z-index:20;
+    transition:background 400ms ease, transform 100ms ease;
+  }
+  .closeBtn:active{ transform:scale(.9); }
+  .serviceBadge span{
+    color:#fff; font-size:12px; font-weight:600;
+  }
+
+  /* Widget-instellingen: onderdelen verbergen / automatisch inpassen */
+  .hideNames .nameBtn, .autoNoNames .nameBtn{ display:none; }
+  .hideNames .namesRow, .autoNoNames .namesRow{ min-height:38px; }
+  .hideVolume .volumeWrap{ display:none; }
+  .hideVolume .overlay{ padding-right:1.2em; }
+  .hideProgress #progressRange{ visibility:hidden; height:0; margin:auto 0 0 0; }
+  .hideNextUp .nextUp, .autoNoNext .nextUp{ display:none; }
+
+  /* ---------- ＋-knop, playlist-kiezer en meldingen (zelfde stijl als Aura) ---------- */
+  .unusedAddBtn{
+    width:32px; height:32px; border-radius:50%;
+    border:1px solid rgba(255,255,255,.3); background:transparent; color:#fff;
+    font-size:18px; line-height:1; flex-shrink:0; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .unusedAddBtn:active{ background:rgba(255,255,255,.15); }
+  .pkBtn{
+    border:0; border-radius:10px; font:inherit; font-size:14px; font-weight:600;
+    padding:.85em .5em; color:#fff; background:rgba(255,255,255,.12); cursor:pointer;
+  }
+  .pkBtn:active{ transform:scale(.96); }
+  .sheetBackdrop{ position:absolute; inset:0; z-index:30; background:rgba(0,0,0,.55); display:none; align-items:flex-end; }
+  .sheetBackdrop.open{ display:flex; }
+  .sheet{ width:100%; background:#16191c; border-radius:16px 16px 0 0; padding:1em 1em 1.3em 1em; box-shadow:0 -10px 30px rgba(0,0,0,.5); color:#fff; }
+  .sheetTitle{ font-size:13px; opacity:.7; margin-bottom:.8em; line-height:1.4; }
+  .sheetTitle b{ color:#fff; }
+  .sheetGrid{ display:grid; grid-template-columns:1fr 1fr; gap:.5em; }
+  .sheet .cancel{ width:100%; margin-top:.6em; background:transparent; opacity:.7; }
+  .toast{
+    position:absolute; left:50%; bottom:1.2em; z-index:40; transform:translate(-50%, 20px);
+    background:rgba(20,22,25,.95); color:#fff; border-radius:999px; padding:.6em 1.1em;
+    font-size:13px; max-width:90%; text-align:center; box-shadow:0 8px 20px rgba(0,0,0,.5);
+    opacity:0; pointer-events:none; transition:opacity 200ms ease, transform 200ms ease;
+  }
+  .toast.show{ opacity:1; transform:translate(-50%, 0); }
+  .toast.error{ background:#B3452F; }
+  .errorBox{
+    position:fixed; left:0; right:0; bottom:0;
+    background:#B3452F; color:#fff; font-size:12px;
+    padding:.6em 1em; z-index:9999; word-break:break-word;
+    display:none;
+  }
+  .diag{
+    position:absolute; left:0; right:0; top:0; z-index:9998; display:none;
+    background:rgba(0,0,0,.8); color:#9f9; font:11px monospace; padding:4px 8px;
+    pointer-events:none; white-space:pre-wrap;
+  }
+
+  /* ---------- Nu speelt light ---------- */
+  /* Geen afspeellijst-knoppen, geen ＋, geen "Volgende"; vorige/play/volgende/shuffle als één groep in het midden. */
+  .namesRow, .nextUp, .addCurBtn, .sheetBackdrop{ display:none !important; }
+  .controls{
+    margin:auto 0 !important;            /* midden tussen hoes en voortgangsbalk */
+    align-self:center;
+    gap:clamp(8px, 3.5vw, 22px);
+  }
+  .controls .ctrlBtn{ width:clamp(38px, 13vw, 52px); height:clamp(38px, 13vw, 52px); }
+  .controls .ctrlBtn svg{ width:46%; height:46%; }
+  .controls .ctrlBtn.play{ width:clamp(48px, 17vw, 68px); height:clamp(48px, 17vw, 68px); }
+  .controls .ctrlBtn.play svg{ width:38%; height:38%; }
+  .controls .shuffleBtn{ width:clamp(38px, 13vw, 52px); height:clamp(38px, 13vw, 52px); border-radius:50%; }
+  .controls .shuffleBtn svg{ width:62%; height:40%; }
+  #progressRange{ margin:0 0 12px 0 !important; }
+</style>
+
+</head>
+<body class="homey-widget-full">
+
+<div class="wrap">
+  <div class="bg" id="bg"></div>
+  <button class="serviceBadge" id="spotifyStartBtn" title="Spotify starten">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none"><circle cx="12" cy="12" r="11" fill="#1DB954"/><path d="M6.5 9.3c4-1.1 8-.7 10.6 1" stroke="#fff" stroke-width="1.6" stroke-linecap="round" fill="none"/><path d="M6.8 12.6c3.3-.9 6.7-.5 9.2.9" stroke="#fff" stroke-width="1.6" stroke-linecap="round" fill="none"/><path d="M7.2 15.8c2.6-.6 5.3-.3 7.4.8" stroke="#fff" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>
+    <span>Spotify</span>
+  </button>
+  <button class="closeBtn" id="closeBtn" title="Sluiten">&times;</button>
+  <div class="overlay">
+    <div class="top" id="topBlock">
+      <div class="art" id="art"></div>
+      <div class="info">
+        <div class="artist" id="artist"></div>
+        <div class="album" id="album">Laden…</div>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="ctrlBtn" id="prevBtn" title="Vorige">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3 6 9-6v12z"/></svg>
+      </button>
+      <button class="ctrlBtn play" id="playBtn" title="Afspelen/pauzeren">
+        <svg id="playIcon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+      </button>
+      <button class="ctrlBtn" id="nextBtn" title="Volgende">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2zM6 6l9 6-9 6z"/></svg>
+      </button>
+      <button class="shuffleBtn" id="shuffleBtn" title="Afspeelvolgorde">
+          <svg id="shuffleIcon" viewBox="0 0 100 60">
+            <path d="M4,16 C30,16 35,30 50,30 C65,30 70,16 80,16" stroke="currentColor" stroke-width="10" fill="none" stroke-linecap="round"/>
+            <path d="M4,44 C30,44 35,30 50,30 C65,30 70,44 80,44" stroke="currentColor" stroke-width="10" fill="none" stroke-linecap="round"/>
+            <path d="M80,7 L98,16 L80,25 Z" fill="currentColor"/>
+            <path d="M80,35 L98,44 L80,53 Z" fill="currentColor"/>
+          </svg>
+        </button>
+    </div>
+    <div class="namesRow" id="namesRow">
+      <div class="shuffleAnchor">
+        <button class="shuffleBtn addCurBtn" id="addCurBtn" title="Dit nummer toevoegen aan een afspeellijst">＋</button>
+      </div>
+    </div>
+    <input type="range" id="progressRange" min="0" max="100" step="1" value="0">
+    <div class="bottomBar" id="bottomBar">
+      <div class="miniArt" id="miniArt"></div>
+      <div class="miniTicker">
+        <div class="ticker-inner" id="trackTicker"></div>
+      </div>
+    </div>
+    <div class="nextUp"><span id="nextUp"></span></div>
+  </div>
+  <div class="volumeWrap">
+    <input type="range" id="volumeRange" min="0" max="60" step="5" value="30">
+  </div>
+  <div class="sheetBackdrop" id="sheetBackdrop">
+    <div class="sheet">
+      <div class="sheetTitle" id="sheetTitle"></div>
+      <div class="sheetGrid" id="sheetGrid"></div>
+      <button class="pkBtn cancel" id="sheetCancel">Annuleren</button>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+</div>
+
+<div class="errorBox" id="errorBox"></div>
+<div class="diag" id="diag"></div>
+
+<script>
+/* ==========================================================================
+   Widget "Nu speelt" — alleen weergave en bediening.
+   Alle Spotify- en Homey-verkeer loopt via de app op de Homey (achterkant).
+   De widget krijgt de status live doorgestuurd (Homey.on('state')) en meldt
+   zich elke 30 s ("ik ben in beeld"), zodat de app alleen pollt als er echt
+   iemand kijkt.
+   ========================================================================== */
+(function(){
+  var H = null;
+  var S = null;               // laatste status van de app
+  var receivedAt = 0;         // wanneer S binnenkwam (klok van dit apparaat)
+  var lastTrackId = null;
+  var lastPlaylistsJson = "";
+  var currentHeight = 0;
+  var suppressPlaySyncUntil = 0;
+  var suppressShuffleUntil = 0;
+  var progressIsDragging = false;
+  var volumeIsDragging = false;
+  var currentlyPlaying = false;
+  var shuffleOn = false;
+  var debugOn = false;
+  var WS = {};                // widget-instellingen
+
+  var PANEL_INDEX = 0;        // Nu speelt = kwart 1 van het panorama
+  var PANEL_COUNT = 4;
+
+  var $ = function(id){ return document.getElementById(id); };
+  var els = {
+    bg: $("bg"), art: $("art"), miniArt: $("miniArt"), ticker: $("trackTicker"),
+    artist: $("artist"), album: $("album"), errorBox: $("errorBox"),
+    playIcon: $("playIcon"), shuffleBtn: $("shuffleBtn"), nextUp: $("nextUp"),
+    progress: $("progressRange"), volume: $("volumeRange"), namesRow: $("namesRow")
+  };
+  var root = document.documentElement;
+
+  /* ---------------- hoogte ---------------- */
+  function isLandscape(){
+    try{
+      if(screen.orientation && screen.orientation.type) return screen.orientation.type.indexOf("landscape") === 0;
+    }catch(e){}
+    if(typeof window.orientation === "number") return Math.abs(window.orientation) === 90;
+    return screen.width > screen.height;
+  }
+  function computeBaseHeight(cfg){
+    cfg = cfg || {};
+    if(cfg.heightMode === "fixed" && cfg.heightFixed > 0) return Math.round(cfg.heightFixed);
+    var sw = screen.width || 0, sh = screen.height || 0;
+    var land = isLandscape();
+    var screenH = land ? Math.min(sw, sh) : Math.max(sw, sh);
+    var margin = land ? (cfg.marginLandscape != null ? cfg.marginLandscape : 140)
+                      : (cfg.marginPortrait != null ? cfg.marginPortrait : 180);
+    return Math.max(300, Math.round(screenH - margin));
+  }
+  /* Eigen hoogte per widget (widget-instelling "Hoogte"): standaard de volledige
+     hoogte uit de app-instellingen, of een percentage daarvan. */
+  function computeHeight(cfg){
+    var h = computeBaseHeight(cfg);
+    if(WS.height_mode === "percent"){
+      var p = Number(WS.height_percent);
+      if(!(p > 0)) p = 60;
+      p = Math.max(20, Math.min(100, p));
+      h = Math.max(200, Math.round(h * p / 100));
+    }
+    return h;
+  }
+  function applyHeight(cfg){
+    var h = computeHeight(cfg);
+    if(h === currentHeight) return;
+    currentHeight = h;
+    root.style.setProperty("--vol-len", Math.round(h * 0.8) + "px");
+    if(H) H.setHeight(h).catch(function(){});
+  }
+  // Achtergrond: standaard het eigen kwart van de hoes, of (widget-instelling
+  // "Achtergrond") een ander kwart of de hele hoes.
+  function updatePanorama(){
+    var w = root.clientWidth, h = root.clientHeight;
+    if(!w || !h) return;
+    root.style.setProperty("--vol-len", Math.round(h * 0.8) + "px");
+    fitLayout();
+    var bgEl = document.getElementById("bg");
+    if(WS.panorama === "whole"){
+      bgEl.style.backgroundSize = "cover";
+      bgEl.style.backgroundPosition = "center";
+      return;
+    }
+    bgEl.style.backgroundSize = "";
+    bgEl.style.backgroundPosition = "";
+    var idx = /^[1-4]$/.test(String(WS.panorama)) ? Number(WS.panorama) - 1 : PANEL_INDEX;
+    root.style.setProperty("--panorama-width", (w * PANEL_COUNT) + "px");
+    root.style.setProperty("--panorama-height", h + "px");
+    root.style.setProperty("--panorama-offset", (-idx * w) + "px");
+  }
+
+  /* Onderdelen tonen/verbergen (widget-instellingen) en automatisch inpassen:
+     past alles niet in een lagere tegel, dan eerst "Volgende" weg, daarna de
+     afspeellijst-knoppen. */
+  function applyToggles(){
+    var b = document.body.classList;
+    b.toggle("hideNames", true);
+    b.toggle("hideVolume", WS.show_volume === false);
+    b.toggle("hideProgress", WS.show_progress === false);
+    b.toggle("hideNextUp", true);
+    fitLayout();
+  }
+  var fitBusy = false;
+  function fitLayout(){
+    if(fitBusy) return;
+    var ov = document.querySelector(".overlay");
+    if(!ov || !ov.clientHeight) return;
+    fitBusy = true;
+    var b = document.body.classList;
+    b.remove("autoNoNext"); b.remove("autoNoNames");
+    var over = function(){ return ov.scrollHeight > ov.clientHeight + 1; };
+    if(over()) b.add("autoNoNext");
+    if(over()) b.add("autoNoNames");
+    fitBusy = false;
+  }
+  window.addEventListener("resize", updatePanorama);
+  if(window.ResizeObserver) new ResizeObserver(updatePanorama).observe(root);
+  function onOrientation(){ setTimeout(function(){ applyHeight(S && S.config); updatePanorama(); }, 300); }
+  window.addEventListener("orientationchange", onOrientation);
+  try{ screen.orientation.addEventListener("change", onOrientation); }catch(e){}
+
+  /* ---------------- hulpjes ---------------- */
+  function showError(msg){
+    if(!msg){ els.errorBox.style.display = "none"; return; }
+    els.errorBox.textContent = msg;
+    els.errorBox.style.display = "block";
+  }
+  function haptic(){ try{ H && H.hapticFeedback(); }catch(e){} }
+
+  // Reageert direct bij aanraken (pointerdown) — in het dashboard gaat een
+  // "klik" soms verloren omdat een klein schuifje als veegbeweging telt.
+  function onTap(el, handler){
+    var last = 0;
+    var fire = function(e){
+      var now = Date.now();
+      if(now - last < 700) return;
+      last = now;
+      haptic();
+      handler(e);
+    };
+    el.addEventListener("pointerdown", function(e){ e.preventDefault(); fire(e); });
+    el.addEventListener("click", fire);
+  }
+
+  function send(action, extra){
+    if(!H) return Promise.resolve();
+    var body = { action: action };
+    if(extra) for(var k in extra) body[k] = extra[k];
+    return H.api("POST", "/command", body).then(function(r){
+      if(r && r.ok === false && r.error) flashError(r.error);
+      return r;
+    }).catch(function(err){ flashError("Opdracht mislukt: " + (err && err.message || err)); });
+  }
+  var errTimer = null;
+  function flashError(msg){
+    showError(msg);
+    clearTimeout(errTimer);
+    errTimer = setTimeout(function(){ renderStatus(); }, 6000);
+  }
+
+  /* ---------------- kleuren uit de hoes (zelfde als index) ---------------- */
+  function applyColorsFromImage(url){
+    var img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = function(){
+      try{
+        var size = 24, c = document.createElement("canvas");
+        c.width = size; c.height = size;
+        var ctx = c.getContext("2d");
+        ctx.drawImage(img, 0, 0, size, size);
+        var d = ctx.getImageData(0, 0, size, size).data;
+        var r=0,g=0,b=0,n=0,i, bin=32, counts={}, light={};
+        var lightest=-1, lr=255, lg=255, lb=255, darkest=Infinity, dr=0, dg=0, db=0;
+        for(i=0;i<d.length;i+=4){
+          var pr=d[i], pg=d[i+1], pb=d[i+2];
+          r+=pr; g+=pg; b+=pb; n++;
+          var key = Math.round(pr/bin)*bin+","+Math.round(pg/bin)*bin+","+Math.round(pb/bin)*bin;
+          counts[key]=(counts[key]||0)+1;
+          var lum = 0.2126*pr + 0.7152*pg + 0.0722*pb;
+          if(lum > 170) light[key]=(light[key]||0)+1;
+          if(lum > lightest){ lightest=lum; lr=pr; lg=pg; lb=pb; }
+          if(lum < darkest){ darkest=lum; dr=pr; dg=pg; db=pb; }
+        }
+        r=Math.round(r/n); g=Math.round(g/n); b=Math.round(b/n);
+        function top(o){ var best=null, m=0; for(var k in o){ if(o[k]>m){ m=o[k]; best=k; } } return best; }
+        var dom = top(counts).split(",");
+        var cl = top(light); cl = cl ? cl.split(",") : [255,255,255];
+        root.style.setProperty("--dominant-color", "rgb("+dom.join(",")+")");
+        root.style.setProperty("--common-light-color", "rgb("+cl.join(",")+")");
+        root.style.setProperty("--lightest-color", "rgb("+lr+","+lg+","+lb+")");
+        root.style.setProperty("--title-color", "rgb("+dr+","+dg+","+db+")");
+        root.style.setProperty("--bottombar-color", "rgb("+Math.round(dr*.4)+","+Math.round(dg*.4)+","+Math.round(db*.4)+")");
+        root.style.setProperty("--vol-c1", "rgb("+Math.round(r*.35)+","+Math.round(g*.35)+","+Math.round(b*.35)+")");
+        root.style.setProperty("--vol-c2", "rgb("+Math.round(r+(255-r)*.65)+","+Math.round(g+(255-g)*.65)+","+Math.round(b+(255-b)*.65)+")");
+        root.style.setProperty("--ticker-stroke", "rgb("+Math.max(0,r-90)+","+Math.max(0,g-90)+","+Math.max(0,b-90)+")");
+      }catch(e){ /* CORS: kleuren blijven zoals ze waren */ }
+    };
+    img.src = url;
+  }
+
+  /* ---------------- weergave ---------------- */
+  var playSVG  = '<path d="M8 5v14l11-7z"/>';
+  var pauseSVG = '<path d="M7 5h4v14H7zm6 0h4v14h-4z"/>';
+  function updatePlayIcon(){ els.playIcon.innerHTML = currentlyPlaying ? pauseSVG : playSVG; }
+  function updateShuffleIcon(){ els.shuffleBtn.classList.toggle("active", shuffleOn); }
+
+  function renderTrack(t){
+    if(!t) { els.album.textContent = ""; return; }
+    if(t.id === lastTrackId) return;
+    lastTrackId = t.id;
+    els.artist.textContent = t.artist || "";
+    els.album.textContent = t.album || "";
+    els.ticker.textContent = t.name ? (t.artist + " - " + t.name) : (t.artist || "");
+    if(t.artUrl){
+      var u = 'url("' + t.artUrl + '")';
+      els.art.style.backgroundImage = u;
+      els.miniArt.style.backgroundImage = u;
+      els.bg.style.backgroundImage = u;
+      applyColorsFromImage(t.artUrl);
+    }
+  }
+
+  function renderPlaylists(cfg){
+    var lists = (cfg && cfg.playlists) || [];
+    var json = JSON.stringify(lists);
+    if(json === lastPlaylistsJson) return;
+    lastPlaylistsJson = json;
+    Array.prototype.slice.call(els.namesRow.querySelectorAll(".nameBtn")).forEach(function(b){ b.remove(); });
+    lists.forEach(function(p){
+      var b = document.createElement("button");
+      b.className = "nameBtn";
+      b.textContent = p.name;
+      b.setAttribute("data-playlist-uri", p.uri);
+      onTap(b, function(){
+        suppressPlaySyncUntil = Date.now() + 5000;
+        currentlyPlaying = true; updatePlayIcon();
+        markActivePlaylist(p.uri);
+        send("playlist", { uri: p.uri });
+      });
+      els.namesRow.appendChild(b);
+    });
+    fitLayout();
+    if(S) markActivePlaylist(S.contextUri);
+  }
+  function markActivePlaylist(uri){
+    Array.prototype.forEach.call(els.namesRow.querySelectorAll(".nameBtn"), function(b){
+      b.classList.toggle("active", !!uri && b.getAttribute("data-playlist-uri") === uri);
+    });
+  }
+
+  function currentPositionMs(){
+    if(!S || !S.track) return 0;
+    var pos = S.progressMs + (S.now - S.sampledAt);
+    if(S.isPlaying) pos += Date.now() - receivedAt;
+    return Math.max(0, Math.min(pos, S.track.durationMs || pos));
+  }
+  function tickProgress(){
+    if(progressIsDragging || !S || !S.track || !S.track.durationMs) {
+      els.progress.disabled = !(S && S.track && S.track.durationMs);
+      return;
+    }
+    els.progress.disabled = false;
+    els.progress.max = Math.round(S.track.durationMs / 1000);
+    els.progress.value = Math.round(currentPositionMs() / 1000);
+  }
+  setInterval(tickProgress, 1000);
+
+  function renderStatus(){
+    if(!S) return;
+    var st = S.status || {};
+    if(st.spotify === "no-login" || st.spotify === "error" || st.spotify === "blocked") showError(st.spotifyMsg);
+    else if(!st.homey) showError("Homey: " + (st.homeyMsg || "speaker niet gevonden"));
+    else showError("");
+    if(debugOn){
+      $("diag").style.display = "block";
+      $("diag").textContent = "Modus: " + st.mode + " | Spotify: " + st.spotify +
+        " | verzoeken afgelopen uur: " + st.requestsLastHour + " | Homey: " + (st.homey ? "ok" : "NIET ok") +
+        " | hoogte: " + currentHeight + "px";
+    }
+  }
+
+  function applyState(s){
+    if(!s) return;
+    S = s;
+    receivedAt = Date.now();
+    applyHeight(s.config);
+    renderPlaylists(s.config);
+    renderTrack(s.track);
+    markActivePlaylist(s.contextUri);
+    els.nextUp.textContent = s.nextUp ? ("Volgende: " + s.nextUp) : "";
+    if(Date.now() >= suppressPlaySyncUntil){
+      currentlyPlaying = !!s.isPlaying;
+      updatePlayIcon();
+    }
+    if(typeof s.shuffle === "boolean" && Date.now() >= suppressShuffleUntil){
+      shuffleOn = s.shuffle; updateShuffleIcon();
+    }
+    var cfg = s.config || {};
+    els.volume.max = cfg.volumeMax || 60;
+    els.volume.step = cfg.volumeStep || 5;
+    if(!volumeIsDragging && typeof s.volume === "number"){
+      var step = cfg.volumeStep || 5;
+      els.volume.value = Math.min(cfg.volumeMax || 60, Math.round(s.volume * 100 / step) * step);
+    }
+    tickProgress();
+    renderStatus();
+  }
+
+  /* ---------------- bediening ---------------- */
+  function flashButton(el){
+    el.style.transition = "none";
+    el.style.boxShadow = "0 0 0 4px rgba(29,185,84,.9)";
+    setTimeout(function(){ el.style.transition = ""; el.style.boxShadow = ""; }, 450);
+  }
+
+  onTap($("playBtn"), function(){
+    currentlyPlaying = !currentlyPlaying;
+    updatePlayIcon();
+    suppressPlaySyncUntil = Date.now() + 5000;
+    send(currentlyPlaying ? "play" : "pause");
+  });
+  onTap($("prevBtn"), function(){ flashButton($("prevBtn")); send("previous"); });
+  onTap($("nextBtn"), function(){
+    flashButton($("nextBtn"));
+    if(S && S.nextUp) els.ticker.textContent = S.nextUp;
+    send("next");
+  });
+  onTap(els.shuffleBtn, function(){
+    shuffleOn = !shuffleOn;
+    updateShuffleIcon();
+    suppressShuffleUntil = Date.now() + 5000;
+    send("shuffle", { on: shuffleOn });
+  });
+  // Tekst na toevoegen, bijv. "8 nummers toegevoegd aan Ramon, 2 stonden er al in".
+  function addResultText(r, name){
+    var a = r.added || 0, sk = r.skipped || 0;
+    var n = function(x){ return x === 1 ? "1 nummer" : x + " nummers"; };
+    if(a === 0 && sk > 0) return sk === 1 ? "Staat al in " + name : "Alle " + sk + " nummers staan al in " + name;
+    return n(a) + " toegevoegd aan " + name + (sk ? ", " + sk + (sk === 1 ? " stond" : " stonden") + " er al in" : "");
+  }
+  /* ---------- Toevoegen aan een afspeellijst (knoppen uit de app-instellingen) ---------- */
+  var pk = {
+    backdrop: document.getElementById("sheetBackdrop"), title: document.getElementById("sheetTitle"),
+    grid: document.getElementById("sheetGrid"), cancel: document.getElementById("sheetCancel"),
+    toast: document.getElementById("toast"), uris: null, toastTimer: null
+  };
+  function toast(m, err){
+    pk.toast.textContent = m; pk.toast.classList.toggle("error", !!err); pk.toast.classList.add("show");
+    clearTimeout(pk.toastTimer); pk.toastTimer = setTimeout(function(){ pk.toast.classList.remove("show"); }, err ? 4500 : 2500);
+  }
+  function targetPlaylists(){
+    return ((S && S.config && S.config.playlists) || []).filter(function(p){ return p && p.name && p.uri; });
+  }
+  function escTxt(s){ var d = document.createElement("div"); d.textContent = s || ""; return d.innerHTML; }
+  function openPicker(uris, titleHtml){
+    pk.uris = uris;
+    pk.title.innerHTML = titleHtml;
+    var lists = targetPlaylists();
+    pk.grid.innerHTML = lists.length
+      ? lists.map(function(p, i){ return '<button class="pkBtn" data-i="' + i + '">' + escTxt(p.name) + '</button>'; }).join("")
+      : '<div style="opacity:.6;font-size:13px">Geen afspeellijsten ingesteld (app-instellingen, onderdeel 3).</div>';
+    pk.backdrop.classList.add("open");
+    pk.openedAt = Date.now();
+  }
+  function closePicker(){ pk.uris = null; pk.backdrop.classList.remove("open"); }
+  pk.cancel.addEventListener("click", closePicker);
+  // De tik die de kiezer opende mag hem niet meteen weer sluiten of een lijst kiezen.
+  var pickerJustOpened = function(){ return Date.now() - (pk.openedAt || 0) < 450; };
+  pk.backdrop.addEventListener("click", function(e){ if(e.target === pk.backdrop && !pickerJustOpened()) closePicker(); });
+  pk.grid.addEventListener("click", function(e){
+    if(pickerJustOpened()) return;
+    var b = e.target.closest("button"); if(!b || !pk.uris) return;
+    var p = targetPlaylists()[+b.getAttribute("data-i")], uris = pk.uris; closePicker();
+    if(!p || !H) return;
+    toast("Toevoegen…");
+    H.api("POST", "/command", { action: "addToPlaylist", playlistUri: p.uri, uris: uris }).then(function(r){
+      if(!r || r.ok === false){ toast((r && r.error) || "Toevoegen mislukt", true); return; }
+      toast(addResultText(r, p.name));
+    }).catch(function(err){ toast("Toevoegen mislukt: " + (err && err.message || err), true); });
+  });
+
+  // ＋ naast shuffle: het nummer dat nu speelt aan een afspeellijst toevoegen.
+  onTap($("addCurBtn"), function(){
+    var t = S && S.track;
+    if(!t || !t.uri){ flashError("Er is (nog) geen nummer om toe te voegen"); return; }
+    openPicker([t.uri], "<b>" + escTxt(t.name || "") + "</b>" + (t.artist ? " — " + escTxt(t.artist) : "") + " toevoegen aan…");
+  });
+  onTap($("spotifyStartBtn"), function(){ send("flowOn"); });
+  onTap($("closeBtn"), function(){ send("flowOff"); });
+
+  els.progress.addEventListener("pointerdown", function(){ progressIsDragging = true; });
+  els.progress.addEventListener("pointerup", function(){ progressIsDragging = false; });
+  els.progress.addEventListener("change", function(){
+    progressIsDragging = false;
+    var ms = Math.round(parseFloat(els.progress.value) * 1000);
+    if(S){ S.progressMs = ms; S.sampledAt = S.now; receivedAt = Date.now(); }
+    send("seek", { positionMs: ms });
+  });
+
+  var lastVolSent = 0, volTimer = null;
+  function sendVolume(){ lastVolSent = Date.now(); send("volume", { percent: parseInt(els.volume.value, 10) }); }
+  els.volume.addEventListener("pointerdown", function(){ volumeIsDragging = true; });
+  els.volume.addEventListener("pointerup", function(){ setTimeout(function(){ volumeIsDragging = false; }, 1500); });
+  els.volume.addEventListener("input", function(){
+    clearTimeout(volTimer);
+    if(Date.now() - lastVolSent > 150) sendVolume();
+    else volTimer = setTimeout(sendVolume, 160);
+  });
+  els.volume.addEventListener("change", function(){ clearTimeout(volTimer); sendVolume(); });
+
+  /* ---------------- verbinding met de app ---------------- */
+  function fetchState(){
+    if(!H) return;
+    H.api("GET", "/state").then(applyState).catch(function(err){
+      showError("Geen verbinding met de app: " + (err && err.message || err));
+    });
+  }
+
+  // Vangnet tegen een "bevroren" webview: komt er 3 minuten niets binnen
+  // terwijl de widget in beeld is, dan de widget herladen.
+  setInterval(function(){
+    if(document.visibilityState === "visible" && receivedAt && Date.now() - receivedAt > 180000) location.reload();
+  }, 30000);
+
+  // Elke 30 s: status ophalen (lokaal, geen Spotify) = "ik ben in beeld".
+  setInterval(function(){ if(document.visibilityState === "visible") fetchState(); }, 30000);
+  document.addEventListener("visibilitychange", function(){ if(document.visibilityState === "visible") fetchState(); });
+
+  updatePlayIcon();
+  updateShuffleIcon();
+
+  window.onHomeyReady = function(Homey){
+    H = Homey;
+    try{ WS = Homey.getSettings() || {}; debugOn = !!WS.debug; }catch(e){}
+    applyToggles();
+    updatePanorama();
+    Homey.on("state", applyState);
+    var readyDone = false;
+    function ready(cfg){
+      if(readyDone) return;
+      readyDone = true;
+      currentHeight = computeHeight(cfg);
+      root.style.setProperty("--vol-len", Math.round(currentHeight * 0.8) + "px");
+      Homey.ready({ height: currentHeight });
+      setTimeout(updatePanorama, 50);
+    }
+    Homey.api("GET", "/state")
+      .then(function(s){ ready(s && s.config); applyState(s); })
+      .catch(function(err){ ready(null); showError("Geen verbinding met de app: " + (err && err.message || err)); });
+    setTimeout(function(){ ready(null); }, 4000); // nooit blijven hangen op het laadscherm
+  };
+})();
+
+</script>
+</body>
+</html>

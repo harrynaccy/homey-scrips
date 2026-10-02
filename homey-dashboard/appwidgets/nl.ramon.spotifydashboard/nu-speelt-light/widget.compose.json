@@ -1,0 +1,137 @@
+{
+  "name": {
+    "en": "Spotify – Now playing light",
+    "nl": "Spotify – Nu speelt light"
+  },
+  "settings": [
+    {
+      "id": "height_mode",
+      "type": "dropdown",
+      "value": "app",
+      "title": {
+        "en": "Height",
+        "nl": "Hoogte"
+      },
+      "values": [
+        {
+          "id": "app",
+          "title": {
+            "en": "Full (app setting)",
+            "nl": "Volledig (app-instelling)"
+          }
+        },
+        {
+          "id": "percent",
+          "title": {
+            "en": "Percentage of full height",
+            "nl": "Percentage van de volledige hoogte"
+          }
+        }
+      ]
+    },
+    {
+      "id": "height_percent",
+      "type": "number",
+      "value": 60,
+      "min": 20,
+      "max": 100,
+      "step": 1,
+      "title": {
+        "en": "Height in % (only with 'Percentage')",
+        "nl": "Hoogte in % (alleen bij 'Percentage')"
+      }
+    },
+    {
+      "id": "panorama",
+      "type": "dropdown",
+      "value": "default",
+      "title": {
+        "en": "Background",
+        "nl": "Achtergrond (stuk van de hoes)"
+      },
+      "values": [
+        {
+          "id": "default",
+          "title": {
+            "en": "Standard (quarter 1)",
+            "nl": "Standaard (kwart 1)"
+          }
+        },
+        {
+          "id": "1",
+          "title": {
+            "en": "Quarter 1",
+            "nl": "Kwart 1"
+          }
+        },
+        {
+          "id": "2",
+          "title": {
+            "en": "Quarter 2",
+            "nl": "Kwart 2"
+          }
+        },
+        {
+          "id": "3",
+          "title": {
+            "en": "Quarter 3",
+            "nl": "Kwart 3"
+          }
+        },
+        {
+          "id": "4",
+          "title": {
+            "en": "Quarter 4",
+            "nl": "Kwart 4"
+          }
+        },
+        {
+          "id": "whole",
+          "title": {
+            "en": "Whole cover",
+            "nl": "Hele hoes"
+          }
+        }
+      ]
+    },
+    {
+      "id": "show_volume",
+      "type": "checkbox",
+      "value": true,
+      "title": {
+        "en": "Show volume slider",
+        "nl": "Volumebalk tonen"
+      }
+    },
+    {
+      "id": "show_progress",
+      "type": "checkbox",
+      "value": true,
+      "title": {
+        "en": "Show progress bar",
+        "nl": "Voortgangsbalk tonen"
+      }
+    },
+    {
+      "id": "debug",
+      "type": "checkbox",
+      "value": false,
+      "title": {
+        "en": "Show diagnostics",
+        "nl": "Diagnose tonen"
+      }
+    }
+  ],
+  "api": {
+    "getState": {
+      "method": "GET",
+      "path": "/state"
+    },
+    "command": {
+      "method": "POST",
+      "path": "/command"
+    }
+  },
+  "apiWidget": "nu-speelt",
+  "naadloos": false
+}
