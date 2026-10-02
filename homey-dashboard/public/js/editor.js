@@ -1322,7 +1322,7 @@
       const pct = v => (v === null || v === undefined) ? '–' : Math.round(Number(v) / 255 * 100) + '%';
       const yn = v => v === null || v === undefined ? '–' : (v === true || v === 'true') ? 'aan' : 'uit';
       stat.innerHTML = `<span class="stat ok">Verbonden${s.model ? ' · ' + esc(s.model) : ''}</span>
-        <div class="counts"><div><b>${s.battery ?? '–'}${s.battery != null ? '%' : ''}</b><small>Batterij${s.plugged === true || s.plugged === 'true' ? ' (laadt)' : ''}</small></div><div><b>${pct(s.brightness)}</b><small>Helderheid</small></div><div><b>${yn(s.screenOn)}</b><small>Scherm</small></div><div><b>${yn(s.kiosk)}</b><small>Kioskmodus</small></div></div>
+        <div class="counts"><div><b>${s.battery ?? '–'}${s.battery != null ? '%' : ''}</b><small>Batterij${s.plugged === true || s.plugged === 'true' ? ' (laadt)' : ''}</small></div><div><b>${pct(s.brightness)}</b><small>Helderheid (wil ${pct(D.isNight() ? D.cfg.settings.night.brightness : D.cfg.settings.display.brightness)}${D.isNight() ? ', nacht' : ''})</small></div><div><b>${yn(s.screenOn)}</b><small>Scherm</small></div><div><b>${yn(s.kiosk)}</b><small>Kioskmodus</small></div></div>
         ${s.version ? `<p class="note">Fully ${esc(String(s.version))}${s.page ? ' · ' + esc(String(s.page)) : ''}</p>` : ''}`;
     }).catch(e => { stat.innerHTML = `<span class="stat bad">Niet verbonden</span><p class="note">${esc(e.message)}</p>`; });
     loadStat();

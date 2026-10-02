@@ -5,7 +5,6 @@
 // Aanbevolen Fully-instellingen voor dit dashboard: [sleutel, waarde, naam, waarom]
 const RECOMMENDED = [
   ['websiteIntegration', true, 'JavaScript-koppeling', 'Nodig voor helderheid, nachtstand en "scherm uit"'],
-  ['screenBrightness', '', 'Vaste helderheid', 'Leeg: het dashboard bepaalt de helderheid'],
   ['keepScreenOn', true, 'Scherm aan houden', 'Het dashboard bepaalt zelf wanneer het scherm uit gaat'],
   ['timeToScreensaverV2', '0', 'Screensaver van Fully', 'Uit: het dashboard heeft een eigen screensaver'],
   ['enableZoom', false, 'Zoomen', 'Uit: niet per ongeluk inzoomen'],
