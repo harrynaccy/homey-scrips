@@ -11,7 +11,7 @@ const ROOT = path.join(__dirname, '..');
 const REPO = process.env.UPDATE_REPO || 'harrynaccy/homey-scrips';
 const BRANCH = process.env.UPDATE_BRANCH || 'claude/youthful-wright-lt4h11';
 const SUB = 'homey-dashboard/';
-const PROTECT = [/^docker-compose\.ya?ml$/, /^data\//, /^node_modules\//, /^desktop\//, /^\.env$/];
+const PROTECT = [/^docker-compose\.ya?ml$/, /^data\//, /^node_modules\//, /^desktop\//, /^\.env$/, /^reserve\//];
 const MUST = ['package.json', 'server/server.js', 'public/index.html', 'public/js/core.js'];
 
 // ---------- zip lezen (alleen wat GitHub aanlevert: opslaan of deflate) ----------

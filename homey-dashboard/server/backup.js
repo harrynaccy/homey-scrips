@@ -6,7 +6,7 @@ const path = require('path');
 const zlib = require('zlib');
 
 const ROOT = path.join(__dirname, '..');
-const SKIP = new Set(['node_modules', '.git', 'data', 'dist']);
+const SKIP = new Set(['node_modules', '.git', 'data', 'dist', 'reserve']);
 const STORE = /\.(png|jpe?g|webp|gif|zip|gz|ico|woff2?)$/i;
 const SECRET = /^(\s*-?\s*)(HOMEY_TOKEN|ANTHROPIC_API_KEY)(\s*[=:]\s*)(.*)$/;
 
@@ -109,7 +109,7 @@ OPNIEUW OPZETTEN (kort – de hele uitleg staat in de handleiding, hoofdstuk Voo
 `;
 }
 
-function fullBackup({ dataDir, keys }) {
+function fullEntries({ dataDir, keys }) {
   const entries = [];
   walk(ROOT, '', entries);
   // data (indeling, achtergronden, back-ups, pincode, flow-geschiedenis)
@@ -121,9 +121,15 @@ function fullBackup({ dataDir, keys }) {
   const ci = entries.findIndex(x => x.name === 'docker-compose.yml');
   if (ci >= 0) { if (!keys) entries[ci].data = Buffer.from(redact(entries[ci].data.toString('utf8'))); }
   else entries.push({ name: 'docker-compose.yml', data: Buffer.from(composeFromEnv(keys)) });
+  if (!keys) {
+    // sleutels en wachtwoorden van NAS, TomTom en tablet (Fully) leeg; sessies niet meenemen
+    const sec = entries.find(x => x.name === 'data/extra-geheim.json'); if (sec) sec.data = Buffer.from('{}');
+    for (let i = entries.length - 1; i >= 0; i--) if (entries[i].name === 'data/sessies.json') entries.splice(i, 1);
+  }
   entries.push({ name: 'PROJECT-GEGEVENS.txt', data: Buffer.from(projectInfo(keys)) });
-  return zip(entries);
+  return entries;
 }
+function fullBackup({ dataDir, keys }) { return zip(fullEntries({ dataDir, keys })); }
 // data-map: alles meenemen (ook submappen), behalve tijdelijke bestanden
 function walk2(dir, base, out) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -133,4 +139,4 @@ function walk2(dir, base, out) {
   }
 }
 
-module.exports = { fullBackup, redact };
+module.exports = { fullBackup, fullEntries, zip, redact };

@@ -1301,6 +1301,7 @@
       F.group('Tablet (Fully Kiosk)', '<div id="tabbox"><div class="muted">Laden…</div></div>') +
       F.group('Eigen apps', '<div id="awstat"><div class="muted">Laden…</div></div>') +
       F.group('Back-ups', `<p class="note">Elke dag wordt automatisch een back-up gemaakt (14 dagen bewaard).</p><div class="acts"><button class="btn sm" data-bk>${icon('download')}Back-up maken</button><button class="btn sm" data-export>${icon('download')}Exporteren</button><label class="btn sm">${icon('upload')}Importeren<input type="file" accept=".json" id="impfile" hidden></label></div><div id="bklist" class="bklist"><div class="muted">Laden…</div></div>`) +
+      F.group('Reserve: installatie en back-ups', '<div id="resbox"><div class="muted">Laden…</div></div>') +
       F.group('Camera\'s', '<div id="cambox"><div class="muted">Laden…</div></div>') +
       F.group('Pincode', '<div id="pinbox"><div class="muted">Laden…</div></div>') +
       F.group('Bijwerken', '<div id="updbox"><div class="muted">Kijken of er een nieuwe versie is…</div></div>') +
@@ -1313,6 +1314,22 @@
       F.group('Achterkant openen', F.row('Aantal tikken', F.num('settings.unlock.taps', u.taps, 3, 8, 'none')) + F.row('Binnen', F.range('settings.unlock.window', u.window, 800, 3000, 100, 'none', 'n'), 'milliseconden') + `<p class="note">Tik op een lege plek of op de tabbalk.</p>`) +
       F.group('Opnieuw beginnen', `<button class="btn sm danger" data-reset>${icon('trash')}Alles terugzetten naar begin</button>`) +
       `<p class="note center">Homey Dashboard · ${D.hasFully() ? 'Fully Kiosk' : 'browser'} · ${window.innerWidth}×${window.innerHeight}</p>`;
+  };
+  // ---------- reservemap ----------
+  E.reserveBox = async (box, r) => {
+    try { r = r || await D.api('GET', '/api/reserve'); } catch (e) { box.innerHTML = `<p class="note">${esc(e.message)}</p>`; return; }
+    const when = d => d ? new Date(d).toLocaleString('nl-NL', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }) : 'nog nooit';
+    const mb = n => (n / 1048576).toFixed(1) + ' MB';
+    const bk = r.files.backup.filter(f => f.name.endsWith('.zip'));
+    box.innerHTML = `<p class="note">Map op de NAS: <b>${esc(r.folder)}</b>, met <b>1 Installatie</b> en <b>2 Back-up</b>. Elke 24 uur wordt gekeken of er iets veranderd is; alleen dan komt er een nieuwe back-up (met én zonder sleutels, laatste 7 bewaard).</p>
+      <p class="note">Laatste controle: <b>${esc(when(r.lastCheck))}</b><br>Laatste back-up: <b>${esc(when(r.lastBackup))}</b></p>
+      ${r.lastError ? `<p class="note"><span class="stat bad">Mislukt</span> ${esc(r.lastError)}</p>` : r.result ? `<p class="note">${esc(r.result)}</p>` : ''}
+      <p class="note">${r.exe.length ? `<span class="stat ok">Installatiebestand aanwezig</span> ${r.exe.map(esc).join(', ')}` : '<span class="stat warn">Nog geen installatiebestand</span><br>Zet het .exe-bestand met File Station in <b>reserve/1 Installatie</b>.'}</p>
+      <p class="note">${r.extra.length ? `Extra mappen mee in de back-up: <b>${r.extra.map(esc).join(', ')}</b>` : '<span class="stat warn">Geen extra mappen gekoppeld</span> (spotify homey staat niet in docker-compose.yml)'}</p>
+      ${bk.length ? `<div class="bklist">${bk.slice(0, 6).map(f => `<div class="bk"><span>${esc(f.name.replace('.zip', ''))}<small>${mb(f.size)}</small></span></div>`).join('')}</div>` : ''}
+      <div class="acts"><button class="btn sm primary" data-resrun ${r.busy ? 'disabled' : ''}>${icon('refresh')}${r.busy ? 'Bezig…' : 'Nu een back-up maken'}</button></div>`;
+    const b = box.querySelector('[data-resrun]');
+    if (b) b.onclick = async () => { b.disabled = true; b.textContent = 'Bezig… (kan een minuut duren)'; try { const x = await D.api('POST', '/api/reserve/run'); D.toast(x.lastError ? 'Back-up mislukt: ' + x.lastError : 'Back-up klaar', !!x.lastError); E.reserveBox(box, x); } catch (e) { D.toast(e.message, true); E.reserveBox(box); } };
   };
   // ---------- tablet (Fully Kiosk) op afstand ----------
   E.tabletBox = async box => {
@@ -1423,6 +1440,7 @@
   E.wire.systeem = async root => {
     const ub = root.querySelector('#updbox'); if (ub) E.updateBox(ub);
     const tbx = root.querySelector('#tabbox'); if (tbx) E.tabletBox(tbx);
+    const rbx = root.querySelector('#resbox'); if (rbx) E.reserveBox(rbx);
     const cb = root.querySelector('#cambox'); if (cb) D.cam.settingsBox(cb);
     const pbx = root.querySelector('#pinbox');
     if (pbx) Promise.all([D.api('GET', '/api/flows/pin'), D.api('GET', '/api/auth/state').catch(() => ({}))]).then(([st, au]) => {

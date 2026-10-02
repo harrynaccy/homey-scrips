@@ -106,6 +106,8 @@ const bridge = new AppBridge(homey, AW_DIR);
 bridge.on('event', e => broadcast('appevent', e));
 const { Extra } = require('./extra');
 const extra = new Extra({ homey, dataDir: DATA, broadcast });
+const { Reserve } = require('./reserve');
+const reserve = new Reserve({ dataDir: DATA, broadcast }); reserve.start();
 const { Fully } = require('./fully');
 const fully = new Fully(extra);
 health.fully = fully;
@@ -211,6 +213,10 @@ app.get('/api/assistant/job/:id', (req, res) => {
   if (!j) return res.status(404).json({ error: 'Deze vraag is niet meer bekend (is het dashboard op de NAS opnieuw gestart?). Probeer het opnieuw.' });
   res.json({ status: j.status, progress: j.progress, seconds: Math.round((Date.now() - j.started) / 1000), result: j.result, error: j.error });
 });
+
+// ---------- reservemap (installatiebestand + back-ups elke 24 uur) ----------
+app.get('/api/reserve', wrap(() => reserve.status()));
+app.post('/api/reserve/run', guard, wrap(() => reserve.check(true)));
 
 // ---------- tablet (Fully Kiosk) ----------
 app.get('/api/tablet', wrap(() => fully.info()));
