@@ -22,6 +22,18 @@ const dec = s => String(s || '').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
   .replace(/&#(\d+);/g, (m, n) => String.fromCharCode(Number(n))).replace(/&amp;/g, '&').trim();
 const tag = (xml, name) => { const m = new RegExp(`<${name}[^>]*>([\\s\\S]*?)</${name}>`, 'i').exec(xml); return m ? dec(m[1]) : ''; };
 const nice = s => s.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+const slugify = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+// Plaats uit het adres van de melding (…/overijssel/twente/<plaats>/…); de schrijfwijze bij voorkeur uit de omschrijving.
+// Voorbeeld: "Politie naar Nijverdalsebergweg in Nijverdal voor ongeval met letsel" + …/twente/nijverdal/ → "Nijverdal"; …/hengelo-ov/ → "Hengelo".
+function placeOf(link, desc) {
+  const slug = (/\/overijssel\/twente\/([^/?#]+)/.exec(link || '') || [])[1] || '';
+  if (!slug || /^\d+$/.test(slug)) return (/ in ([A-Z][^,.]*?)\s*$/.exec(desc || '') || [])[1] || '';
+  for (const m of String(desc || '').matchAll(/(?:\bin|\bnaar)\s+([A-Z][\w\u00C0-\u024F'.-]*(?:\s+[\w\u00C0-\u024F'.-]+){0,3})/g)) {
+    const words = m[1].split(/\s+/);
+    for (let n = words.length; n > 0; n--) { const c = words.slice(0, n).join(' '); const cs = slugify(c); if (cs && (slug === cs || slug.startsWith(cs + '-'))) return c; }
+  }
+  return nice(slug.replace(/-(ov|o|ovl|gld)$/, ''));
+}
 
 // Welke dienst en welke urgentie? Eerst de omschrijving van alarmeringen.nl, dan de P2000-tekst zelf.
 function kindOf(title, desc) {
@@ -48,8 +60,7 @@ function parseRss(xml) {
     const t = Date.parse(tag(it, 'pubDate'));
     if (!title || !Number.isFinite(t)) continue;
     const id = tag(it, 'guid') || `${t}|${title}`;
-    const slug = (/\/overijssel\/twente\/([^/?#]+)/.exec(link) || [])[1] || '';
-    const place = (/ in ([A-Z][^,.]*?)\s*$/.exec(desc) || [])[1] || (slug && !/^\d+$/.test(slug) ? nice(slug) : '');
+    const place = placeOf(link, desc);
     out.push({ id, t, title, desc, link: link.replace(/\?.*$/, ''), twente: link.includes(REGION), place, kind: kindOf(title, desc), prio: prioOf(title) });
   }
   return out;
@@ -99,8 +110,8 @@ class P2000 {
       await this.poll().catch(() => {});
     }
     const from = Date.now() - KEEP;
-    return { at: Date.now(), ok: this.ok, error: this.err, items: this.items.filter(x => x.t >= from), source: 'alarmeringen.nl' };
+    return { at: Date.now(), ok: this.ok, error: this.err, items: this.items.filter(x => x.t >= from).map(x => ({ ...x, place: placeOf(x.link, x.desc) })), source: 'alarmeringen.nl' };
   }
 }
 
-module.exports = { P2000, parseRss, kindOf, prioOf };
+module.exports = { P2000, parseRss, kindOf, prioOf, placeOf };
