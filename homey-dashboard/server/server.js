@@ -246,6 +246,14 @@ app.get('/api/x/secrets', xr(() => extra.hasSecrets()));
 app.get('/api/x/homey', xr(() => extra.homeyInfo()));
 app.get('/api/x/notes/:id', xr(r => extra.notes(String(r.params.id))));
 app.post('/api/x/notes/:id', xr(r => extra.setNotes(String(r.params.id), (r.body || {}).list)));
+// P2000 Twente (bron alarmeringen.nl; de NAS haalt op en bewaart 24 uur)
+const { P2000 } = require('./p2000');
+const p2000 = new P2000({ dataDir: DATA, fetchText: async u => {
+  const r = await fetch(u, { headers: { 'User-Agent': 'HomeyDashboard/1.0 (eigen dashboard; NAS)' }, signal: AbortSignal.timeout(15000) });
+  if (!r.ok) throw new Error(`${new URL(u).hostname} gaf ${r.status}`);
+  return r.text();
+} });
+app.get('/api/x/p2000', xr(() => p2000.list()));
 app.post('/api/appwidgets/scan', guard, async (req, res) => { try { res.json(await appscan.scan()); } catch (e) { fail(res, e); } });
 app.post('/api/appwidgets/install', guard, async (req, res) => { try { const b = req.body || {}; res.json(await appscan.install(String(b.appId || ''), String(b.widgetId || ''))); } catch (e) { fail(res, e); } });
 app.get('/api/appwidgets', wrap(() => ({ widgets: bridge.list(), status: bridge.status(), demo: homey.status.mode === 'demo' })));

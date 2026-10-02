@@ -107,3 +107,24 @@ body.editing .tile.x-spacer { outline: 1px dashed rgba(255,255,255,.2); }
 .x-ovsearch { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .x-ovsearch input { flex: 1 1 140px; }
 .x-ovsearch [data-ovres] { display: flex; flex-wrap: wrap; gap: 4px; width: 100%; }
+/* P2000 Twente */
+.x-p2k > span { gap: .5em; }
+.x-dot { flex: none; width: .62em; height: .62em; border-radius: 50%; background: var(--muted); }
+.x-dot.k-brandweer { background: #ff5a4f; } .x-dot.k-ambulance { background: #ffc531; } .x-dot.k-politie { background: #4f8dff; }
+.x-p2k .x-time { flex: none; font-style: normal; font-variant-numeric: tabular-nums; color: var(--muted); font-size: .9em; }
+.x-p2k .x-ptxt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+.x-p2k .x-ptxt small { display: block; margin: .15em 0 0; color: var(--muted); font-size: .8em; white-space: normal; text-transform: uppercase; letter-spacing: .02em; }
+.x-p2k.p1 .x-ptxt { font-weight: 600; }
+.x-p2k b { color: var(--muted); font-weight: 500; }
+.x-spoed { color: #ff7a6b; font-weight: 700; text-transform: uppercase; font-size: .72em; letter-spacing: .04em; margin-right: .35em; }
+.x-src { font-size: .62em; color: var(--muted); opacity: .7; text-align: right; margin-top: .3em; }
+.x-sheetlist .x-p2k .x-ptxt { white-space: normal; }
+.x-p2r { display: flex; align-items: flex-start; gap: .55em; padding: .4em 0; border-bottom: 1px solid color-mix(in srgb, var(--text) 8%, transparent); }
+.x-p2r .x-dot { margin-top: .42em; }
+.x-p2r .x-pb { min-width: 0; flex: 1; }
+.x-p2r .x-pl1 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.x-p2r .x-pl1 .x-time { margin-right: .45em; }
+.x-p2r .x-pl2 { font-size: calc(.78em * var(--ts-small, 1)); color: var(--muted); display: flex; gap: .5em; align-items: baseline; }
+.x-p2r .x-pl2 .x-spoed { margin: 0; }
+.x-p2r.p1 .x-pl1 { font-weight: 600; }
+.x-p2r .x-time { font-style: normal; }

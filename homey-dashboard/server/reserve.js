@@ -16,7 +16,7 @@ const KEEP = 7;
 const DAY = 24 * 3600 * 1000;
 
 // niet meetellen als "wijziging" (verandert vanzelf steeds), wel meenemen in de back-up
-const NOCOUNT = [/^PROJECT-GEGEVENS\.txt$/, /^data\/backups\//, /^data\/update-/, /^data\/sessies\.json$/, /^data\/controle-status\.json$/, /^data\/reserve\.json$/, /(^|\/)knmi\.json$/, /\.log$/i];
+const NOCOUNT = [/^PROJECT-GEGEVENS\.txt$/, /^data\/backups\//, /^data\/update-/, /^data\/sessies\.json$/, /^data\/controle-status\.json$/, /^data\/reserve\.json$/, /^data\/p2000\.json$/, /(^|\/)knmi\.json$/, /\.log$/i];
 // helemaal overslaan
 const SKIPDIR = new Set(['#recycle', '@eaDir', '.git', 'reserve']);
 

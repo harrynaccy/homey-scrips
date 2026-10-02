@@ -22,7 +22,7 @@
     return X.c.get(key) || {};
   };
   setInterval(() => { if (D.cfg && !document.hidden) D.refreshWhere(t => LIVE.includes(t.type)); }, 60e3);
-  const LIVE = ['rain', 'weather', 'air', 'price', 'waste', 'agenda', 'departures', 'travel', 'nas', 'homeyinfo', 'sunmoon', 'countdown', 'usage', 'solar'];
+  const LIVE = ['p2000', 'rain', 'weather', 'air', 'price', 'waste', 'agenda', 'departures', 'travel', 'nas', 'homeyinfo', 'sunmoon', 'countdown', 'usage', 'solar'];
   const wait = (t, ic, r, msg) => hd(t, ic) + `<div class="empty">${r && r.err ? `${icon('x')}<span>${esc(r.err)}</span>` : `<span>${esc(msg || 'Laden…')}</span>`}</div>`;
 
   // ---------- 1. ramen en deuren ----------
@@ -285,6 +285,35 @@
     },
   };
 
+  // ---------- 18b. P2000 Twente ----------
+  const P2K_KIND = { brandweer: 'Brandweer', ambulance: 'Ambulance', politie: 'Politie', overig: 'Overig' };
+  const p2kFilter = (t, items) => {
+    const o = t.opts; const places = String(o.places || '').toLowerCase().split(/[,;\n]+/).map(s => s.trim()).filter(Boolean);
+    return items.filter(x => !(o.fire === false && x.kind === 'brandweer') && !(o.ambu === false && x.kind === 'ambulance') && !(o.pol === false && x.kind === 'politie')
+      && (!o.urgent || x.prio === 1) && (!places.length || places.some(p => String(x.place || '').toLowerCase().includes(p) || x.title.toLowerCase().includes(p))));
+  };
+  const p2kText = x => { const d = x.desc || x.title; return x.place ? d.replace(new RegExp(`\\s+(in|naar)\\s+${x.place.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'i'), '') : d; };
+  const p2kRow = (x, full) => full
+    ? `<div class="x-row x-p2k${x.prio === 1 ? ' p1' : ''}"><span><i class="x-dot k-${esc(x.kind)}" title="${esc(P2K_KIND[x.kind] || '')}"></i><em class="x-time">${esc(day(x.t))} ${hm(x.t)}</em><span class="x-ptxt">${esc(p2kText(x))}<small>${esc(x.title)}</small></span></span><b>${x.prio === 1 ? '<small class="x-spoed">spoed</small>' : ''}${esc(x.place || '')}</b></div>`
+    : `<div class="x-p2r${x.prio === 1 ? ' p1' : ''}"><i class="x-dot k-${esc(x.kind)}" title="${esc(P2K_KIND[x.kind] || '')}"></i><div class="x-pb"><div class="x-pl1"><em class="x-time">${hm(x.t)}</em>${esc(p2kText(x))}</div><div class="x-pl2">${esc(x.place || '')}${x.prio === 1 ? '<span class="x-spoed">spoed</span>' : ''}</div></div></div>`;
+  T.p2000 = {
+    label: 'P2000 Twente', icon: 'siren', size: [4, 4], title: t => t.opts.title || 'P2000 Twente',
+    render(t, inner, el) {
+      const r = X.get('p2000', 60e3, () => D.api('GET', '/api/x/p2000'), ['p2000']);
+      if (!r.v) { inner.innerHTML = wait(t, 'siren', r); return; }
+      const all = p2kFilter(t, r.v.items || []);
+      const since = Date.now() - 3600e3; const lastHour = all.filter(x => x.t >= since).length;
+      const stale = r.v.error || r.err;
+      const sub = stale ? `<span class="x-warn">${esc(r.v.error || 'Geen verbinding')}</span>` : `${all.length} in 24 uur${lastHour ? ` · ${lastHour} laatste uur` : ''}`;
+      const rows = all.slice(0, 40).map(x => p2kRow(x)).join('') || `<div class="empty">${r.v.ok || (r.v.items || []).length ? 'Geen meldingen in de afgelopen 24 uur' : 'Nog geen gegevens'}</div>`;
+      inner.innerHTML = hd(t, 'siren', sub) + `<div class="list">${rows}</div><div class="x-src">bron: alarmeringen.nl</div>`;
+      pressOpen(el, () => {
+        const list = p2kFilter(t, (r.v && r.v.items) || []);
+        sheet(D.titleOf(t), `${list.length} meldingen in de afgelopen 24 uur · bron: alarmeringen.nl`, `<div class="x-sheetlist">${list.map(x => p2kRow(x, true)).join('') || '<div class="empty">Geen meldingen</div>'}</div>`);
+      });
+    },
+  };
+
   // ---------- 19. reistijd ----------
   T.travel = {
     label: 'Reistijd naar werk', icon: 'play', size: [3, 2], title: t => t.opts.title || 'Naar ' + (t.opts.label || 'werk'),
@@ -369,7 +398,7 @@
     ['price', 'Stroomprijs', 'Dynamische prijs per uur, goedkoopste uren'], ['solar', 'Zonnepanelen', 'Opbrengst nu en vandaag'], ['usage', 'Verbruik per dag', 'Stroom of gas per dag'],
     ['waste', 'Afvalkalender', 'Welke container wanneer (Twente Milieu)'], ['agenda', 'Agenda', 'Afspraken uit Google of iCloud'], ['countdown', 'Afteller', 'Aantal dagen tot …'],
     ['notes', 'Boodschappen en notities', 'Lijstje, gedeeld met alle schermen'], ['timer', 'Kookwekker', 'Timer met geluid'],
-    ['departures', 'Vertrektijden bus en tram', 'Bij jouw halte'], ['travel', 'Reistijd naar werk', 'Met de auto'],
+    ['departures', 'Vertrektijden bus en tram', 'Bij jouw halte'], ['travel', 'Reistijd naar werk', 'Met de auto'], ['p2000', 'P2000 Twente', 'Meldingen brandweer, ambulance en politie'],
     ['nas', 'NAS-status', 'Schijven, temperatuur, opslag'], ['homeyinfo', 'Homey-status', 'Versie, geheugen, aantallen'],
     ['heading', 'Kop of scheidingslijn', 'Tabblad in blokken verdelen'], ['spacer', 'Lege ruimte', 'Onzichtbare tegel als ruimte'], ['photos', 'Fotolijst', 'Diashow van je eigen foto\'s'], ['wifiqr', 'Wifi voor gasten', 'QR-code om te scannen'],
   ];
@@ -392,6 +421,10 @@
     timer: (t, P, F) => F.row('Standaard (min)', F.num(`${P}.opts.dflt`, t.opts.dflt || 5, 1, 180, 'tile')),
     departures: (t, P, F) => `<div class="f col"><label>Halte<small>${esc(t.opts.stopName || 'Nog geen halte gekozen')}</small></label><div class="x-ovsearch"><input type="search" placeholder="Zoek: Enschede, Station" data-ovq><div data-ovres></div></div></div>` +
       F.row('Alleen lijnen', F.text(`${P}.opts.lines`, t.opts.lines, 'tile', 'bijv. 1, 9'), 'Leeg = alle lijnen') + '<p class="note">Bus, tram en metro (OVapi). Treinen van de NS zitten hier niet in.</p>',
+    p2000: (t, P, F) => F.row('Brandweer', F.toggle(`${P}.opts.fire`, t.opts.fire !== false, 'tile')) + F.row('Ambulance', F.toggle(`${P}.opts.ambu`, t.opts.ambu !== false, 'tile')) + F.row('Politie', F.toggle(`${P}.opts.pol`, t.opts.pol !== false, 'tile')) +
+      F.row('Alleen spoed', F.toggle(`${P}.opts.urgent`, !!t.opts.urgent, 'tile'), 'A1, P1 en prio 1') +
+      F.row('Alleen plaatsen', F.text(`${P}.opts.places`, t.opts.places, 'tile', 'bijv. Enschede, Hengelo'), 'Leeg = heel Twente') +
+      '<p class="note">De NAS haalt elke 2 minuten de meldingen op bij alarmeringen.nl en bewaart die van Twente 24 uur. Tik op de tegel voor de hele lijst met de volledige P2000-tekst.</p>',
     travel: (t, P, F) => F.row('Naar', F.text(`${P}.opts.to`, t.opts.to, 'tile', 'Straat 1, Plaats')) + F.row('Naam', F.text(`${P}.opts.label`, t.opts.label, 'tile', 'werk')) +
       `<div class="f col"><label>TomTom-sleutel (voor files)<small>Optioneel en gratis via developer.tomtom.com. Zonder sleutel: reistijd zonder files.</small></label><div class="x-ovsearch"><input type="password" placeholder="Plak hier je sleutel" data-tomtom><button class="btn sm" data-savekey>Opslaan</button></div></div>`,
     nas: () => `<div class="f col"><label>NAS-account<small>Wordt alleen op de NAS bewaard. Tip: maak een aparte gebruiker zonder tweestapsverificatie.</small></label>
