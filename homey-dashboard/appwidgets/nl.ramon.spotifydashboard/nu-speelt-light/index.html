@@ -375,8 +375,11 @@
   /* Geen afspeellijst-knoppen, geen ＋, geen "Volgende". Vorige/play/volgende in het midden van de widget, shuffle eronder.
      Volumebalk rechts stopt op de hoogte van de voortgangsbalk; het onderste vak loopt door tot rechts (zelfde marge als links). */
   .namesRow, .nextUp, .addCurBtn, .sheetBackdrop{ display:none !important; }
+  .info{ display:none !important; }   /* artiest- en albumnaam weg; het nummer staat in de lichtkrant */
+  .top{ justify-content:center; }
+  .art{ width:var(--art-size, min(35vw, 140px)) !important; height:var(--art-size, min(35vw, 140px)) !important; border-radius:14px; }
   .controls{
-    margin:auto -2em 0 0 !important;   /* -2em: compenseert de extra ruimte rechts voor de volumebalk, zodat play in het midden van de widget staat */
+    margin:auto 0 0 0 !important;      /* knoppen onderaan, vlak boven de voortgangsbalk; gecentreerd onder de hoes */
     justify-content:center;
     gap:clamp(8px, 3.5vw, 22px);
   }
@@ -384,7 +387,7 @@
   .controls .ctrlBtn svg{ width:46%; height:46%; }
   .controls .ctrlBtn.play{ width:clamp(48px, 17vw, 68px); height:clamp(48px, 17vw, 68px); }
   .controls .ctrlBtn.play svg{ width:38%; height:38%; }
-  .shuffleRow{ display:flex; justify-content:center; margin:clamp(10px, 3vw, 18px) -2em auto 0; }
+  .shuffleRow{ display:flex; justify-content:center; margin:clamp(8px, 2.5vw, 14px) 0 clamp(12px, 3.5vw, 20px) 0; }
   .shuffleRow .shuffleBtn{ width:clamp(46px, 15vw, 60px); height:clamp(30px, 9vw, 36px); }
   .shuffleRow .shuffleBtn svg{ width:55%; height:50%; }
   #progressRange{ margin:0 0 12px 0 !important; }
@@ -922,7 +925,18 @@
 <script>
 /* Nu speelt light: volumebalk laten eindigen boven het onderste vak (ter hoogte van de voortgangsbalk) */
 (function(){
+  /* hoes zo groot mogelijk en vierkant: breedte = ruimte tussen linkerrand en volumebalk (gelijke marges),
+     hoogte = tot vlak boven de afspeelknoppen; bovenaan evenveel ruimte als links (padding van .overlay) */
+  function sizeArt(){
+    var ov = document.querySelector(".overlay"); if(!ov || !ov.clientHeight) return;
+    var cs = getComputedStyle(ov), pl = parseFloat(cs.paddingLeft), pr = parseFloat(cs.paddingRight), pt = parseFloat(cs.paddingTop), pb = parseFloat(cs.paddingBottom);
+    var h = function(id){ var e = document.querySelector(id); if(!e) return 0; var c = getComputedStyle(e); return e.offsetHeight + parseFloat(c.marginTop) + parseFloat(c.marginBottom); };
+    var below = h(".controls") - parseFloat(getComputedStyle(document.querySelector(".controls")).marginTop) + h(".shuffleRow") + h("#progressRange") + h("#bottomBar") + 14;
+    var w = ov.clientWidth - pl - pr, avail = ov.clientHeight - pt - pb - below;
+    document.documentElement.style.setProperty("--art-size", Math.max(60, Math.floor(Math.min(w, avail))) + "px");
+  }
   function placeVolume(){
+    sizeArt();
     var wrap = document.querySelector(".wrap"), pr = document.getElementById("progressRange"), vw = document.querySelector(".volumeWrap");
     if(!wrap || !pr || !vw) return;
     var wr = wrap.getBoundingClientRect(), r = pr.getBoundingClientRect();
