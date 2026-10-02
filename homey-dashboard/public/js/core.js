@@ -306,6 +306,13 @@
     const S = Number(fx.shS) || 0; const off = { down: [0, 0.35], diag: [0.3, 0.35], around: [0, 0] }[fx.shD] || [0, 0.35];
     const x = Math.round(off[0] * S), y = Math.round(off[1] * S); const sc = D.hexA(fx.shC, fx.shA); const has = fx.shA > 0 && S >= 0;
     st.setProperty('--shadow', has && fx.shT === 'tile' ? `${x}px ${y}px ${S}px ${sc}` : '0 0 0 transparent');
+    // "Verhoogd": het knopvlak als blokje met lichtrand boven en diepe schaduw onder (werkt ook zonder kader / doorzichtig)
+    const raised = has && fx.shT === 'raised'; el.classList.toggle('sh-raised', raised);
+    if (raised) {
+      const A = Math.max(0, Math.min(1, Number(fx.shA) || 0)), Z = Math.max(4, S);
+      st.setProperty('--rsh', `${x ? Math.round(x * 0.5) : 0}px ${Math.round(Z * 0.35)}px ${Math.round(Z * 0.7)}px ${D.hexA(fx.shC, Math.min(0.9, A + 0.15))}, 0 ${Math.max(1, Math.round(Z * 0.08))}px ${Math.max(2, Math.round(Z * 0.15))}px ${D.hexA(fx.shC, A * 0.8)}, inset 0 1px 0 rgba(255,255,255,${(0.08 + 0.16 * A).toFixed(2)}), inset 0 -2px 0 rgba(0,0,0,${(0.35 * A).toFixed(2)})`);
+      st.setProperty('--rlift', Math.round(A * 5) + 'px');
+    } else { st.removeProperty('--rsh'); st.removeProperty('--rlift'); }
     if (has && fx.shT === 'face') st.setProperty('--fsh', `drop-shadow(${Math.round(x / 2)}px ${Math.round(y / 2)}px ${Math.round(S / 3)}px ${sc})`); else st.removeProperty('--fsh');
     st.setProperty('--tsh', has && fx.shT === 'text' ? `${Math.round(x / 3)}px ${Math.max(1, Math.round(y / 3))}px ${Math.max(1, Math.round(S / 4))}px ${sc}` : '0 0 0 transparent');
     // gloed

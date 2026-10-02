@@ -830,7 +830,8 @@
       (bordery ? auto('fbw', 'Knoprand dikte', 3, 0, 12, 1, 'px', 'Rand van de knop zelf, bij de ring de dikte van de ring') : '') +
       (t ? F.row('Zonder kader', F.toggle(k('frameless'), raw.frameless, 'tile')) : '');
     const fxb = `<div class="fxpresets">${Object.entries(FX_PRESETS).map(([id, [n]]) => `<button data-fxpreset="${id}" data-base="${base}" data-fx="${fx}">${esc(n)}</button>`).join('')}</div>` +
-      F.row('Schaduw op', F.seg(k('shT'), v.shT, [['tile', 'Tegel'], ['face', 'Knop'], ['text', 'Tekst']], fx)) +
+      F.row('Schaduw op', F.seg(k('shT'), v.shT, [['tile', 'Tegel'], ['face', 'Knop'], ['text', 'Tekst'], ['raised', 'Verhoogd']], fx), 'Verhoogd = knop als blokje met lichtrand en diepe schaduw; sterkte met de schuif hieronder') +
+      (v.shT === 'tile' && t && (raw.frameless || Number(raw.opacity ?? th.tileOpacity) === 0) ? '<p class="note">Deze knop heeft geen kader (zonder kader of doorzichtig), dus een schaduw op de tegel zie je niet. Kies <b>Knop</b> of <b>Verhoogd</b>.</p>' : '') +
       F.row('Schaduw sterkte', F.range(k('shA'), v.shA, 0, 1, 0.01, fx, '%') + reset('shA')) + F.row('Schaduw grootte', F.range(k('shS'), v.shS, 0, 60, 1, fx, 'px') + reset('shS')) +
       F.row('Richting', F.seg(k('shD'), v.shD, [['down', 'Onder'], ['diag', 'Schuin'], ['around', 'Rondom']], fx)) + F.row('Schaduwkleur', F.color(k('shC'), v.shC, fx) + reset('shC')) +
       F.row('Gloed', F.seg(k('glW'), v.glW, [['auto', 'Standaard'], ['never', 'Nooit'], ['on', 'Als aan'], ['always', 'Altijd'], ['alarm', 'Bij alarm']], fx), 'Standaard = de gloed van de knopstijl. Nooit = helemaal geen gloed. Bij alarm = bijv. raam open of beweging') +

@@ -465,3 +465,13 @@ body.editing.tabs-full #tabbar { padding-left: 16px; }
 .cb-tile .cb-sep { height: 1em !important; margin: 0 .2em !important; }
 .cb-tile .cb-bk { width: 1.5em !important; height: 1.5em !important; }
 .cb-tile .cb-bk i { width: .45em !important; height: .45em !important; box-shadow: none !important; }
+/* ---------- Schaduw op: Verhoogd (optisch verhoogde knop) ---------- */
+.tile.sh-raised :is(.kb-glow, .kb-ring, .kb-scene, .kb-icon, .kb-toggle, .kb-dim, .kb-cover) .face,
+.tile.sh-raised .kb-mini, .tile.sh-raised .badge { box-shadow: var(--rsh); transform: translateY(calc(var(--rlift, 0px) * -1)); filter: none; }
+.tile.sh-raised :is(.kb-glow, .kb-icon, .kb-toggle, .kb-dim, .kb-cover):not(.is-on) .face,
+.tile.sh-raised .kb-mini, .tile.sh-raised .badge:not(.on) { background: color-mix(in srgb, var(--text) 9%, var(--tile-solid)); }
+.tile.sh-raised .kb-icon .face { border-radius: 26%; }
+.tile.sh-raised .kb.is-on :is(.face) { box-shadow: var(--rsh), 0 0 1.2em color-mix(in srgb, var(--kon) 40%, transparent); }
+.tile.sh-raised .kb-ring.is-on .face { box-shadow: var(--rsh), inset 0 0 0 var(--fbw, .2em) var(--kon), 0 0 1.2em color-mix(in srgb, var(--kon) 40%, transparent); }
+.tile.sh-raised.gw-never .kb.is-on .face { box-shadow: var(--rsh); }
+.tile.sh-raised.pressing :is(.kb .face, .kb-mini, .badge) { transform: translateY(0); box-shadow: 0 1px 3px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.08); }
