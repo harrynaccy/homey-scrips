@@ -53,6 +53,9 @@ window.ICONS = {
   resize: 'M21 15v6h-6M21 21l-7-7M3 9V3h6M3 3l7 7',
   shapes: 'M8.5 3 13 11H4zM17.5 21a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM3 14h7v7H3z',
   knob: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
+  road: 'M8 3 5 21M16 3l3 18M12 4v3M12 10v3M12 16v3',
+  cone: 'M12 3 6.5 20h11zM8.6 13.5h6.8M10.2 8.5h3.6M4 21h16',
+  fuel: 'M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3 21h12M6 9h6M14 8h2a2 2 0 0 1 2 2v6a1.5 1.5 0 0 0 3 0V9l-3-3',
 };
 window.icon = function (name, cls) {
   const d = window.ICONS[name] || window.ICONS.chip;

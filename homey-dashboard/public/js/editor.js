@@ -221,7 +221,7 @@
   };
   E.F = F;
 
-  E.fmtOut = (v, f) => f === '%' ? Math.round(v * 100) + '%' : f === 'p' ? v + '%' : f === 'px' ? v + 'px' : f === 'x' ? Number(v).toFixed(2) + '×' : f === 'b' ? Math.round(v / 255 * 100) + '%' : f === 'min' ? v + ' min' : f === 's' ? v + ' s' : f === 'deg' ? v + '°' : v;
+  E.fmtOut = (v, f) => f === '%' ? Math.round(v * 100) + '%' : f === 'p' ? v + '%' : f === 'px' ? v + 'px' : f === 'x' ? Number(v).toFixed(2) + '×' : f === 'b' ? Math.round(v / 255 * 100) + '%' : f === 'min' ? v + ' min' : f === 's' ? v + ' s' : f === 'deg' ? v + '°' : f === 'km' ? v + ' km' : f === 'h' ? v + ' uur' : f === 'd' ? v + (v == 1 ? ' dag' : ' dagen') : v;
 
   // effecten na een wijziging
   const FX = {

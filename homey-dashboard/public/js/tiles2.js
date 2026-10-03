@@ -22,7 +22,7 @@
     return X.c.get(key) || {};
   };
   setInterval(() => { if (D.cfg && !document.hidden) D.refreshWhere(t => LIVE.includes(t.type)); }, 60e3);
-  const LIVE = ['p2000', 'rain', 'weather', 'air', 'price', 'waste', 'agenda', 'departures', 'travel', 'nas', 'homeyinfo', 'sunmoon', 'countdown', 'usage', 'solar'];
+  const LIVE = ['p2000', 'roadworks', 'jams', 'fuel', 'rain', 'weather', 'air', 'price', 'waste', 'agenda', 'departures', 'travel', 'nas', 'homeyinfo', 'sunmoon', 'countdown', 'usage', 'solar'];
   const wait = (t, ic, r, msg) => hd(t, ic) + `<div class="empty">${r && r.err ? `${icon('x')}<span>${esc(r.err)}</span>` : `<span>${esc(msg || 'Laden…')}</span>`}</div>`;
 
   // ---------- 1. ramen en deuren ----------
@@ -322,6 +322,84 @@
     },
   };
 
+  // ---------- Wegwerkzaamheden Enschede (NDW + P2000-afsluitingen) ----------
+  const dshort = t => new Date(t).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' });
+  const period = x => x.active ? (x.end ? 't/m ' + dshort(x.end) : 'tot nader bericht') : (x.start ? 'vanaf ' + dshort(x.start) + (x.end ? ' t/m ' + dshort(x.end) : '') : '');
+  const WHAT = { roadClosed: 'weg afgesloten', carriagewayClosures: 'rijbaan dicht', laneClosures: 'rijstrook dicht', narrowLanes: 'smalle rijstroken', singleAlternateLineTraffic: 'verkeer om en om', contraflow: 'tegenverkeer op rijbaan', roadworks: 'wegwerkzaamheden', resurfacingWork: 'nieuw asfalt', maintenanceWork: 'onderhoud', constructionWork: 'bouw', bridgeMaintenanceWork: 'brugonderhoud' };
+  const wwRow = x => {
+    const where = [x.road, x.street].filter(Boolean).join(' · ') || (x.texts[0] || 'Melding');
+    const what = [...new Set(x.what.map(w => WHAT[w] || ''))].filter(Boolean).join(', ');
+    const txt = x.texts.find(s2 => s2 !== where) || '';
+    return `<div class="x-ww${x.closed ? ' closed' : ''}"><div class="x-ww1"><span class="x-wwtag ${x.closed ? 'red' : 'org'}">${x.closed ? 'afgesloten' : 'hinder'}</span><b>${esc(where)}</b></div>`
+      + `<div class="x-ww2">${esc([what, period(x), x.diversion ? 'omleiding' : ''].filter(Boolean).join(' · '))}</div>${txt ? `<div class="x-ww3">${esc(txt)}</div>` : ''}</div>`;
+  };
+  T.roadworks = {
+    label: 'Wegwerkzaamheden Enschede', icon: 'cone', size: [4, 5], title: t => t.opts.title || 'Wegwerkzaamheden Enschede',
+    render(t, inner, el) {
+      const o = t.opts;
+      const q = `radius=${encodeURIComponent(o.radius || 6)}&days=${encodeURIComponent(o.soon === false ? 0 : (o.days || 7))}&p2000=${o.p2000 === false ? 0 : 1}&hours=${encodeURIComponent(o.hours || 3)}&accidents=${o.accidents ? 1 : 0}&places=${encodeURIComponent(o.places || 'Enschede')}`;
+      const r = X.get('ww:' + q, 5 * 60e3, () => D.api('GET', '/api/x/wegwerk?' + q), ['roadworks']);
+      if (!r.v) { inner.innerHTML = wait(t, 'cone', r, 'Gegevens van NDW ophalen…'); return; }
+      const v = r.v; let items = v.items || [];
+      if (o.onlyClosed) items = items.filter(x => x.closed);
+      const now = items.filter(x => x.active), soon = o.soon === false ? [] : items.filter(x => !x.active);
+      const p2 = (v.p2000 || []);
+      const sub = v.error ? `<span class="x-warn">${esc(v.error)}</span>` : v.loading ? 'NDW wordt opgehaald…' : `${now.length} nu${soon.length ? ` · ${soon.length} binnenkort` : ''}${p2.length ? ` · ${p2.length} P2000` : ''}`;
+      const p2t = x => { const m = /^\S+ naar (.+?) in .+? voor (.+)$/i.exec(x.desc || ''); return m ? m[2].charAt(0).toUpperCase() + m[2].slice(1) + ' · ' + m[1] : p2kText(x); };
+      const p2Html = p2.map(x => `<div class="x-ww p2k${x.closed ? ' closed' : ''}"><div class="x-ww1"><span class="x-wwtag blue">P2000</span><em class="x-time">${hm(x.t)}</em><b>${esc(p2t(x))}</b></div><div class="x-ww3">${esc(x.title)}</div></div>`).join('');
+      const head = h => `<div class="x-wwh">${esc(h)}</div>`;
+      const body = p2Html + (now.length ? head('Nu') + now.map(wwRow).join('') : '') + (soon.length ? head('Binnenkort (' + (o.days || 7) + ' dagen)') + soon.map(wwRow).join('') : '');
+      inner.innerHTML = hd(t, 'cone', sub) + `<div class="list">${body || `<div class="empty">${v.loading ? 'Laden…' : 'Geen werkzaamheden of afsluitingen'}</div>`}</div><div class="x-src">bron: NDW${o.p2000 === false ? '' : ' · P2000 alarmeringen.nl'}</div>`;
+    },
+  };
+
+  // ---------- Files A- en N-wegen (ANWB, reserve NDW) ----------
+  const PROVS = [['overijssel', 'Overijssel'], ['friesland', 'Friesland'], ['rest', 'Rest van Nederland']];
+  const jamRow = x => `<div class="x-jam${x.type === 'afsluiting' ? ' closed' : ''}"><span class="x-road ${/^A/i.test(x.road) ? 'a' : 'n'}">${esc(x.road || '?')}</span>`
+    + `<div class="x-jb"><div class="x-jl1">${esc([x.from, x.to].filter(Boolean).join(' → ') || x.reason || '')}</div><div class="x-jl2">${x.type === 'afsluiting' ? '<b class="x-red">afgesloten</b>' : ''}${esc([x.reason && (x.from || x.to) ? x.reason : ''].filter(Boolean).join(''))}</div></div>`
+    + `<div class="x-jn">${x.km != null ? `<b>${String(x.km).replace('.', ',')} km</b>` : ''}${x.delay ? `<small>+${x.delay} min</small>` : ''}</div></div>`;
+  T.jams = {
+    label: 'Files A- en N-wegen', icon: 'road', size: [4, 6], title: t => t.opts.title || 'Files',
+    render(t, inner) {
+      const o = t.opts;
+      const r = X.get('files', 2 * 60e3, () => D.api('GET', '/api/x/files'), ['jams']);
+      if (!r.v) { inner.innerHTML = wait(t, 'road', r, 'Files ophalen…'); return; }
+      const v = r.v; const items = (v.items || []).filter(x => (x.type === 'afsluiting' ? o.closures !== false : o.jams !== false));
+      const sort = (a, b) => ((b.type === 'afsluiting') - (a.type === 'afsluiting')) || ((b.km || 0) - (a.km || 0)) || ((b.delay || 0) - (a.delay || 0));
+      const order = String(o.order || 'overijssel,friesland,rest').split(',');
+      const groups = order.map(k => PROVS.find(p => p[0] === k)).filter(Boolean).filter(p => p[0] !== 'rest' || o.rest !== false);
+      const files = items.filter(x => x.type === 'file'); const tot = files.reduce((s2, x) => s2 + (x.km || 0), 0);
+      const sub = v.error ? `<span class="x-warn">${esc(v.error)}</span>` : v.loading ? 'Laden…' : `${files.length} ${files.length === 1 ? 'file' : 'files'}${tot ? ' · ' + Math.round(tot) + ' km' : ''}${items.length - files.length ? ` · ${items.length - files.length} afgesloten` : ''}`;
+      const body = groups.map(([k, name]) => { const l = items.filter(x => (x.prov || 'rest') === k).sort(sort); return `<div class="x-wwh">${esc(name)}${l.length ? ` <small>${l.length}</small>` : ''}</div>` + (l.map(jamRow).join('') || '<div class="x-jnone">Geen files</div>'); }).join('');
+      inner.innerHTML = hd(t, 'road', sub) + `<div class="list">${body}</div><div class="x-src">bron: ${esc(v.source || '')}${v.source === 'NDW' ? ' (reserve; zonder filelengte)' : ''}${v.stale ? ' · verbinding even weg' : ''}</div>`;
+    },
+  };
+
+  // ---------- Goedkoopst tanken (Enschede, Gronau, Ahaus/Alstätte) ----------
+  const eur = n => '€ ' + n.toFixed(3).replace('.', ',').replace(/(\d,\d\d)(\d)$/, '$1<sup>$2</sup>');
+  const eur2 = n => '€ ' + n.toFixed(2).replace('.', ',');
+  const FUEL = { e5: ['Euro 95', 'Super E5'], e10: ['Euro 95 (E10)', 'Super E10'], diesel: ['Diesel', 'Diesel'] };
+  T.fuel = {
+    label: 'Goedkoopst tanken', icon: 'fuel', size: [4, 8], title: t => t.opts.title || 'Goedkoopst tanken',
+    render(t, inner) {
+      const o = t.opts; const fuel = o.fuel || 'e5'; const n = Number(o.count) || 3; const liters = Number(o.liters) || 55;
+      const r = X.get('fuel:' + fuel, 10 * 60e3, () => D.api('GET', '/api/x/tanken?fuel=' + fuel), ['fuel']);
+      if (!r.v) { inner.innerHTML = wait(t, 'fuel', r); return; }
+      const v = r.v;
+      const pick = a => (a.list || []).filter(s2 => o.openOnly === false || s2.open !== false).slice(0, n);
+      const block = (name, a, de) => { const l = pick(a);
+        return `<div class="x-fb"><div class="x-wwh">${esc(name)} <small>${esc(de ? FUEL[fuel][1] : FUEL[fuel][0])}</small></div>`
+          + (l.map((s2, i) => `<div class="x-fs${i === 0 ? ' best' : ''}"><div class="x-fn"><b>${esc(s2.name || s2.full)}</b><small>${esc([s2.street, s2.place].filter(Boolean).join(', '))}${s2.open === true ? ' · <span class="x-ok">open</span>' : s2.open === false ? ' · gesloten' : ''}</small></div><div class="x-fp">${eur(s2.price)}</div></div>`).join('')
+          || `<div class="x-jnone${a.error ? ' x-warn' : ''}">${esc(a.error || 'Geen open tankstations gevonden')}</div>`) + '</div>'; };
+      const best = a => { const l = pick(a); return l.length ? l[0] : null; };
+      const nl = best(v.nl), cands = [['Gronau', best(v.gronau)], ['Ahaus / Alstätte', best(v.ahaus)]].filter(x => x[1]).sort((a, b) => a[1].price - b[1].price);
+      let diff = '';
+      if (nl && cands.length) { const [nm, de] = cands[0]; const d = nl.price - de.price;
+        diff = d > 0.0005 ? `<div class="x-fdiff"><b>${esc(nm)}</b> is ${eur2(d)} per liter goedkoper · <b>${eur2(d * liters)}</b> op ${liters} liter</div>` : `<div class="x-fdiff">Enschede is ${eur2(-d)} per liter goedkoper dan ${esc(nm)} · ${eur2(-d * liters)} op ${liters} liter</div>`; }
+      inner.innerHTML = hd(t, 'fuel', esc(FUEL[fuel][0])) + `<div class="list">${block('Enschede', v.nl)}${block('Gronau', v.gronau, true)}${block('Ahaus / Alstätte', v.ahaus, true)}</div>${diff}<div class="x-src">bron: ANWB · Tankerkönig (MTS-K), CC BY 4.0</div>`;
+    },
+  };
+
   // ---------- Verbindingen (zelfde als de balk linksonder) ----------
   T.conn = {
     label: 'Verbindingen', icon: 'server', size: [3, 1], title: t => t.opts.title || 'Verbindingen',
@@ -491,6 +569,7 @@
     ['waste', 'Afvalkalender', 'Welke container wanneer (Twente Milieu)'], ['agenda', 'Agenda', 'Afspraken uit Google of iCloud'], ['countdown', 'Afteller', 'Aantal dagen tot …'],
     ['notes', 'Boodschappen en notities', 'Lijstje, gedeeld met alle schermen'], ['timer', 'Kookwekker', 'Timer met geluid'],
     ['departures', 'Vertrektijden bus en tram', 'Bij jouw halte'], ['travel', 'Reistijd naar werk', 'Met de auto'], ['p2000', 'P2000 Twente', 'Meldingen brandweer, ambulance en politie'], ['ns', 'NS reisinformatie', 'Vertrektijden en storingen van je station'], ['bus', 'Bus reisinformatie', 'Live vertrektijden en omleidingen van je halte'],
+    ['roadworks', 'Wegwerkzaamheden Enschede', 'Werkzaamheden en afsluitingen, ook uit P2000'], ['jams', 'Files A- en N-wegen', 'Overijssel, Friesland en de rest van Nederland'], ['fuel', 'Goedkoopst tanken', 'Enschede, Gronau en Ahaus/Alstätte'],
     ['conn', 'Verbindingen', 'Scherm, NAS, Homey en back-up (zoals de balk linksonder)'], ['nas', 'NAS-status', 'Schijven, temperatuur, opslag'], ['homeyinfo', 'Homey-status', 'Versie, geheugen, aantallen'],
     ['heading', 'Kop of scheidingslijn', 'Tabblad in blokken verdelen'], ['spacer', 'Lege ruimte', 'Onzichtbare tegel als ruimte'], ['photos', 'Fotolijst', 'Diashow van je eigen foto\'s'], ['wifiqr', 'Wifi voor gasten', 'QR-code om te scannen'],
   ];
@@ -546,6 +625,22 @@
         F.row('Rand', F.range(`${P}.opts.pBorder`, t.opts.pBorder != null ? t.opts.pBorder : 0.14, 0, 1, 0.01, 'tile', '%'))) +
       F.row('Kleur meldingen', F.colorOpt(`${P}.opts.warnColor`, t.opts.warnColor, '#ffcf4a', 'tile'), 'Bijv. "tijdelijk niet beschikbaar" en "verbinding even weg"') +
       '<p class="note">Live via OVapi (bus, tram, metro van alle vervoerders, ook Arriva).</p>',
+    roadworks: (t, P, F) => F.row('Straal rond Enschede', F.range(`${P}.opts.radius`, t.opts.radius || 6, 1, 30, 1, 'tile', 'km')) +
+      F.row('Alleen afsluitingen', F.toggle(`${P}.opts.onlyClosed`, !!t.opts.onlyClosed, 'tile'), 'Uit = ook hinder (rijstrook dicht, om en om)') +
+      F.row('Binnenkort tonen', F.toggle(`${P}.opts.soon`, t.opts.soon !== false, 'tilepanel')) + (t.opts.soon !== false ? F.row('Dagen vooruit', F.range(`${P}.opts.days`, t.opts.days || 7, 1, 30, 1, 'tile', 'd')) : '') +
+      F.row('P2000-afsluitingen', F.toggle(`${P}.opts.p2000`, t.opts.p2000 !== false, 'tilepanel'), 'Meldingen waarin een afsluiting of afzetting staat') +
+      (t.opts.p2000 !== false ? F.row('Plaatsen (P2000)', F.text(`${P}.opts.places`, t.opts.places, 'tile', 'Enschede'), 'Leeg = Enschede') + F.row('P2000 tonen', F.range(`${P}.opts.hours`, t.opts.hours || 3, 1, 24, 1, 'tile', 'h'), 'Hoe lang na de melding') +
+        F.row('Ook verkeersongevallen', F.toggle(`${P}.opts.accidents`, !!t.opts.accidents, 'tile'), 'Bijv. "ongeval wegvervoer"') : '') +
+      '<p class="note">Bron: NDW open data (ook gemeentelijke werkzaamheden via Melvin). De NAS haalt elke 15 minuten op zolang de tegel in beeld is.</p>',
+    jams: (t, P, F) => F.row('Files', F.toggle(`${P}.opts.jams`, t.opts.jams !== false, 'tile')) + F.row('Afsluitingen', F.toggle(`${P}.opts.closures`, t.opts.closures !== false, 'tile')) +
+      F.row('Volgorde', F.seg(`${P}.opts.order`, t.opts.order || 'overijssel,friesland,rest', [['overijssel,friesland,rest', 'Overijssel eerst'], ['friesland,overijssel,rest', 'Friesland eerst']], 'tile')) +
+      F.row('Rest van Nederland', F.toggle(`${P}.opts.rest`, t.opts.rest !== false, 'tile')) +
+      '<p class="note">Bron: ANWB (niet officieel, kan veranderen); lukt dat niet, dan NDW zonder filelengte. Provincie wordt bepaald aan de hand van de plek van de file.</p>',
+    fuel: (t, P, F) => F.row('Brandstof', F.seg(`${P}.opts.fuel`, t.opts.fuel || 'e5', [['e5', 'Euro 95 / E5'], ['e10', 'E10'], ['diesel', 'Diesel']], 'tile')) +
+      F.row('Aantal per plaats', F.range(`${P}.opts.count`, t.opts.count || 3, 1, 5, 1, 'tile', 'n')) + F.row('Alleen open', F.toggle(`${P}.opts.openOnly`, t.opts.openOnly !== false, 'tile')) +
+      F.row('Liters per tankbeurt', F.num(`${P}.opts.liters`, t.opts.liters || 55, 10, 120, 'tile')) +
+      `<div class="f col"><label>Tankerkönig-sleutel (Duitsland)<small data-tkstat>Gratis via onboarding.tankerkoenig.de. Wordt alleen op de NAS bewaard.</small></label><div class="x-ovsearch"><input type="password" placeholder="Plak hier je sleutel" data-tkkey autocomplete="off"><button class="btn sm" data-tksave>Opslaan</button></div></div>` +
+      '<p class="note">Enschede: prijzen van de ANWB (niet officieel). Duitsland: officiële prijzen via Tankerkönig, elke 10 minuten.</p>',
     conn: (t, P, F) => F.row('Tekst eronder', F.toggle(`${P}.opts.info`, t.opts.info !== false, 'tile'), 'Reactietijden en back-up; vanaf 2 hoog') +
       '<p class="note">De vaste balk linksonder stel je in bij Scherm → Statusbalk linksonder.</p>',
     p2000: (t, P, F) => F.row('Brandweer', F.toggle(`${P}.opts.fire`, t.opts.fire !== false, 'tile')) + F.row('Ambulance', F.toggle(`${P}.opts.ambu`, t.opts.ambu !== false, 'tile')) + F.row('Politie', F.toggle(`${P}.opts.pol`, t.opts.pol !== false, 'tile')) +
@@ -592,6 +687,11 @@
         try { await D.api('POST', '/api/x/key', { name: 'ns', value: v }); root.querySelector('[data-nskey]').value = ''; D.toast('NS-sleutel opgeslagen op de NAS'); X.c.clear(); D.renderGrid(); D.editor.refreshPanel(); } catch (e) { D.toast(e.message, true); } };
     },
     bus: (root, t, P) => { reisPhotoWire(root, t); D.tileWire.departures(root, t, P); },
+    fuel: root => {
+      const st = root.querySelector('[data-tkstat]'); D.api('GET', '/api/x/secrets').then(s2 => { if (st && s2.tankerkoenig) st.textContent = 'Sleutel is ingesteld (staat alleen op de NAS). Opnieuw invullen vervangt hem.'; }).catch(() => {});
+      const b = root.querySelector('[data-tksave]'); if (b) b.onclick = async () => { const v = root.querySelector('[data-tkkey]').value.trim(); if (!v) { D.toast('Plak eerst je sleutel', true); return; }
+        try { await D.api('POST', '/api/x/key', { name: 'tankerkoenig', value: v }); root.querySelector('[data-tkkey]').value = ''; D.toast('Tankerkönig-sleutel opgeslagen op de NAS'); X.c.clear(); D.renderGrid(); D.editor.refreshPanel(); } catch (e) { D.toast(e.message, true); } };
+    },
     departures: (root, t, P) => {
       const q = root.querySelector('[data-ovq]'), res = root.querySelector('[data-ovres]'); if (!q) return; let tm;
       q.oninput = () => { clearTimeout(tm); tm = setTimeout(async () => { if (q.value.trim().length < 3) { res.innerHTML = ''; return; } res.innerHTML = '<small class="muted">Zoeken…</small>';
