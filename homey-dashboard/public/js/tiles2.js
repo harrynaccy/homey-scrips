@@ -399,7 +399,8 @@
     qrLib().then(() => use.forEach(k => { const q = window.qrcode(0, 'M'); q.addData(NAV[k][1](s2)); q.make(); const box = root.querySelector(`[data-fqr="${k}"]`); if (box) box.innerHTML = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true }); })).catch(() => {});
     const st = root.querySelector('[data-fstat]');
     root.querySelectorAll('[data-fphone]').forEach(btn => { btn.onclick = async () => { const k = btn.dataset.fphone; btn.disabled = true; st.textContent = 'Versturen…';
-      try { await D.api('POST', '/api/x/tanken/telefoon', { name: s2.name || s2.full, street: s2.street, place: s2.place, price: s2.price, lat: s2.lat, lon: s2.lon, app: k }); st.textContent = `Verstuurd. Tik op de melding op je telefoon; die opent ${NAV[k][0]}.`; D.toast('Naar je telefoon gestuurd'); }
+      try { const r = await D.api('POST', '/api/x/tanken/telefoon', { name: s2.name || s2.full, street: s2.street, place: s2.place, price: s2.price, lat: s2.lat, lon: s2.lon, app: k });
+        st.textContent = `Verstuurd${r.sent > 1 ? ` naar ${r.sent} kanalen` : ''}. Tik op de melding op je telefoon; die opent ${NAV[k][0]}.${r.failed && r.failed.length ? ' Niet gelukt: ' + r.failed.join('; ') : ''}`; D.toast('Naar je telefoon gestuurd'); }
       catch (e) { st.textContent = e.message; } btn.disabled = false; }; });
   };
   const fuelRow = (s2, i, key) => `<button class="x-fs nopress${i === 0 ? ' best' : ''}" data-fst="${esc(key)}"><div class="x-fn"><b>${esc(s2.name || s2.full)}</b><small>${esc([s2.street, s2.place].filter(Boolean).join(', '))}${s2.open === false ? ' · gesloten' : ''}</small></div><div class="x-fp">${eur(s2.price)}</div></button>`;
@@ -619,7 +620,7 @@
   const devSel = (P, F, cur, filter, label = 'Apparaat') => F.row(label, F.select(`${P}.opts.deviceId`, cur || '', [['', 'Kies…'], ...D.lib.devices.filter(filter).sort((a, b) => a.name.localeCompare(b.name)).map(d => [d.id, d.name])], 'tilepanel'));
   const fuelKeys = F => F.row('Navigatie-app', F.seg('settings.navApp', navApp(), [['waze', 'Waze'], ['gmaps', 'Google Maps'], ['both', 'Beide']], 'tile'), 'Voor "Naar telefoon" en de QR-code; geldt voor alle tanktegels') +
     `<div class="f col"><label>Tankerkönig-sleutel (Duitsland)<small data-tkstat>Gratis via onboarding.tankerkoenig.de. Wordt alleen op de NAS bewaard.</small></label><div class="x-ovsearch"><input type="password" placeholder="Plak hier je sleutel" data-tkkey autocomplete="off"><button class="btn sm" data-tksave>Opslaan</button></div></div>` +
-    `<div class="f col"><label>ntfy-kanaal (naar je telefoon)<small data-ntstat>De naam van je kanaal in de app ntfy, precies zo (hoofdletters tellen). Wordt alleen op de NAS bewaard.</small></label><div class="x-ovsearch"><input type="password" placeholder="Kanaalnaam" data-ntkey autocomplete="off"><button class="btn sm" data-ntsave>Opslaan</button><button class="btn sm ghost" data-nttest>Test</button></div></div>`;
+    `<div class="f col"><label>ntfy-kanaal (naar je telefoon)<small data-ntstat>De naam van je kanaal in de app ntfy, precies zo (hoofdletters tellen). Meer telefoons: meerdere kanalen met een komma ertussen. Wordt alleen op de NAS bewaard.</small></label><div class="x-ovsearch"><input type="password" placeholder="Kanaalnaam" data-ntkey autocomplete="off"><button class="btn sm" data-ntsave>Opslaan</button><button class="btn sm ghost" data-nttest>Test</button></div></div>`;
   D.tileOptions = {
     room: (t, P, F) => F.row('Ruimte', F.select(`${P}.opts.zoneId`, t.opts.zoneId || '', [['', 'Kies…'], ...D.lib.zones.map(z => [z.id, z.name])], 'tilepanel')) +
       F.row('Tik opent pagina', F.select(`${P}.opts.page`, t.opts.page || '', [['', 'Niets'], ...D.cfg.tabs.map(x => [x.id, (x.sub ? 'Subpagina: ' : '') + x.name])], 'tile')),
@@ -740,7 +741,7 @@
       save('[data-tksave]', '[data-tkkey]', 'tankerkoenig', 'Tankerkönig-sleutel opgeslagen op de NAS');
       save('[data-ntsave]', '[data-ntkey]', 'ntfy', 'ntfy-kanaal opgeslagen op de NAS');
       const tb = root.querySelector('[data-nttest]'); if (tb) tb.onclick = async () => {
-        try { await D.api('POST', '/api/x/tanken/telefoon', { name: 'Test vanaf het dashboard', street: '', place: 'Enschede centrum', lat: 52.2215, lon: 6.8937, app: navApp() }); D.toast('Testmelding verstuurd; kijk op je telefoon'); } catch (e) { D.toast(e.message, true); } };
+        try { await D.api('POST', '/api/x/tanken/telefoon', { name: 'Test vanaf het dashboard', street: '', place: 'Enschede centrum', lat: 52.2215, lon: 6.8937, app: navApp() }).then(r => D.toast(r.failed && r.failed.length ? 'Deels verstuurd. Niet gelukt: ' + r.failed.join('; ') : `Testmelding verstuurd${r.sent > 1 ? ` naar ${r.sent} kanalen` : ''}; kijk op je telefoon`, !!(r.failed && r.failed.length))); } catch (e) { D.toast(e.message, true); } };
     },
     fueltip: root => D.tileWire.fuel(root),
     departures: (root, t, P) => {

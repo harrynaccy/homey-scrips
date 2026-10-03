@@ -93,8 +93,11 @@ class Tanken {
   }
   // station naar de telefoon: melding via ntfy; tikken op de melding opent Waze met de route
   async toPhone(b) {
-    const topic = str(this.secrets().ntfy).trim();
-    if (!topic) throw new Error('Vul bij Tegel je ntfy-kanaal in');
+    // één of meer kanalen, gescheiden door komma, puntkomma of spatie (elke telefoon die op een van deze kanalen staat krijgt de melding)
+    const topics = [...new Set(str(this.secrets().ntfy).split(/[,;\s]+/).map(x => x.trim()).filter(Boolean))];
+    if (!topics.length) throw new Error('Vul bij Tegel je ntfy-kanaal in');
+    const bad = topics.filter(x => !/^[\w-]{1,64}$/.test(x));
+    if (bad.length) throw new Error(`Kanaalnaam mag alleen letters, cijfers, - en _ bevatten: ${bad.join(', ')}`);
     const lat = b.lat == null || b.lat === '' ? NaN : Number(b.lat), lon = b.lon == null || b.lon === '' ? NaN : Number(b.lon);
     if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) throw new Error('Van dit station is de plek onbekend');
     const name = str(b.name).slice(0, 80), addr = [str(b.street), str(b.place)].filter(Boolean).join(', ').slice(0, 120);
@@ -104,12 +107,14 @@ class Tanken {
     const app = ['waze', 'gmaps', 'both'].includes(b.app) ? b.app : 'both';
     const use = app === 'both' ? ['waze', 'gmaps'] : [app];
     // JSON-bericht (officieel ntfy-formaat; letters als € en ä gaan zo goed). Tik op de melding = eerste app, knoppen = elke app.
-    const r = await fetch(`${NTFY}/`, { method: 'POST', signal: AbortSignal.timeout(12000), headers: { ...UA, 'Content-Type': 'application/json' },
+    const send = topic => fetch(`${NTFY}/`, { method: 'POST', signal: AbortSignal.timeout(12000), headers: { ...UA, 'Content-Type': 'application/json' },
       body: JSON.stringify({ topic, title: `${name}${price ? ' – ' + price : ''}`, tags: ['fuelpump'], click: APPS[use[0]][1],
         message: `${addr || name}\n${use.length > 1 ? 'Tik om te navigeren met Waze, of kies hieronder.' : 'Tik om te navigeren met ' + APPS[use[0]][0] + '.'}`,
         actions: use.map(k => ({ action: 'view', label: APPS[k][0], url: APPS[k][1], clear: true })) }) });
-    if (!r.ok) throw new Error(`ntfy gaf ${r.status}`);
-    return { ok: true };
+    const res = await Promise.all(topics.map(t => send(t).then(r => (r.ok ? null : `${t}: ntfy gaf ${r.status}`), e => `${t}: ${e.message || e}`)));
+    const fails = res.filter(Boolean);
+    if (fails.length === topics.length) throw new Error(fails.join('; '));
+    return { ok: true, sent: topics.length - fails.length, failed: fails };
   }
 }
 
