@@ -8,6 +8,7 @@ Stand: 2 oktober 2026. Eigenaar: Ramon. Taal: Nederlands, kort en duidelijk.
 - Wijzigingen gaan via deze GitHub-branch; Ramon haalt ze binnen met **Systeem → Bijwerken** in het dashboard. Geen zipbestanden meer.
 - Kort antwoorden, weinig opsommingen van wat je allemaal gedaan hebt; zeg eerlijk wat niet getest is.
 - Na elke wijziging die invloed heeft op het draaien: test lokaal in demo-modus (zie onder) voordat je pusht.
+- **Na het bouwen van een nieuwe tegel/programma altijd afsluiten met de vraag:** "Wil je hier ook een Homey-app van, zodat je het buiten de deur op je telefoon kunt zien?" (Tegels onder Overig bestaan alleen in het dashboard; een eigen Homey-app verschijnt onder Eigen apps én in de Homey-app. Gegevens blijven van de NAS komen, Homey haalt ze thuis op.)
 
 ## Opbouw
 - **NAS**: Synology DS918+, 192.168.178.79. Dashboard draait in Docker (Container Manager, project `homey-dashboard`), map `/volume1/docker/Homey Dashboard` (= deze map), poort **8095**.
@@ -40,6 +41,7 @@ Stand: 2 oktober 2026. Eigenaar: Ramon. Taal: Nederlands, kort en duidelijk.
 - Eerder (zie git log): 25 extra tegels, dimmers, klokken, pictogramsets, subpagina's, Controle-verbeteringen, Voorbeeld A11+, camera Reolink.
 
 ## Nog open
+0. **Homey-app "Reisinfo"** (NS- en Bus-widget, aparte app naast Spotify Dashboard): pas maken als Ramon dat aangeeft. Nog te kiezen: twee losse widgets of één, station/halte kiezen in de widget of overnemen van de dashboardtegels. Ramon installeert zelf met `homey app install`.
 1. **Tablet krijgt de reservemap**: SMB aan op de NAS, eventueel aparte NAS-gebruiker met alleen lezen, FolderSync op de tablet (naar lokale map, dagelijks, filter "met-sleutels" uitsluiten).
 2. Ideeënlijst (nog niet gebouwd): scherm wekken via Homey (voordeur/beweging), nachtstand op Homey-status, zoeken in de instellingen, controle op kapotte tegels, kopiëren naar ander tabblad, echte tablet-schermafdruk in de A11+-voorbeeldweergave, handleiding (`public/handleiding.html`) bijwerken met alles van deze week.
 3. Ook genoemd maar niet gekozen: alarmscherm bij rook, waarschuwing raam open + regen, starttabblad per tijd van de dag, vegen tussen tabbladen.
