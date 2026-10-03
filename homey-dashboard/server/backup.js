@@ -133,7 +133,7 @@ function fullBackup({ dataDir, keys }) { return zip(fullEntries({ dataDir, keys 
 // data-map: alles meenemen (ook submappen), behalve tijdelijke bestanden
 function walk2(dir, base, out) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (e.name.endsWith('.tmp') || e.name.startsWith('voor-update-') || ['update-terug', 'update-proef'].includes(e.name)) continue;
+    if (e.name.endsWith('.tmp') || e.name.startsWith('voor-update-') || ['update-terug', 'update-proef', 'gtfs'].includes(e.name)) continue; // gtfs = reservebron NS, wordt vanzelf opnieuw opgehaald
     const full = path.join(dir, e.name); const rel = base + '/' + e.name;
     if (e.isDirectory()) walk2(full, rel, out); else if (e.isFile()) out.push({ name: rel, data: fs.readFileSync(full) });
   }

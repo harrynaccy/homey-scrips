@@ -186,3 +186,4 @@ body.editing .tile.x-spacer { outline: 1px dashed rgba(255,255,255,.2); }
 .x-reis .xr-photo { position: absolute; inset: 0; background-size: cover; background-position: center; z-index: 0; }
 .x-reis .xr-dim { position: absolute; inset: 0; z-index: 0; }
 .x-reis > .xr-hd, .x-reis > .xr-panel { position: relative; z-index: 1; }
+.xr-src { margin-top: .4em; text-align: right; font-size: .72em; color: var(--xr-muted); opacity: .8; }

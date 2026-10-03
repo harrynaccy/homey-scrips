@@ -25,7 +25,11 @@ const arr = v => (Array.isArray(v) ? v : v && typeof v === 'object' ? Object.val
 const str = v => (v == null ? '' : String(v));
 
 class Reis {
-  constructor({ secrets }) { this.secrets = secrets; }
+  constructor({ secrets, dataDir }) {
+    this.secrets = secrets;
+    try { if (dataDir) { const { OvGtfs } = require('./ovgtfs'); this.gtfs = new OvGtfs({ dataDir }); } } catch (e) { console.error('[ovgtfs]', e.message); }
+  }
+  reserveInfo() { return this.gtfs ? this.gtfs.info() : { status: 'niet beschikbaar' }; }
   nsKey() { const k = str(this.secrets().ns).trim(); if (!k) throw new Error('Vul bij Tegel je NS-sleutel in (gratis via apiportal.ns.nl)'); return k; }
   ns(path) { return getJson(NS + path, { 'Ocp-Apim-Subscription-Key': this.nsKey() }); }
 
@@ -54,9 +58,23 @@ class Reis {
     return v;
   }
 
-  // ---------- NS: vertrektijden ----------
-  nsDepartures(station) {
+  // ---------- vertrektijden: eerst NS, lukt dat niet dan de reservebron (open OV-data) ----------
+  async nsDepartures(station) {
     station = str(station).toUpperCase(); if (!/^[A-Z0-9]{1,8}$/.test(station)) throw new Error('Kies bij Tegel een station');
+    let nsRes = null, nsErr = null;
+    try { nsRes = await this.nsOnly(station); if (!nsRes.stale && nsRes.departures.length) return nsRes; } catch (e) { nsErr = e; }
+    if (!this.gtfs) { if (nsRes) return nsRes; throw nsErr; }
+    try {
+      const s = (await this.stationList().catch(() => [])).find(x => x.code === station);
+      const r = await cached('ov:dep:' + station, 30e3, () => this.gtfs.departures(station, s ? s.name : station));
+      return { ...r, nsError: nsErr ? String(nsErr.message || nsErr) : (nsRes && nsRes.staleError) || 'NS gaf geen vertrektijden' };
+    } catch (e) {
+      if (nsRes) return nsRes;
+      if (e.preparing) throw Object.assign(new Error('NS geeft nu geen vertrektijden. ' + e.message), { preparing: true });
+      throw nsErr || e;
+    }
+  }
+  nsOnly(station) {
     return cached('ns:dep:' + station, 30e3, async () => {
       const vs = await this.depVariants(station); this.depOk = this.depOk || {};
       const order = this.depOk[station] != null ? [vs[this.depOk[station]], ...vs.filter((_, i) => i !== this.depOk[station])].filter(Boolean) : vs;
