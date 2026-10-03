@@ -260,6 +260,7 @@ const reis = new Reis({ secrets: () => extra.secrets() });
 app.get('/api/x/ns/stations', xr(r => reis.nsStations(r.query.q)));
 app.get('/api/x/ns/departures', xr(r => reis.nsDepartures(r.query.station)));
 app.get('/api/x/ns/disruptions', xr(r => reis.nsDisruptions(r.query.station)));
+app.get('/api/x/ns/test', xr(r => reis.nsTest(r.query.station)));
 app.get('/api/x/bus', xr(r => reis.bus({ code: r.query.code, lines: r.query.lines, dest: r.query.dest })));
 app.post('/api/appwidgets/scan', guard, async (req, res) => { try { res.json(await appscan.scan()); } catch (e) { fail(res, e); } });
 app.post('/api/appwidgets/install', guard, async (req, res) => { try { const b = req.body || {}; res.json(await appscan.install(String(b.appId || ''), String(b.widgetId || ''))); } catch (e) { fail(res, e); } });

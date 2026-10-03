@@ -135,19 +135,19 @@ body.editing .tile.x-spacer { outline: 1px dashed rgba(255,255,255,.2); }
 
 /* ---------- NS- en busreisinformatie (bord) ---------- */
 .tile.t-ns .inner, .tile.t-bus .inner { padding: 0; }
-.x-reis { position: absolute; inset: 0; display: flex; flex-direction: column; gap: clamp(8px, 2.2cqh, 18px); padding: clamp(12px, 3.6cqw, 34px); border-radius: inherit; color: #fff; overflow: hidden;
+.x-reis { position: absolute; inset: 0; display: flex; flex-direction: column; gap: clamp(6px, 2.2cqh, 18px); padding: clamp(10px, min(3.6cqw, 5cqh), 34px); border-radius: inherit; color: #fff; overflow: hidden;
   --xr-panel: rgba(255,255,255,.045); --xr-line: rgba(255,255,255,.14); --xr-muted: rgba(255,255,255,.72); font-size: clamp(11px, 2.2cqw, 17px); }
 .x-reis.ns { background: radial-gradient(120% 90% at 85% 0%, #1f3f9a 0%, transparent 60%), linear-gradient(165deg, #0e2a6e, #0a1d52 70%, #11286b); }
 .x-reis.bus { background: radial-gradient(120% 90% at 85% 100%, #7a1d33 0%, transparent 60%), linear-gradient(165deg, #3d0b17, #2e0812 65%, #5a1526); }
 .x-reis.themed { background: var(--tile); color: var(--text); --xr-muted: var(--muted); --xr-line: color-mix(in srgb, var(--text) 14%, transparent); }
 .xr-hd { display: flex; align-items: flex-start; justify-content: space-between; gap: 1em; flex: none; }
 .xr-ht { min-width: 0; }
-.xr-hd h3 { margin: 0; font-size: clamp(18px, 5.4cqw, 44px); font-weight: 800; letter-spacing: -.01em; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.xr-hd p { margin: .35em 0 0; color: var(--xr-muted); font-size: clamp(12px, 2.6cqw, 22px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.xr-clock { font-size: clamp(18px, 4.6cqw, 40px); font-weight: 300; font-variant-numeric: tabular-nums; flex: none; }
+.xr-hd h3 { margin: 0; font-size: clamp(16px, min(5.4cqw, 8cqh), 44px); font-weight: 800; letter-spacing: -.01em; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.xr-hd p { margin: .3em 0 0; color: var(--xr-muted); font-size: clamp(11px, min(2.6cqw, 4.4cqh), 22px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.xr-clock { font-size: clamp(16px, min(4.6cqw, 7cqh), 40px); font-weight: 300; font-variant-numeric: tabular-nums; flex: none; }
 .xr-panel { background: var(--xr-panel); border: 1px solid var(--xr-line); border-radius: clamp(10px, 2cqw, 18px); padding: clamp(10px, 2.6cqw, 24px); min-height: 0; display: flex; flex-direction: column; }
-.xr-panel.xr-dep { flex: 1.45 1 0; }
-.xr-panel.xr-dis { flex: 1 1 0; }
+.xr-panel.xr-dep { flex: 1 1 0; }
+.xr-panel.xr-dis { flex: 0 1 auto; max-height: 38%; }   /* alleen zo groot als nodig; vertrektijden krijgen de rest */
 .xr-panel h4 { margin: 0 0 .55em; font-size: .92em; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--xr-muted); flex: none; }
 .xr-list { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; }
 .xr-list::-webkit-scrollbar { display: none; }

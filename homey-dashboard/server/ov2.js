@@ -17,8 +17,8 @@ async function cached(key, ms, fn) {
 }
 async function getJson(url, headers) {
   const r = await fetch(url, { headers: { ...UA, ...(headers || {}) }, signal: AbortSignal.timeout(12000) });
-  if (r.status === 401 || r.status === 403) throw new Error(url.startsWith(NS) ? 'NS-sleutel klopt niet of is verlopen (vul hem opnieuw in bij Tegel)' : `toegang geweigerd (${r.status})`);
-  if (!r.ok) throw new Error(`${new URL(url).hostname} gaf ${r.status}`);
+  if (r.status === 401 || r.status === 403) throw Object.assign(new Error(url.startsWith(NS) ? 'NS-sleutel klopt niet of is verlopen (vul hem opnieuw in bij Tegel)' : `toegang geweigerd (${r.status})`), { status: r.status, auth: true });
+  if (!r.ok) { const e = new Error(`${new URL(url).hostname} gaf ${r.status}`); e.status = r.status; throw e; }
   return r.json();
 }
 const arr = v => (Array.isArray(v) ? v : v && typeof v === 'object' ? Object.values(v) : []);
@@ -34,18 +34,36 @@ class Reis {
     q = str(q).toLowerCase().trim(); if (q.length < 2) return [];
     const all = await cached('ns:stations', 7 * 864e5, async () => {
       const j = await this.ns('/reisinformatie-api/api/v2/stations');
-      return { list: arr(j.payload || j).filter(s => !s.land || s.land === 'NL').map(s => ({ code: str(s.code).toUpperCase(), name: str((s.namen && (s.namen.lang || s.namen.middel)) || s.name) })).filter(s => s.code && s.name) };
+      return { list: arr(j.payload || j).filter(s => !s.land || s.land === 'NL').map(s => ({ code: str(s.code).toUpperCase(), uic: str(s.UICCode || s.uicCode || (s.id && s.id.uicCode) || ''), name: str((s.namen && (s.namen.lang || s.namen.middel)) || s.name) })).filter(s => s.code && s.name) };
     });
     const hit = all.list.filter(s => s.name.toLowerCase().includes(q) || s.code.toLowerCase() === q);
     hit.sort((a, b) => (a.name.toLowerCase().startsWith(q) ? 0 : 1) - (b.name.toLowerCase().startsWith(q) ? 0 : 1) || a.name.localeCompare(b.name));
-    return hit.slice(0, 15);
+    return hit.slice(0, 15).map(({ code, name }) => ({ code, name }));
+  }
+  async stationList() { await this.nsStations('zz').catch(() => {}); const c = cache.get('ns:stations'); return c ? c.v.list : []; }
+  async uicOf(code) { const s = (await this.stationList()).find(x => x.code === code); return s && s.uic; }
+  // verschillende manieren om vertrektijden te vragen; de eerste die werkt wordt onthouden
+  async depVariants(station) {
+    const v = [['station + maxJourneys', `/reisinformatie-api/api/v2/departures?station=${encodeURIComponent(station)}&maxJourneys=25`]];
+    const uic = await this.uicOf(station).catch(() => null);
+    if (uic) v.push(['uicCode', `/reisinformatie-api/api/v2/departures?uicCode=${encodeURIComponent(uic)}`]);
+    v.push(['alleen station', `/reisinformatie-api/api/v2/departures?station=${encodeURIComponent(station)}`]);
+    v.push(['station (kleine letters)', `/reisinformatie-api/api/v2/departures?station=${encodeURIComponent(station.toLowerCase())}&lang=nl`]);
+    return v;
   }
 
   // ---------- NS: vertrektijden ----------
   nsDepartures(station) {
     station = str(station).toUpperCase(); if (!/^[A-Z0-9]{1,8}$/.test(station)) throw new Error('Kies bij Tegel een station');
     return cached('ns:dep:' + station, 30e3, async () => {
-      const j = await this.ns(`/reisinformatie-api/api/v2/departures?station=${encodeURIComponent(station)}&maxJourneys=25`);
+      const vs = await this.depVariants(station); this.depOk = this.depOk || {};
+      const order = this.depOk[station] != null ? [vs[this.depOk[station]], ...vs.filter((_, i) => i !== this.depOk[station])].filter(Boolean) : vs;
+      let j = null, last = null;
+      for (const [name, path] of order) {
+        try { j = await this.ns(path); const i = vs.findIndex(x => x[0] === name); if (this.depOk[station] !== i) console.log(`[ns] vertrektijden werken via: ${name}`); this.depOk[station] = i; break; }
+        catch (e) { last = e; if (e.auth) throw e; }
+      }
+      if (!j) throw last || new Error('NS gaf geen vertrektijden');
       const deps = arr((j.payload && j.payload.departures) || j.departures).map(d => {
         const p = d.product || {};
         const planned = d.plannedDateTime, actual = d.actualDateTime || planned;
@@ -67,9 +85,12 @@ class Reis {
   // ---------- NS: storingen, werkzaamheden en calamiteiten ----------
   nsDisruptions(station) {
     station = str(station).toUpperCase();
-    return cached('ns:dis', 5 * 60e3, async () => {
-      const j = await this.ns('/disruptions/v3?isActive=true');
-      const list = arr(j.payload || j).filter(d => d && d.isActive !== false).map(d => {
+    return cached('ns:dis:' + station, 5 * 60e3, async () => {
+      let j = await this.ns('/disruptions/v3?isActive=true');
+      let raw = arr(j && (j.payload || j.disruptions || j.data) || j);
+      if (!raw.length) { j = await this.ns('/disruptions/v3').catch(() => j); raw = arr(j && (j.payload || j.disruptions || j.data) || j); }
+      if (!raw.length && station) { j = await this.ns(`/disruptions/v3/station/${encodeURIComponent(station)}`).catch(() => null); raw = arr(j && (j.payload || j.disruptions || j.data) || j); }
+      const list = raw.filter(d => d && typeof d === 'object' && d.isActive !== false).map(d => {
         const ts = arr(d.timespans)[0] || {};
         const stations = new Set();
         for (const ps of arr(d.publicationSections)) for (const s of arr(ps.section && ps.section.stations)) stations.add(str(s.stationCode).toUpperCase());
@@ -77,7 +98,7 @@ class Reis {
         const type = str(d.type).toUpperCase();
         return {
           id: str(d.id), type, label: type === 'MAINTENANCE' ? 'WERK' : type === 'CALAMITY' ? 'LET OP' : 'STORING',
-          title: str(d.title || (d.titleSections && arr(d.titleSections).flat().map(x => x.value).join(''))),
+          title: str(d.title || d.titel || (d.titleSections && arr(d.titleSections).flat().map(x => x && x.value).join('')) || (d.trajectories && 'Storing')),
           text: str((ts.situation && ts.situation.label) || d.situation || (ts.cause && ts.cause.label) || ''),
           period: str(d.period || (ts.start ? `${ts.start}${ts.end ? ' t/m ' + ts.end : ''}` : '')),
           extra: str(d.expectedDuration && d.expectedDuration.description),
@@ -90,6 +111,22 @@ class Reis {
       const rank = d => (station && d.stations.includes(station) ? 0 : 10) + (d.type === 'CALAMITY' ? 0 : d.type === 'DISRUPTION' ? 1 : 2);
       return { ...r, station, list: r.list.slice().sort((a, b) => rank(a) - rank(b)).slice(0, 25).map(d => ({ ...d, mine: !!station && d.stations.includes(station) })) };
     });
+  }
+
+  // ---------- testpagina: wat antwoordt NS op elke manier van vragen? (zonder sleutel in de uitvoer) ----------
+  async nsTest(station) {
+    station = str(station || 'ES').toUpperCase(); const key = this.nsKey(); const out = { station, at: new Date().toISOString(), tests: [] };
+    const paths = [...(await this.depVariants(station)), ['storingen actief', '/disruptions/v3?isActive=true'], ['storingen alles', '/disruptions/v3'], ['storingen station', `/disruptions/v3/station/${encodeURIComponent(station)}`], ['stations', '/reisinformatie-api/api/v2/stations']];
+    for (const [name, path] of paths) {
+      const t0 = Date.now();
+      try {
+        const r = await fetch(NS + path, { headers: { ...UA, 'Ocp-Apim-Subscription-Key': key }, signal: AbortSignal.timeout(12000) });
+        const txt = await r.text(); let count = null;
+        try { const j = JSON.parse(txt); const p = j && (j.payload || j); count = Array.isArray(p) ? p.length : p && Array.isArray(p.departures) ? p.departures.length : null; } catch (e) { /* geen json */ }
+        out.tests.push({ name, path, status: r.status, ms: Date.now() - t0, count, begin: txt.slice(0, name === 'stations' ? 120 : 300) });
+      } catch (e) { out.tests.push({ name, path, error: String(e.message || e), ms: Date.now() - t0 }); }
+    }
+    return out;
   }
 
   // ---------- Bus: vertrektijden en meldingen van een halte (OVapi) ----------
