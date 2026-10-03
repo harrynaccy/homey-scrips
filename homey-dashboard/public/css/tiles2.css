@@ -222,3 +222,17 @@ body.editing .tile.x-spacer { outline: 1px dashed rgba(255,255,255,.2); }
 .x-fp sup { font-size: .6em; }
 .x-fs.best .x-fp { color: #4cd38a; font-size: 1.15em; font-weight: 800; }
 .x-fdiff { flex: none; margin-top: .4em; padding: .45em .6em; border-radius: .6em; background: color-mix(in srgb, #4cd38a 14%, transparent); font-size: .85em; }
+.x-fcols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1.1em; align-items: start; font-size: min(1em, 2.9cqh, 2.4cqw); }
+.x-ftip .x-fcols { font-size: min(1em, 7.5cqh, 3.6cqw); }
+.x-fcol { min-width: 0; }
+button.x-fs { width: 100%; background: none; border: 0; border-bottom: 1px solid color-mix(in srgb, var(--text) 8%, transparent); color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: 0; }
+button.x-fs:active { background: color-mix(in srgb, var(--text) 8%, transparent); }
+.x-ftip .x-fs { padding: .22em 0; }
+.x-ftip .x-fs.best .x-fp { font-size: 1.05em; }
+.x-fsheet { display: flex; flex-direction: column; align-items: center; gap: .7em; padding: .5em 0 1em; text-align: center; }
+.x-fsp { font-size: 2.4em; font-weight: 800; color: #4cd38a; font-variant-numeric: tabular-nums; }
+.x-fsp sup { font-size: .55em; }
+.x-fqr { width: min(240px, 60vw); background: #fff; border-radius: 12px; padding: 8px; }
+.x-fqr svg { width: 100%; height: auto; display: block; }
+.x-fdiff { font-size: min(.85em, 2.6cqh, 2.2cqw); }
+.x-fdiff + .x-src { font-size: min(.68em, 1.9cqh, 1.6cqw); }

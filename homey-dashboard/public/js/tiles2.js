@@ -22,7 +22,7 @@
     return X.c.get(key) || {};
   };
   setInterval(() => { if (D.cfg && !document.hidden) D.refreshWhere(t => LIVE.includes(t.type)); }, 60e3);
-  const LIVE = ['p2000', 'roadworks', 'jams', 'fuel', 'rain', 'weather', 'air', 'price', 'waste', 'agenda', 'departures', 'travel', 'nas', 'homeyinfo', 'sunmoon', 'countdown', 'usage', 'solar'];
+  const LIVE = ['p2000', 'roadworks', 'jams', 'fuel', 'fueltip', 'rain', 'weather', 'air', 'price', 'waste', 'agenda', 'departures', 'travel', 'nas', 'homeyinfo', 'sunmoon', 'countdown', 'usage', 'solar'];
   const wait = (t, ic, r, msg) => hd(t, ic) + `<div class="empty">${r && r.err ? `${icon('x')}<span>${esc(r.err)}</span>` : `<span>${esc(msg || 'Laden…')}</span>`}</div>`;
 
   // ---------- 1. ramen en deuren ----------
@@ -375,28 +375,64 @@
     },
   };
 
-  // ---------- Goedkoopst tanken (Enschede, Gronau, Ahaus/Alstätte) ----------
+  // ---------- Goedkoopst tanken en Tanktip (Nederland | Duitsland); tik op een station = naar telefoon (Waze) of QR ----------
   const eur = n => '€ ' + n.toFixed(3).replace('.', ',').replace(/(\d,\d\d)(\d)$/, '$1<sup>$2</sup>');
   const eur2 = n => '€ ' + n.toFixed(2).replace('.', ',');
   const FUEL = { e5: ['Euro 95', 'Super E5'], e10: ['Euro 95 (E10)', 'Super E10'], diesel: ['Diesel', 'Diesel'] };
+  const fuelData = fuel => X.get('fuel:' + fuel, 10 * 60e3, () => D.api('GET', '/api/x/tanken?fuel=' + fuel), ['fuel', 'fueltip']);
+  const fuelPick = (o, a, n) => ((a && a.list) || []).filter(s2 => o.openOnly === false || s2.open !== false).slice(0, n);
+  const wazeUrl = s2 => `https://waze.com/ul?ll=${Number(s2.lat).toFixed(6)},${Number(s2.lon).toFixed(6)}&navigate=yes`;
+  const hasPos = s2 => Number.isFinite(Number(s2.lat)) && Number.isFinite(Number(s2.lon)) && s2.lat !== null && s2.lon !== null;
+  const fuelSheet = s2 => {
+    const addr = [s2.street, s2.place].filter(Boolean).join(', ');
+    if (!hasPos(s2)) { sheet(s2.name || s2.full, addr, '<div class="empty">Van dit station is de plek onbekend; navigeren lukt niet.</div>'); return; }
+    sheet(s2.name || s2.full, addr, `<div class="x-fsheet"><div class="x-fsp">${eur(s2.price)}</div>
+      <button class="btn" data-fphone>${icon('play')}Naar telefoon (Waze)</button><small class="muted" data-fstat></small>
+      <div class="x-fqr" data-fqr><div class="muted">QR-code laden…</div></div><small class="muted">Of scan met je telefoon: opent Waze met de route.</small></div>`);
+    const root = document.querySelector('#sheet');
+    const shut = setTimeout(() => { if (root.contains(root.querySelector('[data-fqr]'))) D.closeSheet(); }, 60e3);
+    root.querySelector('[data-close]').addEventListener('click', () => clearTimeout(shut));
+    qrLib().then(() => { const q = window.qrcode(0, 'M'); q.addData(wazeUrl(s2)); q.make(); const box = root.querySelector('[data-fqr]'); if (box) box.innerHTML = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true }); }).catch(() => {});
+    const btn = root.querySelector('[data-fphone]'), st = root.querySelector('[data-fstat]');
+    btn.onclick = async () => { btn.disabled = true; st.textContent = 'Versturen…';
+      try { await D.api('POST', '/api/x/tanken/telefoon', { name: s2.name || s2.full, street: s2.street, place: s2.place, price: s2.price, lat: s2.lat, lon: s2.lon }); st.textContent = 'Verstuurd. Tik op de melding op je telefoon.'; D.toast('Naar je telefoon gestuurd'); }
+      catch (e) { st.textContent = e.message; btn.disabled = false; } };
+  };
+  const fuelRow = (s2, i, key) => `<button class="x-fs nopress${i === 0 ? ' best' : ''}" data-fst="${esc(key)}"><div class="x-fn"><b>${esc(s2.name || s2.full)}</b><small>${esc([s2.street, s2.place].filter(Boolean).join(', '))}${s2.open === false ? ' · gesloten' : ''}</small></div><div class="x-fp">${eur(s2.price)}</div></button>`;
+  const fuelCols = (t, v, n) => {
+    const o = t.opts; const fuel = o.fuel || 'e5'; const map = {};
+    const col = (name, a, de) => { const l = fuelPick(o, a, n);
+      return `<div class="x-fcol"><div class="x-wwh">${esc(name)} <small>${esc(FUEL[fuel][de ? 1 : 0])}</small></div>`
+        + (l.map((s2, i) => { const k = (de ? 'de' : 'nl') + i; map[k] = s2; return fuelRow(s2, i, k); }).join('')
+        || `<div class="x-jnone${a && a.error ? ' x-warn' : ''}">${esc((a && a.error) || 'Geen open tankstations gevonden')}</div>`) + '</div>'; };
+    return { html: `<div class="x-fcols">${col('Nederland', v.nl)}${col('Duitsland', v.de, true)}</div>`, map };
+  };
+  const fuelWire = (inner, map) => inner.querySelectorAll('[data-fst]').forEach(b2 => { b2.onclick = e => { if (D.editing) return; e.stopPropagation(); const s2 = map[b2.dataset.fst]; if (s2) fuelSheet(s2); }; });
   T.fuel = {
-    label: 'Goedkoopst tanken', icon: 'fuel', size: [4, 8], title: t => t.opts.title || 'Goedkoopst tanken',
+    label: 'Goedkoopst tanken', icon: 'fuel', size: [8, 8], title: t => t.opts.title || 'Goedkoopst tanken',
     render(t, inner) {
-      const o = t.opts; const fuel = o.fuel || 'e5'; const n = Number(o.count) || 3; const liters = Number(o.liters) || 55;
-      const r = X.get('fuel:' + fuel, 10 * 60e3, () => D.api('GET', '/api/x/tanken?fuel=' + fuel), ['fuel']);
+      const o = t.opts; const fuel = o.fuel || 'e5'; const n = Number(o.count) || 8; const liters = Number(o.liters) || 55;
+      const r = fuelData(fuel);
       if (!r.v) { inner.innerHTML = wait(t, 'fuel', r); return; }
-      const v = r.v;
-      const pick = a => (a.list || []).filter(s2 => o.openOnly === false || s2.open !== false).slice(0, n);
-      const block = (name, a, de) => { const l = pick(a);
-        return `<div class="x-fb"><div class="x-wwh">${esc(name)} <small>${esc(de ? FUEL[fuel][1] : FUEL[fuel][0])}</small></div>`
-          + (l.map((s2, i) => `<div class="x-fs${i === 0 ? ' best' : ''}"><div class="x-fn"><b>${esc(s2.name || s2.full)}</b><small>${esc([s2.street, s2.place].filter(Boolean).join(', '))}${s2.open === true ? ' · <span class="x-ok">open</span>' : s2.open === false ? ' · gesloten' : ''}</small></div><div class="x-fp">${eur(s2.price)}</div></div>`).join('')
-          || `<div class="x-jnone${a.error ? ' x-warn' : ''}">${esc(a.error || 'Geen open tankstations gevonden')}</div>`) + '</div>'; };
-      const best = a => { const l = pick(a); return l.length ? l[0] : null; };
-      const nl = best(v.nl), cands = [['Gronau', best(v.gronau)], ['Ahaus / Alstätte', best(v.ahaus)]].filter(x => x[1]).sort((a, b) => a[1].price - b[1].price);
+      const v = r.v; const c = fuelCols(t, v, n);
+      const nl = fuelPick(o, v.nl, 1)[0], de = fuelPick(o, v.de, 1)[0];
       let diff = '';
-      if (nl && cands.length) { const [nm, de] = cands[0]; const d = nl.price - de.price;
-        diff = d > 0.0005 ? `<div class="x-fdiff"><b>${esc(nm)}</b> is ${eur2(d)} per liter goedkoper · <b>${eur2(d * liters)}</b> op ${liters} liter</div>` : `<div class="x-fdiff">Enschede is ${eur2(-d)} per liter goedkoper dan ${esc(nm)} · ${eur2(-d * liters)} op ${liters} liter</div>`; }
-      inner.innerHTML = hd(t, 'fuel', esc(FUEL[fuel][0])) + `<div class="list">${block('Enschede', v.nl)}${block('Gronau', v.gronau, true)}${block('Ahaus / Alstätte', v.ahaus, true)}</div>${diff}<div class="x-src">bron: ANWB · Tankerkönig (MTS-K), www.tankerkoenig.de, CC BY 4.0</div>`;
+      if (nl && de) { const d = nl.price - de.price;
+        diff = Math.abs(d) < 0.0005 ? '<div class="x-fdiff">Nederland en Duitsland zijn even duur</div>'
+          : `<div class="x-fdiff"><b>${esc(d > 0 ? de.place || 'Duitsland' : nl.place || 'Nederland')}</b> is ${eur2(Math.abs(d))} per liter goedkoper · <b>${eur2(Math.abs(d) * liters)}</b> op ${liters} liter</div>`; }
+      inner.innerHTML = hd(t, 'fuel', esc(FUEL[fuel][0]) + ' · tik op een station om te navigeren') + `<div class="list">${c.html}</div>${diff}<div class="x-src">bron: ANWB · Tankerkönig (MTS-K), www.tankerkoenig.de, CC BY 4.0</div>`;
+      fuelWire(inner, c.map);
+    },
+  };
+  T.fueltip = {
+    label: 'Tanktip', icon: 'fuel', size: [4, 3], title: t => t.opts.title || 'Tanktip',
+    render(t, inner) {
+      const o = t.opts; const fuel = o.fuel || 'e5';
+      const r = fuelData(fuel);
+      if (!r.v) { inner.innerHTML = wait(t, 'fuel', r); return; }
+      const c = fuelCols(t, r.v, Number(o.count) || 2);
+      inner.innerHTML = hd(t, 'fuel', esc(FUEL[fuel][0])) + `<div class="list x-ftip">${c.html}</div>`;
+      fuelWire(inner, c.map);
     },
   };
 
@@ -569,7 +605,7 @@
     ['waste', 'Afvalkalender', 'Welke container wanneer (Twente Milieu)'], ['agenda', 'Agenda', 'Afspraken uit Google of iCloud'], ['countdown', 'Afteller', 'Aantal dagen tot …'],
     ['notes', 'Boodschappen en notities', 'Lijstje, gedeeld met alle schermen'], ['timer', 'Kookwekker', 'Timer met geluid'],
     ['departures', 'Vertrektijden bus en tram', 'Bij jouw halte'], ['travel', 'Reistijd naar werk', 'Met de auto'], ['p2000', 'P2000 Twente', 'Meldingen brandweer, ambulance en politie'], ['ns', 'NS reisinformatie', 'Vertrektijden en storingen van je station'], ['bus', 'Bus reisinformatie', 'Live vertrektijden en omleidingen van je halte'],
-    ['roadworks', 'Wegwerkzaamheden Enschede', 'Werkzaamheden en afsluitingen, ook uit P2000'], ['jams', 'Files A- en N-wegen', 'Overijssel, Friesland en de rest van Nederland'], ['fuel', 'Goedkoopst tanken', 'Enschede, Gronau en Ahaus/Alstätte'],
+    ['roadworks', 'Wegwerkzaamheden Enschede', 'Werkzaamheden en afsluitingen, ook uit P2000'], ['jams', 'Files A- en N-wegen', 'Overijssel, Friesland en de rest van Nederland'], ['fuel', 'Goedkoopst tanken', 'Nederland en Duitsland naast elkaar, tik = Waze'], ['fueltip', 'Tanktip', 'De 2 goedkoopste in Nederland en Duitsland'],
     ['conn', 'Verbindingen', 'Scherm, NAS, Homey en back-up (zoals de balk linksonder)'], ['nas', 'NAS-status', 'Schijven, temperatuur, opslag'], ['homeyinfo', 'Homey-status', 'Versie, geheugen, aantallen'],
     ['heading', 'Kop of scheidingslijn', 'Tabblad in blokken verdelen'], ['spacer', 'Lege ruimte', 'Onzichtbare tegel als ruimte'], ['photos', 'Fotolijst', 'Diashow van je eigen foto\'s'], ['wifiqr', 'Wifi voor gasten', 'QR-code om te scannen'],
   ];
@@ -577,6 +613,8 @@
 
   // ---------- opties bij Tegel ----------
   const devSel = (P, F, cur, filter, label = 'Apparaat') => F.row(label, F.select(`${P}.opts.deviceId`, cur || '', [['', 'Kies…'], ...D.lib.devices.filter(filter).sort((a, b) => a.name.localeCompare(b.name)).map(d => [d.id, d.name])], 'tilepanel'));
+  const fuelKeys = () => `<div class="f col"><label>Tankerkönig-sleutel (Duitsland)<small data-tkstat>Gratis via onboarding.tankerkoenig.de. Wordt alleen op de NAS bewaard.</small></label><div class="x-ovsearch"><input type="password" placeholder="Plak hier je sleutel" data-tkkey autocomplete="off"><button class="btn sm" data-tksave>Opslaan</button></div></div>` +
+    `<div class="f col"><label>ntfy-kanaal (naar je telefoon)<small data-ntstat>De naam van je kanaal in de app ntfy, precies zo (hoofdletters tellen). Wordt alleen op de NAS bewaard.</small></label><div class="x-ovsearch"><input type="password" placeholder="Kanaalnaam" data-ntkey autocomplete="off"><button class="btn sm" data-ntsave>Opslaan</button><button class="btn sm ghost" data-nttest>Test</button></div></div>`;
   D.tileOptions = {
     room: (t, P, F) => F.row('Ruimte', F.select(`${P}.opts.zoneId`, t.opts.zoneId || '', [['', 'Kies…'], ...D.lib.zones.map(z => [z.id, z.name])], 'tilepanel')) +
       F.row('Tik opent pagina', F.select(`${P}.opts.page`, t.opts.page || '', [['', 'Niets'], ...D.cfg.tabs.map(x => [x.id, (x.sub ? 'Subpagina: ' : '') + x.name])], 'tile')),
@@ -637,10 +675,12 @@
       F.row('Rest van Nederland', F.toggle(`${P}.opts.rest`, t.opts.rest !== false, 'tile')) +
       '<p class="note">Bron: ANWB (niet officieel, kan veranderen); lukt dat niet, dan NDW zonder filelengte. Provincie wordt bepaald aan de hand van de plek van de file.</p>',
     fuel: (t, P, F) => F.row('Brandstof', F.seg(`${P}.opts.fuel`, t.opts.fuel || 'e5', [['e5', 'Euro 95 / E5'], ['e10', 'E10'], ['diesel', 'Diesel']], 'tile')) +
-      F.row('Aantal per plaats', F.range(`${P}.opts.count`, t.opts.count || 3, 1, 5, 1, 'tile', 'n')) + F.row('Alleen open', F.toggle(`${P}.opts.openOnly`, t.opts.openOnly !== false, 'tile')) +
-      F.row('Liters per tankbeurt', F.num(`${P}.opts.liters`, t.opts.liters || 55, 10, 120, 'tile')) +
-      `<div class="f col"><label>Tankerkönig-sleutel (Duitsland)<small data-tkstat>Gratis via onboarding.tankerkoenig.de. Wordt alleen op de NAS bewaard.</small></label><div class="x-ovsearch"><input type="password" placeholder="Plak hier je sleutel" data-tkkey autocomplete="off"><button class="btn sm" data-tksave>Opslaan</button></div></div>` +
-      '<p class="note">Enschede: prijzen van de ANWB (niet officieel). Duitsland: officiële prijzen via Tankerkönig, elke 10 minuten.</p>',
+      F.row('Aantal per land', F.range(`${P}.opts.count`, t.opts.count || 8, 1, 12, 1, 'tile', 'n')) + F.row('Alleen open', F.toggle(`${P}.opts.openOnly`, t.opts.openOnly !== false, 'tile')) +
+      F.row('Liters per tankbeurt', F.num(`${P}.opts.liters`, t.opts.liters || 55, 10, 120, 'tile')) + fuelKeys() +
+      '<p class="note">Nederland: Enschede, Oldenzaal, Weerselo en Deurningen (ANWB, niet officieel). Duitsland: Gronau en Ahaus/Alstätte (Tankerkönig, officieel). Elke 10 minuten.</p>',
+    fueltip: (t, P, F) => F.row('Brandstof', F.seg(`${P}.opts.fuel`, t.opts.fuel || 'e5', [['e5', 'Euro 95 / E5'], ['e10', 'E10'], ['diesel', 'Diesel']], 'tile')) +
+      F.row('Aantal per land', F.range(`${P}.opts.count`, t.opts.count || 2, 1, 5, 1, 'tile', 'n')) + F.row('Alleen open', F.toggle(`${P}.opts.openOnly`, t.opts.openOnly !== false, 'tile')) + fuelKeys() +
+      '<p class="note">Zelfde gegevens als Goedkoopst tanken. Tik op een station om het naar je telefoon te sturen (Waze).</p>',
     conn: (t, P, F) => F.row('Tekst eronder', F.toggle(`${P}.opts.info`, t.opts.info !== false, 'tile'), 'Reactietijden en back-up; vanaf 2 hoog') +
       '<p class="note">De vaste balk linksonder stel je in bij Scherm → Statusbalk linksonder.</p>',
     p2000: (t, P, F) => F.row('Brandweer', F.toggle(`${P}.opts.fire`, t.opts.fire !== false, 'tile')) + F.row('Ambulance', F.toggle(`${P}.opts.ambu`, t.opts.ambu !== false, 'tile')) + F.row('Politie', F.toggle(`${P}.opts.pol`, t.opts.pol !== false, 'tile')) +
@@ -688,10 +728,16 @@
     },
     bus: (root, t, P) => { reisPhotoWire(root, t); D.tileWire.departures(root, t, P); },
     fuel: root => {
-      const st = root.querySelector('[data-tkstat]'); D.api('GET', '/api/x/secrets').then(s2 => { if (st && s2.tankerkoenig) st.textContent = 'Sleutel is ingesteld (staat alleen op de NAS). Opnieuw invullen vervangt hem.'; }).catch(() => {});
-      const b = root.querySelector('[data-tksave]'); if (b) b.onclick = async () => { const v = root.querySelector('[data-tkkey]').value.trim(); if (!v) { D.toast('Plak eerst je sleutel', true); return; }
-        try { await D.api('POST', '/api/x/key', { name: 'tankerkoenig', value: v }); root.querySelector('[data-tkkey]').value = ''; D.toast('Tankerkönig-sleutel opgeslagen op de NAS'); X.c.clear(); D.renderGrid(); D.editor.refreshPanel(); } catch (e) { D.toast(e.message, true); } };
+      D.api('GET', '/api/x/secrets').then(s2 => { const st = root.querySelector('[data-tkstat]'); if (st && s2.tankerkoenig) st.textContent = 'Sleutel is ingesteld (staat alleen op de NAS). Opnieuw invullen vervangt hem.';
+        const nt = root.querySelector('[data-ntstat]'); if (nt && s2.ntfy) nt.textContent = 'Kanaal is ingesteld (staat alleen op de NAS). Opnieuw invullen vervangt het.'; }).catch(() => {});
+      const save = (btn, inp, name, msg) => { const b2 = root.querySelector(btn); if (b2) b2.onclick = async () => { const v = root.querySelector(inp).value.trim(); if (!v) { D.toast('Vul eerst iets in', true); return; }
+        try { await D.api('POST', '/api/x/key', { name, value: v }); root.querySelector(inp).value = ''; D.toast(msg); X.c.clear(); D.renderGrid(); D.editor.refreshPanel(); } catch (e) { D.toast(e.message, true); } }; };
+      save('[data-tksave]', '[data-tkkey]', 'tankerkoenig', 'Tankerkönig-sleutel opgeslagen op de NAS');
+      save('[data-ntsave]', '[data-ntkey]', 'ntfy', 'ntfy-kanaal opgeslagen op de NAS');
+      const tb = root.querySelector('[data-nttest]'); if (tb) tb.onclick = async () => {
+        try { await D.api('POST', '/api/x/tanken/telefoon', { name: 'Test vanaf het dashboard', street: 'Tik om Waze te openen', place: 'Enschede', lat: 52.2215, lon: 6.8937 }); D.toast('Testmelding verstuurd; kijk op je telefoon'); } catch (e) { D.toast(e.message, true); } };
     },
+    fueltip: root => D.tileWire.fuel(root),
     departures: (root, t, P) => {
       const q = root.querySelector('[data-ovq]'), res = root.querySelector('[data-ovres]'); if (!q) return; let tm;
       q.oninput = () => { clearTimeout(tm); tm = setTimeout(async () => { if (q.value.trim().length < 3) { res.innerHTML = ''; return; } res.innerHTML = '<small class="muted">Zoeken…</small>';

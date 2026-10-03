@@ -1,5 +1,6 @@
 'use strict';
-// Goedkoopst tanken voor de tegel "Goedkoopst tanken": Enschede (ANWB) en Gronau, Ahaus/Alstätte (Tankerkönig).
+// Goedkoopst tanken voor de tegels "Goedkoopst tanken" en "Tanktip": Nederland = Enschede, Oldenzaal, Weerselo, Deurningen (ANWB),
+// Duitsland = Gronau, Ahaus/Alstätte (Tankerkönig). Plus: station naar de telefoon sturen (ntfy, tik op de melding = Waze).
 // - Tankerkönig: officiële Duitse prijzen (MTS-K), gratis persoonlijke sleutel, alleen op de NAS bewaard.
 //   Bron CC BY 4.0 "Tankerkönig / MTS-K"; niet vaker dan elke 5 minuten vragen (wij: 10 min).
 // - ANWB: prijzen van Nederlandse pompen via hetzelfde adres als de ANWB-website; niet officieel, kan veranderen.
@@ -9,11 +10,12 @@ const ANWB_KEY = process.env.ANWB_KEY || 'QYUEE3fEcFD7SGMJ6E7QBCMzdQGqRkAi';
 const ANWB_FUEL = process.env.ANWB_FUEL_URL || 'https://api.anwb.nl/routing/points-of-interest/v3/all';
 const EVERY = 10 * 60e3;
 
-const AREAS = {
-  gronau: [{ lat: 52.2125, lng: 7.0251, rad: 5 }],
-  ahaus: [{ lat: 52.0755, lng: 7.0110, rad: 5 }, { lat: 52.1236, lng: 6.9056, rad: 4 }], // Ahaus en Alstätte
-};
-const ENSCHEDE_BOX = '52.165,6.770,52.275,7.000';
+// Duitsland: cirkels rond Gronau, Ahaus en Alstätte (km)
+const DE_AREAS = [{ lat: 52.2125, lng: 7.0251, rad: 5 }, { lat: 52.0755, lng: 7.0110, rad: 5 }, { lat: 52.1236, lng: 6.9056, rad: 4 }];
+// Nederland: vak rond Enschede t/m Oldenzaal, Weerselo en Deurningen; daarna op plaatsnaam
+const NL_BOX = '52.165,6.770,52.380,7.000';
+const NL_PLACES = /enschede|glanerbrug|oldenzaal|weerselo|deurningen/i;
+const NTFY = (process.env.NTFY_BASE || 'https://ntfy.sh').replace(/\/$/, '');
 const TK_TYPE = { e5: 'e5', e10: 'e10', diesel: 'diesel' };
 
 const cache = new Map();
@@ -39,10 +41,10 @@ async function tkArea(key, pts, fuel) {
     if (j.ok === false) throw new Error(/apikey|key/i.test(str(j.message)) ? 'Tankerkönig-sleutel klopt niet (nog niet geactiveerd?)' : 'Tankerkönig: ' + str(j.message || 'fout'));
     for (const s of j.stations || []) {
       const price = euro(s.price); if (price == null) continue;
-      got.set(s.id, { id: s.id, name: str(s.brand || s.name).trim() || str(s.name), full: str(s.name), street: [s.street, s.houseNumber].filter(Boolean).join(' ').trim(), place: str(s.place), price, open: s.isOpen === true ? true : s.isOpen === false ? false : null });
+      got.set(s.id, { id: s.id, name: str(s.brand || s.name).trim() || str(s.name), full: str(s.name), street: [s.street, s.houseNumber].filter(Boolean).join(' ').trim(), place: str(s.place), price, open: s.isOpen === true ? true : s.isOpen === false ? false : null, lat: Number(s.lat), lon: Number(s.lng) });
     }
   }
-  return [...got.values()].sort((a, b) => a.price - b.price).slice(0, 15);
+  return [...got.values()].sort((a, b) => a.price - b.price).slice(0, 25);
 }
 
 // ---------- Nederland (ANWB) ----------
@@ -70,12 +72,12 @@ function anwbStations(j, fuel) {
   walk(j);
   return out;
 }
-async function anwbEnschede(fuel) {
+async function anwbNl(fuel) {
   const sep = ANWB_FUEL.includes('?') ? '&' : '?';
-  const j = await getJson(`${ANWB_FUEL}${sep}type-filter=FUEL_STATION&bounding-box-filter=${ENSCHEDE_BOX}&apikey=${ANWB_KEY}`, { 'x-api-key': ANWB_KEY });
-  const list = anwbStations(j, fuel).filter(s => !s.place || /enschede|glanerbrug/i.test(s.place));
+  const j = await getJson(`${ANWB_FUEL}${sep}type-filter=FUEL_STATION&bounding-box-filter=${NL_BOX}&apikey=${ANWB_KEY}`, { 'x-api-key': ANWB_KEY });
+  const list = anwbStations(j, fuel).filter(s => !s.place || NL_PLACES.test(s.place));
   const seen = new Set();
-  return list.filter(s => (seen.has(s.id) ? false : seen.add(s.id))).sort((a, b) => a.price - b.price).slice(0, 15);
+  return list.filter(s => (seen.has(s.id) ? false : seen.add(s.id))).sort((a, b) => a.price - b.price).slice(0, 25);
 }
 
 class Tanken {
@@ -84,10 +86,26 @@ class Tanken {
     fuel = TK_TYPE[fuel] ? fuel : 'e5';
     const key = str(this.secrets().tankerkoenig).trim();
     const part = async (name, fn) => { try { return { ...(await cached(name + ':' + fuel + (name === 'nl' ? '' : ':' + key.slice(0, 6)), EVERY, async () => ({ at: Date.now(), list: await fn() }))) }; } catch (e) { return { error: String(e.message || e), list: [] }; } };
-    const de = async area => (key ? part(area, () => tkArea(key, AREAS[area], fuel)) : { error: 'Vul bij Tegel je Tankerkönig-sleutel in', nokey: true, list: [] });
-    const [nl, gronau, ahaus] = await Promise.all([part('nl', () => anwbEnschede(fuel)), de('gronau'), de('ahaus')]);
-    if (nl.error && !nl.list.length) nl.error = 'Enschede nu niet beschikbaar (' + nl.error + ')';
-    return { at: Date.now(), fuel, nl, gronau, ahaus };
+    const [nl, de] = await Promise.all([part('nl', () => anwbNl(fuel)),
+      key ? part('de', () => tkArea(key, DE_AREAS, fuel)) : { error: 'Vul bij Tegel je Tankerkönig-sleutel in', nokey: true, list: [] }]);
+    if (nl.error && !nl.list.length) nl.error = 'Nederland nu niet beschikbaar (' + nl.error + ')';
+    return { at: Date.now(), fuel, nl, de };
+  }
+  // station naar de telefoon: melding via ntfy; tikken op de melding opent Waze met de route
+  async toPhone(b) {
+    const topic = str(this.secrets().ntfy).trim();
+    if (!topic) throw new Error('Vul bij Tegel je ntfy-kanaal in');
+    const lat = b.lat == null || b.lat === '' ? NaN : Number(b.lat), lon = b.lon == null || b.lon === '' ? NaN : Number(b.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) throw new Error('Van dit station is de plek onbekend');
+    const name = str(b.name).slice(0, 80), addr = [str(b.street), str(b.place)].filter(Boolean).join(', ').slice(0, 120);
+    const price = Number(b.price) > 0 ? '€ ' + Number(b.price).toFixed(3).replace('.', ',') : '';
+    const waze = `https://waze.com/ul?ll=${lat.toFixed(6)},${lon.toFixed(6)}&navigate=yes`;
+    // JSON-bericht (officieel ntfy-formaat; letters als € en ä gaan zo goed)
+    const r = await fetch(`${NTFY}/`, { method: 'POST', signal: AbortSignal.timeout(12000), headers: { ...UA, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic, title: `${name}${price ? ' – ' + price : ''}`, message: `${addr || name}\nTik om te navigeren met Waze.`, click: waze, tags: ['fuelpump'],
+        actions: [{ action: 'view', label: 'Navigeer met Waze', url: waze, clear: true }] }) });
+    if (!r.ok) throw new Error(`ntfy gaf ${r.status}`);
+    return { ok: true };
   }
 }
 

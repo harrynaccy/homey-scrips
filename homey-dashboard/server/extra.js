@@ -170,7 +170,7 @@ class Extra {
   }
   setNas({ url, user, pass }) { const o = this.secrets(); o.nas = { url: String(url || ''), user: String(user || ''), pass: pass === undefined ? (o.nas || {}).pass : String(pass) }; this.saveSecrets(o); cache.delete('nas'); }
   setKey(name, value) { const o = this.secrets(); o[name] = String(value || ''); this.saveSecrets(o); }
-  hasSecrets() { const o = this.secrets(); return { nas: !!(o.nas && o.nas.user), nasUser: (o.nas && o.nas.user) || '', nasUrl: (o.nas && o.nas.url) || '', tomtom: !!o.tomtom, ns: !!o.ns, tankerkoenig: !!o.tankerkoenig }; }
+  hasSecrets() { const o = this.secrets(); return { nas: !!(o.nas && o.nas.user), nasUser: (o.nas && o.nas.user) || '', nasUrl: (o.nas && o.nas.url) || '', tomtom: !!o.tomtom, ns: !!o.ns, tankerkoenig: !!o.tankerkoenig, ntfy: !!o.ntfy }; }
 
   // ---------- Homey-status ----------
   async homeyInfo() {
