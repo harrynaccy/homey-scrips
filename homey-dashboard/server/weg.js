@@ -124,6 +124,60 @@ function anwbParse(j) {
   return out;
 }
 
+// ---------- meldingen leesbaar maken: straat, wat er dicht is, van waar tot waar ----------
+// Melvin-titel: "Harsseveldhoek Enschede Kabels / Leidingen (618570)" = straat + plaats + soort werk + nummer
+const PLACES = 'Enschede|Glanerbrug|Lonneker|Boekelo|Usselo|Hengelo|Oldenzaal|Losser|Overdinkel|De Lutte|Haaksbergen|Borne|Delden|Weerselo|Deurningen|Rossum|Oldenzaal|Gronau|Twekkelo|Driene|Beckum|Hertme|Zenderen|Lattrop|Denekamp|Ootmarsum|Almelo|Goor|Markelo|Rijssen|Holten|Nijverdal|Wierden|Tubbergen|Vriezenveen|Rijssen|Diepenheim|Neede|Eibergen|Buurse|Lemselo|Tilligte|Saasveld|Volthe';
+const TITLE_RE = new RegExp(`^(.+?)\\s+(?:${PLACES})\\b(?:\\s+(.+?))?\\s*(?:\\(\\d+\\))?$`, 'i');
+function streetFromTitle(texts) {
+  for (const t of texts) {
+    if (!/\(\d{3,}\)\s*$/.test(t) && !/^\S+(\s+\S+){0,4}\s+(Enschede|Glanerbrug|Lonneker|Boekelo)\b/i.test(t)) continue;
+    const m = TITLE_RE.exec(t.trim()); if (m && m[1].length <= 60 && !/[.:]/.test(m[1])) return { street: m[1].trim(), work: (m[2] || '').replace(/\s*\(\d+\)\s*$/, '').trim(), title: t };
+  }
+  return null;
+}
+function measureOf(texts, what) {
+  const all = texts.join(' \n ').toLowerCase();
+  if (/dicht in (beide|twee) richtingen|volledig (afgesloten|dicht)|weg(?:vak)? (?:is )?afgesloten|gesloten voor (alle |het )?verkeer|dicht voor (alle |het )?verkeer/.test(all)) return ['afgesloten', 'red'];
+  if (/dicht in (een|één|1) richting|eenrichtingsverkeer|afgesloten in (een|één|1) richting/.test(all)) return ['dicht in één richting', 'orange'];
+  if (/rijstrook/.test(all)) return ['rijstrook dicht', 'orange'];
+  if (/om en om|verkeersregelaar|wegversmalling|versmald/.test(all)) return ['versmald', 'orange'];
+  if (/fietspad/.test(all)) return ['fietspad dicht', 'orange'];
+  if (/trottoir|voetpad|stoep/.test(all)) return ['stoep dicht', 'orange'];
+  if (what.some(w => /roadClosed|carriagewayClosures/i.test(w)) || /afgesloten|afsluiting|weg dicht/.test(all)) return ['afgesloten', 'red'];
+  if (what.some(w => /laneClosures/i.test(w))) return ['rijstrook dicht', 'orange'];
+  return ['hinder', 'orange'];
+}
+const NOT_PLACE = /^(maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag|\d|week|januari|februari|maart|april|mei|juni|juli|augustus|september|oktober|november|december)/i;
+const tidy = x => x.replace(/^(de|het)\s+/i, '').replace(/^kruising\s+(met\s+)?/i, '').replace(/\s+/g, ' ').trim();
+function trajectOf(texts) {
+  for (const t of texts) {
+    let m = /kruising\s+(.+?)\s+(?:t\/m|tot(?: en met)?|-)\s+(?:de\s+)?kruising\s+(.+?)(?=[.,;]|\s+(?:van|vanaf|i\.v\.m\.?|ivm)\s|$)/i.exec(t);
+    if (m) return `tussen ${tidy(m[1])} en ${tidy(m[2])}`;
+    m = /\btussen\s+(.+?)\s+en\s+(.+?)(?=[.,;]|\s+(?:van|vanaf|i\.v\.m\.?|ivm|in verband)\s|$)/i.exec(t);
+    if (m && !NOT_PLACE.test(m[1])) return `tussen ${tidy(m[1])} en ${tidy(m[2])}`;
+    m = /\bvanaf\s+(.+?)\s+(?:tot(?: en met)?|t\/m)\s+(.+?)(?=[.,;]|\s+(?:van|i\.v\.m\.?|ivm)\s|$)/i.exec(t);
+    if (m && !NOT_PLACE.test(m[1]) && !NOT_PLACE.test(m[2])) return `tussen ${tidy(m[1])} en ${tidy(m[2])}`;
+    m = /\b(?:thv|t\.h\.v\.?|ter hoogte van)\s+(.+?)(?=[.,;]|\s+(?:van|vanaf|i\.v\.m\.?|ivm)\s|$)/i.exec(t);
+    if (m) return `ter hoogte van ${m[1].trim()}`;
+  }
+  return '';
+}
+// straat bij coördinaten (PDOK Locatieserver, gratis, geen sleutel); per plek onthouden
+const PDOK = (process.env.PDOK_BASE || 'https://api.pdok.nl/bzk/locatieserver/search/v3_1').replace(/\/$/, '');
+const geoCache = new Map();
+async function streetAt(p, fetchFn) {
+  const k = p.lat.toFixed(4) + ',' + p.lon.toFixed(4);
+  if (geoCache.has(k)) return geoCache.get(k);
+  let v = '';
+  try {
+    const r = await fetchFn(`${PDOK}/reverse?lat=${p.lat}&lon=${p.lon}&type=weg&rows=1`, { headers: UA, signal: AbortSignal.timeout(5000) });
+    if (r.ok) { const j = await r.json(); const d = j && j.response && j.response.docs && j.response.docs[0]; v = d ? String(d.straatnaam || (d.weergavenaam || '').split(',')[0] || '') : ''; }
+    else return '';
+  } catch (e) { return ''; }
+  if (geoCache.size > 3000) geoCache.clear();
+  geoCache.set(k, v); return v;
+}
+
 class Weg {
   constructor({ p2000, fetchFn } = {}) {
     this.p2000 = p2000; this.fetch = fetchFn || fetch;
@@ -175,10 +229,17 @@ class Weg {
       if (s.end && s.end < now) continue;
       const active = /active/i.test(s.status) || (s.start ? s.start <= now : true);
       if (!active && (!s.start || s.start > until)) continue;
-      items.push({ id: s.id, kind: s.kind, closed: s.closed, active, start: s.start, end: s.end, road: s.road, street: s.street, what: s.what, texts: s.texts, diversion: s.diversion, km: Math.round(d * 10) / 10 });
+      const t = streetFromTitle(s.texts); const [measure, sev] = measureOf(s.texts, s.what);
+      items.push({ id: s.id, kind: s.kind, closed: sev === 'red', active, start: s.start, end: s.end, road: s.road, street: s.street || (t && t.street) || '', work: (t && t.work) || '',
+        measure, sev, traject: trajectOf(s.texts), texts: s.texts, what: s.what, diversion: s.diversion, km: Math.round(d * 10) / 10, pts: s.pts.length ? [s.pts[0], s.pts[s.pts.length - 1]] : [] });
     }
     // dubbele meldingen (zelfde weg, zelfde periode, zelfde tekst) uit verschillende bestanden samenvoegen
     const seen = new Set(); const list = items.filter(x => { const k = [x.road, x.street, x.start, x.end, x.texts[0]].join('|'); if (seen.has(k)) return false; seen.add(k); return true; });
+    // geen straat in de melding: opzoeken bij de coördinaten (begin en eind; verschillend = "A → B")
+    await Promise.all(list.slice(0, 80).filter(x => !x.street && !x.road && x.pts.length).map(async x => {
+      const a = await streetAt(x.pts[0], this.fetch); const b = x.pts[1] ? await streetAt(x.pts[1], this.fetch) : '';
+      x.street = a && b && a !== b ? `${a} → ${b}` : a || b || '';
+    }));
     list.sort((a, b) => (b.active - a.active) || (b.closed - a.closed) || ((a.active ? a.end || 9e15 : a.start || 0) - (b.active ? b.end || 9e15 : b.start || 0)));
     // P2000-meldingen met een afsluiting (en eventueel ongevallen) uit de gekozen plaatsen
     let p2000 = [], p2000Error = null;
@@ -193,7 +254,7 @@ class Weg {
           .map(x => ({ t: x.t, title: x.title, desc: x.desc, place: x.place, kind: x.kind, closed: /af ?sluit|afgesloten|afzet|weg ?dicht/i.test(x.title + ' ' + x.desc) }));
       } catch (e) { p2000Error = String(e.message || e); }
     }
-    return { at: now, ndwAt: this.ndwAt, error: this.ndwAt ? null : this.ndwError(), loading: !this.ndwAt && !this.ndwError(), items: list.slice(0, 80), p2000, p2000Error, source: 'NDW' };
+    return { at: now, ndwAt: this.ndwAt, error: this.ndwAt ? null : this.ndwError(), loading: !this.ndwAt && !this.ndwError(), items: list.slice(0, 80).map(({ pts, ...x }) => x), p2000, p2000Error, source: 'NDW' };
   }
 
   // ---------- tegel Files: eerst ANWB, lukt dat niet dan NDW ----------
@@ -222,4 +283,4 @@ class Weg {
   }
 }
 
-module.exports = { Weg, situation, anwbParse, provinceOf, readNdw };
+module.exports = { Weg, situation, anwbParse, provinceOf, readNdw, streetFromTitle, measureOf, trajectOf };

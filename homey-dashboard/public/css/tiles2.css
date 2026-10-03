@@ -240,3 +240,9 @@ button.x-fs:active { background: color-mix(in srgb, var(--text) 8%, transparent)
 .x-fqrw { display: flex; flex-direction: column; align-items: center; gap: .35em; }
 .x-fqrs:has(.x-fqrw + .x-fqrw) .x-fqr { width: min(190px, 38vw); }
 .x-fbtns { display: flex; gap: .6em; flex-wrap: wrap; justify-content: center; }
+.x-wwm { font-style: normal; font-weight: 700; }
+.x-wwm.red { color: #ff6b6b; } .x-wwm.org { color: #ffb347; }
+.x-ww.closed .x-ww1 b { color: inherit; }
+.x-wwfull span { white-space: normal; flex-direction: column; align-items: flex-start; gap: .1em; }
+.x-wwfull small { margin-left: 0 !important; white-space: normal; }
+.x-wwtxt { opacity: .75; }

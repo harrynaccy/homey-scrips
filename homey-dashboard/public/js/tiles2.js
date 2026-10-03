@@ -326,13 +326,11 @@
   const dshort = t => new Date(t).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' });
   const period = x => x.active ? (x.end ? 't/m ' + dshort(x.end) : 'tot nader bericht') : (x.start ? 'vanaf ' + dshort(x.start) + (x.end ? ' t/m ' + dshort(x.end) : '') : '');
   const WHAT = { roadClosed: 'weg afgesloten', carriagewayClosures: 'rijbaan dicht', laneClosures: 'rijstrook dicht', narrowLanes: 'smalle rijstroken', singleAlternateLineTraffic: 'verkeer om en om', contraflow: 'tegenverkeer op rijbaan', roadworks: 'wegwerkzaamheden', resurfacingWork: 'nieuw asfalt', maintenanceWork: 'onderhoud', constructionWork: 'bouw', bridgeMaintenanceWork: 'brugonderhoud' };
-  const wwRow = x => {
-    const where = [x.road, x.street].filter(Boolean).join(' · ') || (x.texts[0] || 'Melding');
-    const what = [...new Set(x.what.map(w => WHAT[w] || ''))].filter(Boolean).join(', ');
-    const txt = x.texts.find(s2 => s2 !== where) || '';
-    return `<div class="x-ww${x.closed ? ' closed' : ''}"><div class="x-ww1"><span class="x-wwtag ${x.closed ? 'red' : 'org'}">${x.closed ? 'afgesloten' : 'hinder'}</span><b>${esc(where)}</b></div>`
-      + `<div class="x-ww2">${esc([what, period(x), x.diversion ? 'omleiding' : ''].filter(Boolean).join(' · '))}</div>${txt ? `<div class="x-ww3">${esc(txt)}</div>` : ''}</div>`;
-  };
+  const wwWhere = x => x.street || x.road || (x.texts[0] || 'Melding').replace(/\s*\(\d+\)\s*$/, '');
+  const wwRow = x => `<div class="x-ww ${x.sev === 'red' ? 'closed' : ''}"><div class="x-ww1"><b>${esc(wwWhere(x))}</b></div>`
+    + `<div class="x-ww2"><span class="x-wwm ${x.sev === 'red' ? 'red' : 'org'}">${esc(x.measure || 'hinder')}</span>${period(x) ? ' · ' + esc(period(x)) : ''}</div>`
+    + (x.traject ? `<div class="x-ww3">${esc(x.traject)}</div>` : '') + '</div>';
+  const wwFull = x => `<div class="x-row x-wwfull"><span><b>${esc(wwWhere(x))}</b><small><em class="x-wwm ${x.sev === 'red' ? 'red' : 'org'}">${esc(x.measure || 'hinder')}</em>${period(x) ? ' · ' + esc(period(x)) : ''}${x.work ? ' · ' + esc(x.work) : ''}</small>${x.traject ? `<small>${esc(x.traject)}</small>` : ''}${x.texts.map(t2 => `<small class="x-wwtxt">${esc(t2)}</small>`).join('')}</span></div>`;
   T.roadworks = {
     label: 'Wegwerkzaamheden Enschede', icon: 'cone', size: [4, 5], title: t => t.opts.title || 'Wegwerkzaamheden Enschede',
     render(t, inner, el) {
@@ -341,7 +339,7 @@
       const r = X.get('ww:' + q, 5 * 60e3, () => D.api('GET', '/api/x/wegwerk?' + q), ['roadworks']);
       if (!r.v) { inner.innerHTML = wait(t, 'cone', r, 'Gegevens van NDW ophalen…'); return; }
       const v = r.v; let items = v.items || [];
-      if (o.onlyClosed) items = items.filter(x => x.closed);
+      if (o.onlyClosed) items = items.filter(x => x.sev === 'red' || x.closed);
       const now = items.filter(x => x.active), soon = o.soon === false ? [] : items.filter(x => !x.active);
       const p2 = (v.p2000 || []);
       const sub = v.error ? `<span class="x-warn">${esc(v.error)}</span>` : v.loading ? 'NDW wordt opgehaald…' : `${now.length} nu${soon.length ? ` · ${soon.length} binnenkort` : ''}${p2.length ? ` · ${p2.length} P2000` : ''}`;
@@ -350,6 +348,7 @@
       const head = h => `<div class="x-wwh">${esc(h)}</div>`;
       const body = p2Html + (now.length ? head('Nu') + now.map(wwRow).join('') : '') + (soon.length ? head('Binnenkort (' + (o.days || 7) + ' dagen)') + soon.map(wwRow).join('') : '');
       inner.innerHTML = hd(t, 'cone', sub) + `<div class="list">${body || `<div class="empty">${v.loading ? 'Laden…' : 'Geen werkzaamheden of afsluitingen'}</div>`}</div><div class="x-src">bron: NDW${o.p2000 === false ? '' : ' · P2000 alarmeringen.nl'}</div>`;
+      pressOpen(el, () => sheet(D.titleOf(t), 'Volledige meldingen · bron: NDW', `<div class="x-sheetlist">${p2.map(x => `<div class="x-row x-wwfull"><span><b>P2000 ${hm(x.t)}</b><small>${esc(x.desc || '')}</small><small class="x-wwtxt">${esc(x.title)}</small></span></div>`).join('')}${now.length ? '<div class="x-wwh">Nu</div>' + now.map(wwFull).join('') : ''}${soon.length ? '<div class="x-wwh">Binnenkort</div>' + soon.map(wwFull).join('') : ''}` + (p2.length || now.length || soon.length ? '' : '<div class="empty">Geen meldingen</div>') + '</div>'));
     },
   };
 
