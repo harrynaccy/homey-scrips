@@ -396,7 +396,7 @@
       let diff = '';
       if (nl && cands.length) { const [nm, de] = cands[0]; const d = nl.price - de.price;
         diff = d > 0.0005 ? `<div class="x-fdiff"><b>${esc(nm)}</b> is ${eur2(d)} per liter goedkoper · <b>${eur2(d * liters)}</b> op ${liters} liter</div>` : `<div class="x-fdiff">Enschede is ${eur2(-d)} per liter goedkoper dan ${esc(nm)} · ${eur2(-d * liters)} op ${liters} liter</div>`; }
-      inner.innerHTML = hd(t, 'fuel', esc(FUEL[fuel][0])) + `<div class="list">${block('Enschede', v.nl)}${block('Gronau', v.gronau, true)}${block('Ahaus / Alstätte', v.ahaus, true)}</div>${diff}<div class="x-src">bron: ANWB · Tankerkönig (MTS-K), CC BY 4.0</div>`;
+      inner.innerHTML = hd(t, 'fuel', esc(FUEL[fuel][0])) + `<div class="list">${block('Enschede', v.nl)}${block('Gronau', v.gronau, true)}${block('Ahaus / Alstätte', v.ahaus, true)}</div>${diff}<div class="x-src">bron: ANWB · Tankerkönig (MTS-K), www.tankerkoenig.de, CC BY 4.0</div>`;
     },
   };
 
