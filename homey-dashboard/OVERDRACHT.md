@@ -1,6 +1,6 @@
 # Overdracht – Homey Dashboard (voor een nieuwe chat)
 
-Stand: 2 oktober 2026. Eigenaar: Ramon. Taal: Nederlands, kort en duidelijk.
+Stand: 3 oktober 2026. Eigenaar: Ramon. Taal: Nederlands, kort en duidelijk.
 
 ## Afspraken met Ramon (belangrijk)
 - **Eerst lezen en voorstellen, pas bouwen/wijzigen na "START".** Ook bij kleine dingen.
@@ -8,6 +8,7 @@ Stand: 2 oktober 2026. Eigenaar: Ramon. Taal: Nederlands, kort en duidelijk.
 - Wijzigingen gaan via deze GitHub-branch; Ramon haalt ze binnen met **Systeem → Bijwerken** in het dashboard. Geen zipbestanden meer.
 - Kort antwoorden, weinig opsommingen van wat je allemaal gedaan hebt; zeg eerlijk wat niet getest is.
 - Na elke wijziging die invloed heeft op het draaien: test lokaal in demo-modus (zie onder) voordat je pusht.
+- **Bij elke push OVERDRACHT.md bijwerken** met wat er gebouwd of gewijzigd is (kort, bij "Wat deze sessie is gebouwd" en "Nog open"), in dezelfde push. Ramon vraagt aan het eind van een sessie ter controle "werk OVERDRACHT.md bij".
 - **Na het bouwen van een nieuwe tegel/programma altijd afsluiten met de vraag:** "Wil je hier ook een Homey-app van, zodat je het buiten de deur op je telefoon kunt zien?" (Tegels onder Overig bestaan alleen in het dashboard; een eigen Homey-app verschijnt onder Eigen apps én in de Homey-app. Gegevens blijven van de NAS komen, Homey haalt ze thuis op.)
 
 ## Opbouw
