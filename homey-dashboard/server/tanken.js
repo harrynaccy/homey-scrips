@@ -1,6 +1,6 @@
 'use strict';
 // Goedkoopst tanken voor de tegels "Goedkoopst tanken" en "Tanktip": Nederland = Enschede, Oldenzaal, Weerselo, Deurningen (ANWB),
-// Duitsland = Gronau, Ahaus/Alstätte (Tankerkönig). Plus: station naar de telefoon sturen (ntfy, tik op de melding = Waze).
+// Duitsland = Gronau, Ahaus/Alstätte (Tankerkönig). Plus: station naar de telefoon sturen (ntfy, tik op de melding = Waze en/of Google Maps).
 // - Tankerkönig: officiële Duitse prijzen (MTS-K), gratis persoonlijke sleutel, alleen op de NAS bewaard.
 //   Bron CC BY 4.0 "Tankerkönig / MTS-K"; niet vaker dan elke 5 minuten vragen (wij: 10 min).
 // - ANWB: prijzen van Nederlandse pompen via hetzelfde adres als de ANWB-website; niet officieel, kan veranderen.
@@ -99,11 +99,15 @@ class Tanken {
     if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) throw new Error('Van dit station is de plek onbekend');
     const name = str(b.name).slice(0, 80), addr = [str(b.street), str(b.place)].filter(Boolean).join(', ').slice(0, 120);
     const price = Number(b.price) > 0 ? '€ ' + Number(b.price).toFixed(3).replace('.', ',') : '';
-    const waze = `https://waze.com/ul?ll=${lat.toFixed(6)},${lon.toFixed(6)}&navigate=yes`;
-    // JSON-bericht (officieel ntfy-formaat; letters als € en ä gaan zo goed)
+    const ll = `${lat.toFixed(6)},${lon.toFixed(6)}`;
+    const APPS = { waze: ['Waze', `https://waze.com/ul?ll=${ll}&navigate=yes`], gmaps: ['Google Maps', `https://www.google.com/maps/dir/?api=1&destination=${ll}&travelmode=driving`] };
+    const app = ['waze', 'gmaps', 'both'].includes(b.app) ? b.app : 'both';
+    const use = app === 'both' ? ['waze', 'gmaps'] : [app];
+    // JSON-bericht (officieel ntfy-formaat; letters als € en ä gaan zo goed). Tik op de melding = eerste app, knoppen = elke app.
     const r = await fetch(`${NTFY}/`, { method: 'POST', signal: AbortSignal.timeout(12000), headers: { ...UA, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topic, title: `${name}${price ? ' – ' + price : ''}`, message: `${addr || name}\nTik om te navigeren met Waze.`, click: waze, tags: ['fuelpump'],
-        actions: [{ action: 'view', label: 'Navigeer met Waze', url: waze, clear: true }] }) });
+      body: JSON.stringify({ topic, title: `${name}${price ? ' – ' + price : ''}`, tags: ['fuelpump'], click: APPS[use[0]][1],
+        message: `${addr || name}\n${use.length > 1 ? 'Tik om te navigeren met Waze, of kies hieronder.' : 'Tik om te navigeren met ' + APPS[use[0]][0] + '.'}`,
+        actions: use.map(k => ({ action: 'view', label: APPS[k][0], url: APPS[k][1], clear: true })) }) });
     if (!r.ok) throw new Error(`ntfy gaf ${r.status}`);
     return { ok: true };
   }

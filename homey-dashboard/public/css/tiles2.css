@@ -236,3 +236,6 @@ button.x-fs:active { background: color-mix(in srgb, var(--text) 8%, transparent)
 .x-fqr svg { width: 100%; height: auto; display: block; }
 .x-fdiff { font-size: min(.85em, 2.6cqh, 2.2cqw); }
 .x-fdiff + .x-src { font-size: min(.68em, 1.9cqh, 1.6cqw); }
+.x-fqrs { display: flex; gap: 1em; justify-content: center; flex-wrap: wrap; }
+.x-fqrw { display: flex; flex-direction: column; align-items: center; gap: .35em; }
+.x-fqrs:has(.x-fqrw + .x-fqrw) .x-fqr { width: min(190px, 38vw); }

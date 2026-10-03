@@ -381,21 +381,25 @@
   const FUEL = { e5: ['Euro 95', 'Super E5'], e10: ['Euro 95 (E10)', 'Super E10'], diesel: ['Diesel', 'Diesel'] };
   const fuelData = fuel => X.get('fuel:' + fuel, 10 * 60e3, () => D.api('GET', '/api/x/tanken?fuel=' + fuel), ['fuel', 'fueltip']);
   const fuelPick = (o, a, n) => ((a && a.list) || []).filter(s2 => o.openOnly === false || s2.open !== false).slice(0, n);
-  const wazeUrl = s2 => `https://waze.com/ul?ll=${Number(s2.lat).toFixed(6)},${Number(s2.lon).toFixed(6)}&navigate=yes`;
+  const llOf = s2 => `${Number(s2.lat).toFixed(6)},${Number(s2.lon).toFixed(6)}`;
+  const NAV = { waze: ['Waze', s2 => `https://waze.com/ul?ll=${llOf(s2)}&navigate=yes`], gmaps: ['Google Maps', s2 => `https://www.google.com/maps/dir/?api=1&destination=${llOf(s2)}&travelmode=driving`] };
+  const navApp = () => { const a = D.cfg && D.cfg.settings && D.cfg.settings.navApp; return ['waze', 'gmaps', 'both'].includes(a) ? a : 'both'; };
   const hasPos = s2 => Number.isFinite(Number(s2.lat)) && Number.isFinite(Number(s2.lon)) && s2.lat !== null && s2.lon !== null;
   const fuelSheet = s2 => {
     const addr = [s2.street, s2.place].filter(Boolean).join(', ');
     if (!hasPos(s2)) { sheet(s2.name || s2.full, addr, '<div class="empty">Van dit station is de plek onbekend; navigeren lukt niet.</div>'); return; }
+    const app = navApp(); const use = app === 'both' ? ['waze', 'gmaps'] : [app];
     sheet(s2.name || s2.full, addr, `<div class="x-fsheet"><div class="x-fsp">${eur(s2.price)}</div>
-      <button class="btn" data-fphone>${icon('play')}Naar telefoon (Waze)</button><small class="muted" data-fstat></small>
-      <div class="x-fqr" data-fqr><div class="muted">QR-code laden…</div></div><small class="muted">Of scan met je telefoon: opent Waze met de route.</small></div>`);
+      <button class="btn" data-fphone>${icon('play')}Naar telefoon${use.length > 1 ? '' : ' (' + NAV[use[0]][0] + ')'}</button><small class="muted" data-fstat></small>
+      <div class="x-fqrs">${use.map(k => `<div class="x-fqrw"><div class="x-fqr" data-fqr="${k}"><div class="muted">QR-code laden…</div></div>${use.length > 1 ? `<b>${NAV[k][0]}</b>` : ''}</div>`).join('')}</div>
+      <small class="muted">Of scan met je telefoon: opent ${use.map(k => NAV[k][0]).join(' of ')} met de route.</small></div>`);
     const root = document.querySelector('#sheet');
     const shut = setTimeout(() => { if (root.contains(root.querySelector('[data-fqr]'))) D.closeSheet(); }, 60e3);
     root.querySelector('[data-close]').addEventListener('click', () => clearTimeout(shut));
-    qrLib().then(() => { const q = window.qrcode(0, 'M'); q.addData(wazeUrl(s2)); q.make(); const box = root.querySelector('[data-fqr]'); if (box) box.innerHTML = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true }); }).catch(() => {});
+    qrLib().then(() => use.forEach(k => { const q = window.qrcode(0, 'M'); q.addData(NAV[k][1](s2)); q.make(); const box = root.querySelector(`[data-fqr="${k}"]`); if (box) box.innerHTML = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true }); })).catch(() => {});
     const btn = root.querySelector('[data-fphone]'), st = root.querySelector('[data-fstat]');
     btn.onclick = async () => { btn.disabled = true; st.textContent = 'Versturen…';
-      try { await D.api('POST', '/api/x/tanken/telefoon', { name: s2.name || s2.full, street: s2.street, place: s2.place, price: s2.price, lat: s2.lat, lon: s2.lon }); st.textContent = 'Verstuurd. Tik op de melding op je telefoon.'; D.toast('Naar je telefoon gestuurd'); }
+      try { await D.api('POST', '/api/x/tanken/telefoon', { name: s2.name || s2.full, street: s2.street, place: s2.place, price: s2.price, lat: s2.lat, lon: s2.lon, app }); st.textContent = 'Verstuurd. Tik op de melding op je telefoon.'; D.toast('Naar je telefoon gestuurd'); }
       catch (e) { st.textContent = e.message; btn.disabled = false; } };
   };
   const fuelRow = (s2, i, key) => `<button class="x-fs nopress${i === 0 ? ' best' : ''}" data-fst="${esc(key)}"><div class="x-fn"><b>${esc(s2.name || s2.full)}</b><small>${esc([s2.street, s2.place].filter(Boolean).join(', '))}${s2.open === false ? ' · gesloten' : ''}</small></div><div class="x-fp">${eur(s2.price)}</div></button>`;
@@ -605,7 +609,7 @@
     ['waste', 'Afvalkalender', 'Welke container wanneer (Twente Milieu)'], ['agenda', 'Agenda', 'Afspraken uit Google of iCloud'], ['countdown', 'Afteller', 'Aantal dagen tot …'],
     ['notes', 'Boodschappen en notities', 'Lijstje, gedeeld met alle schermen'], ['timer', 'Kookwekker', 'Timer met geluid'],
     ['departures', 'Vertrektijden bus en tram', 'Bij jouw halte'], ['travel', 'Reistijd naar werk', 'Met de auto'], ['p2000', 'P2000 Twente', 'Meldingen brandweer, ambulance en politie'], ['ns', 'NS reisinformatie', 'Vertrektijden en storingen van je station'], ['bus', 'Bus reisinformatie', 'Live vertrektijden en omleidingen van je halte'],
-    ['roadworks', 'Wegwerkzaamheden Enschede', 'Werkzaamheden en afsluitingen, ook uit P2000'], ['jams', 'Files A- en N-wegen', 'Overijssel, Friesland en de rest van Nederland'], ['fuel', 'Goedkoopst tanken', 'Nederland en Duitsland naast elkaar, tik = Waze'], ['fueltip', 'Tanktip', 'De 2 goedkoopste in Nederland en Duitsland'],
+    ['roadworks', 'Wegwerkzaamheden Enschede', 'Werkzaamheden en afsluitingen, ook uit P2000'], ['jams', 'Files A- en N-wegen', 'Overijssel, Friesland en de rest van Nederland'], ['fuel', 'Goedkoopst tanken', 'Nederland en Duitsland naast elkaar, tik = navigeren'], ['fueltip', 'Tanktip', 'De 2 goedkoopste in Nederland en Duitsland'],
     ['conn', 'Verbindingen', 'Scherm, NAS, Homey en back-up (zoals de balk linksonder)'], ['nas', 'NAS-status', 'Schijven, temperatuur, opslag'], ['homeyinfo', 'Homey-status', 'Versie, geheugen, aantallen'],
     ['heading', 'Kop of scheidingslijn', 'Tabblad in blokken verdelen'], ['spacer', 'Lege ruimte', 'Onzichtbare tegel als ruimte'], ['photos', 'Fotolijst', 'Diashow van je eigen foto\'s'], ['wifiqr', 'Wifi voor gasten', 'QR-code om te scannen'],
   ];
@@ -613,7 +617,8 @@
 
   // ---------- opties bij Tegel ----------
   const devSel = (P, F, cur, filter, label = 'Apparaat') => F.row(label, F.select(`${P}.opts.deviceId`, cur || '', [['', 'Kies…'], ...D.lib.devices.filter(filter).sort((a, b) => a.name.localeCompare(b.name)).map(d => [d.id, d.name])], 'tilepanel'));
-  const fuelKeys = () => `<div class="f col"><label>Tankerkönig-sleutel (Duitsland)<small data-tkstat>Gratis via onboarding.tankerkoenig.de. Wordt alleen op de NAS bewaard.</small></label><div class="x-ovsearch"><input type="password" placeholder="Plak hier je sleutel" data-tkkey autocomplete="off"><button class="btn sm" data-tksave>Opslaan</button></div></div>` +
+  const fuelKeys = F => F.row('Navigatie-app', F.seg('settings.navApp', navApp(), [['waze', 'Waze'], ['gmaps', 'Google Maps'], ['both', 'Beide']], 'tile'), 'Voor "Naar telefoon" en de QR-code; geldt voor alle tanktegels') +
+    `<div class="f col"><label>Tankerkönig-sleutel (Duitsland)<small data-tkstat>Gratis via onboarding.tankerkoenig.de. Wordt alleen op de NAS bewaard.</small></label><div class="x-ovsearch"><input type="password" placeholder="Plak hier je sleutel" data-tkkey autocomplete="off"><button class="btn sm" data-tksave>Opslaan</button></div></div>` +
     `<div class="f col"><label>ntfy-kanaal (naar je telefoon)<small data-ntstat>De naam van je kanaal in de app ntfy, precies zo (hoofdletters tellen). Wordt alleen op de NAS bewaard.</small></label><div class="x-ovsearch"><input type="password" placeholder="Kanaalnaam" data-ntkey autocomplete="off"><button class="btn sm" data-ntsave>Opslaan</button><button class="btn sm ghost" data-nttest>Test</button></div></div>`;
   D.tileOptions = {
     room: (t, P, F) => F.row('Ruimte', F.select(`${P}.opts.zoneId`, t.opts.zoneId || '', [['', 'Kies…'], ...D.lib.zones.map(z => [z.id, z.name])], 'tilepanel')) +
@@ -676,11 +681,11 @@
       '<p class="note">Bron: ANWB (niet officieel, kan veranderen); lukt dat niet, dan NDW zonder filelengte. Provincie wordt bepaald aan de hand van de plek van de file.</p>',
     fuel: (t, P, F) => F.row('Brandstof', F.seg(`${P}.opts.fuel`, t.opts.fuel || 'e5', [['e5', 'Euro 95 / E5'], ['e10', 'E10'], ['diesel', 'Diesel']], 'tile')) +
       F.row('Aantal per land', F.range(`${P}.opts.count`, t.opts.count || 8, 1, 12, 1, 'tile', 'n')) + F.row('Alleen open', F.toggle(`${P}.opts.openOnly`, t.opts.openOnly !== false, 'tile')) +
-      F.row('Liters per tankbeurt', F.num(`${P}.opts.liters`, t.opts.liters || 55, 10, 120, 'tile')) + fuelKeys() +
+      F.row('Liters per tankbeurt', F.num(`${P}.opts.liters`, t.opts.liters || 55, 10, 120, 'tile')) + fuelKeys(F) +
       '<p class="note">Nederland: Enschede, Oldenzaal, Weerselo en Deurningen (ANWB, niet officieel). Duitsland: Gronau en Ahaus/Alstätte (Tankerkönig, officieel). Elke 10 minuten.</p>',
     fueltip: (t, P, F) => F.row('Brandstof', F.seg(`${P}.opts.fuel`, t.opts.fuel || 'e5', [['e5', 'Euro 95 / E5'], ['e10', 'E10'], ['diesel', 'Diesel']], 'tile')) +
-      F.row('Aantal per land', F.range(`${P}.opts.count`, t.opts.count || 2, 1, 5, 1, 'tile', 'n')) + F.row('Alleen open', F.toggle(`${P}.opts.openOnly`, t.opts.openOnly !== false, 'tile')) + fuelKeys() +
-      '<p class="note">Zelfde gegevens als Goedkoopst tanken. Tik op een station om het naar je telefoon te sturen (Waze).</p>',
+      F.row('Aantal per land', F.range(`${P}.opts.count`, t.opts.count || 2, 1, 5, 1, 'tile', 'n')) + F.row('Alleen open', F.toggle(`${P}.opts.openOnly`, t.opts.openOnly !== false, 'tile')) + fuelKeys(F) +
+      '<p class="note">Zelfde gegevens als Goedkoopst tanken. Tik op een station om het naar je telefoon te sturen (Waze en/of Google Maps).</p>',
     conn: (t, P, F) => F.row('Tekst eronder', F.toggle(`${P}.opts.info`, t.opts.info !== false, 'tile'), 'Reactietijden en back-up; vanaf 2 hoog') +
       '<p class="note">De vaste balk linksonder stel je in bij Scherm → Statusbalk linksonder.</p>',
     p2000: (t, P, F) => F.row('Brandweer', F.toggle(`${P}.opts.fire`, t.opts.fire !== false, 'tile')) + F.row('Ambulance', F.toggle(`${P}.opts.ambu`, t.opts.ambu !== false, 'tile')) + F.row('Politie', F.toggle(`${P}.opts.pol`, t.opts.pol !== false, 'tile')) +
@@ -735,7 +740,7 @@
       save('[data-tksave]', '[data-tkkey]', 'tankerkoenig', 'Tankerkönig-sleutel opgeslagen op de NAS');
       save('[data-ntsave]', '[data-ntkey]', 'ntfy', 'ntfy-kanaal opgeslagen op de NAS');
       const tb = root.querySelector('[data-nttest]'); if (tb) tb.onclick = async () => {
-        try { await D.api('POST', '/api/x/tanken/telefoon', { name: 'Test vanaf het dashboard', street: 'Tik om Waze te openen', place: 'Enschede', lat: 52.2215, lon: 6.8937 }); D.toast('Testmelding verstuurd; kijk op je telefoon'); } catch (e) { D.toast(e.message, true); } };
+        try { await D.api('POST', '/api/x/tanken/telefoon', { name: 'Test vanaf het dashboard', street: '', place: 'Enschede centrum', lat: 52.2215, lon: 6.8937, app: navApp() }); D.toast('Testmelding verstuurd; kijk op je telefoon'); } catch (e) { D.toast(e.message, true); } };
     },
     fueltip: root => D.tileWire.fuel(root),
     departures: (root, t, P) => {
