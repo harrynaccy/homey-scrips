@@ -145,8 +145,6 @@ body.editing .tile.x-spacer { outline: 1px dashed rgba(255,255,255,.2); }
 .xr-hd h3 { margin: 0; font-size: clamp(16px, min(5.4cqw, 8cqh), 44px); font-weight: 800; letter-spacing: -.01em; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .xr-hd p { margin: .3em 0 0; color: var(--xr-muted); font-size: clamp(11px, min(2.6cqw, 4.4cqh), 22px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .xr-clock { font-size: clamp(16px, min(4.6cqw, 7cqh), 40px); font-weight: 300; font-variant-numeric: tabular-nums; flex: none; }
-.xr-right { display: flex; align-items: center; gap: .4em; flex: none; font-size: clamp(16px, min(4.6cqw, 7cqh), 40px); }
-.xr-heart { width: .9em; height: .9em; flex: none; }
 .xr-panel { background: var(--xr-panel); border: 1px solid var(--xr-pborder, var(--xr-line)); backdrop-filter: blur(var(--xr-pblur, 0px)); -webkit-backdrop-filter: blur(var(--xr-pblur, 0px)); border-radius: clamp(10px, 2cqw, 18px); padding: clamp(10px, 2.6cqw, 24px); padding-left: var(--xr-ppad, clamp(10px, 2.6cqw, 24px)); padding-right: var(--xr-ppad, clamp(10px, 2.6cqw, 24px)); min-height: 0; display: flex; flex-direction: column; }
 .xr-panel.xr-dep { flex: 1 1 0; }
 .xr-panel.xr-dis { flex: 0 1 auto; max-height: 38%; }   /* alleen zo groot als nodig; vertrektijden krijgen de rest */
