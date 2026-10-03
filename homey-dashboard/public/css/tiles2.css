@@ -175,7 +175,7 @@ body.editing .tile.x-spacer { outline: 1px dashed rgba(255,255,255,.2); }
 .xr-badge.werk { background: #ffc917; color: #2a2205; }
 .xr-badge.storing { background: #ff9f43; color: #2a1505; }
 .xr-mine { font-size: .72em; color: #ffc917; border: 1px solid currentColor; border-radius: .35em; padding: 0 .4em; }
-.xr-warn { color: #ffcf4a; font-size: .95em; line-height: 1.4; }
+.xr-warn { color: var(--xr-warn, #ffcf4a); font-size: .95em; line-height: 1.4; }
 .xr-warn.sm { font-size: .78em; margin-bottom: .3em; }
 .xr-muted { color: var(--xr-muted); }
 .xr-muted.pad { margin-top: 1em; }
