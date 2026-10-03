@@ -340,8 +340,15 @@
   const reisMode = o => o.bgMode || (o.themeColors ? 'theme' : 'std');
   const reisBg = o => {
     const m = reisMode(o); const st = []; let layers = '';
-    const pa = o.panel != null ? Number(o.panel) : (m === 'photo' ? 0.35 : null);
-    if (pa != null) st.push(`--xr-panel:rgba(0,0,0,${pa})`);
+    // vakjes: glas (standaard), eigen kleur of geen; dekking, vervagen en rand instelbaar
+    const pm = o.pMode || 'glass'; const pa = o.panel != null ? Number(o.panel) : (m === 'photo' ? 0.35 : null);
+    if (pm === 'none') st.push('--xr-panel:transparent', '--xr-pborder:transparent', '--xr-pblur:0px', '--xr-ppad:0px');
+    else {
+      if (pm === 'color') st.push(`--xr-panel:${D.hexA(o.pColor || '#000000', pa != null ? pa : 0.3)}`);
+      else if (pa != null) st.push(`--xr-panel:rgba(0,0,0,${pa})`);
+      if (o.pBorder != null) st.push(`--xr-pborder:${pm === 'color' ? D.hexA(o.pColor || '#000000', Number(o.pBorder)) : `rgba(255,255,255,${Number(o.pBorder)})`}`);
+      const pb = o.pBlur != null ? Number(o.pBlur) : (m === 'photo' ? 6 : 0); st.push(`--xr-pblur:${pb}px`);
+    }
     if (m === 'colors') st.push(`background:linear-gradient(165deg, ${o.c1 || '#0e2a6e'}, ${o.c2 || o.c1 || '#0a1d52'})`);
     if (m === 'photo' && o.photo) {
       layers = `<div class="xr-photo" style="background-image:url('${esc(o.photo)}');${o.blur ? `filter:blur(${Number(o.blur)}px);inset:-${Number(o.blur) * 2}px;` : ''}"></div><div class="xr-dim" style="background:rgba(0,0,0,${o.dim != null ? Number(o.dim) : 0.35})"></div>`;
@@ -512,7 +519,12 @@
       (reisMode(t.opts) === 'colors' ? F.row('Kleur boven', F.color(`${P}.opts.c1`, t.opts.c1 || '#0e2a6e', 'tile')) + F.row('Kleur onder', F.color(`${P}.opts.c2`, t.opts.c2 || '#0a1d52', 'tile'), 'Twee keer dezelfde kleur = effen') : '') +
       (reisMode(t.opts) === 'photo' ? `<div class="f col"><label>Foto<small>Kies een foto of upload een nieuwe (ook te gebruiken bij Scherm → Achtergrond)</small></label><div class="gallery" data-xrgal><div class="muted">Laden…</div></div><label class="btn sm upl">${icon('upload')}Foto uploaden<input type="file" accept="image/*" data-xrfile hidden></label></div>` +
         F.row('Donkerder maken', F.range(`${P}.opts.dim`, t.opts.dim != null ? t.opts.dim : 0.35, 0, 0.85, 0.01, 'tile', '%')) + F.row('Vervagen', F.range(`${P}.opts.blur`, t.opts.blur || 0, 0, 20, 1, 'tile', 'px')) : '') +
-      F.row('Vakjes donkerder', F.range(`${P}.opts.panel`, t.opts.panel != null ? t.opts.panel : (reisMode(t.opts) === 'photo' ? 0.35 : 0.05), 0, 0.85, 0.01, 'tile', '%'), 'Achtergrond van de vakken Vertrek en Storingen') +
+      F.row('Vakjes', F.seg(`${P}.opts.pMode`, t.opts.pMode || 'glass', [['glass', 'Glas'], ['color', 'Eigen kleur'], ['none', 'Geen']], 'tilepanel'), 'Achtergrond van de vakken Vertrek en Storingen') +
+      ((t.opts.pMode || 'glass') === 'none' ? '' :
+        ((t.opts.pMode === 'color') ? F.row('Kleur vakjes', F.color(`${P}.opts.pColor`, t.opts.pColor || '#000000', 'tile')) : '') +
+        F.row('Dekking vakjes', F.range(`${P}.opts.panel`, t.opts.panel != null ? t.opts.panel : (t.opts.pMode === 'color' ? 0.3 : reisMode(t.opts) === 'photo' ? 0.35 : 0.05), 0, 1, 0.01, 'tile', '%'), '0% = helemaal doorzichtig') +
+        F.row('Vervagen', F.range(`${P}.opts.pBlur`, t.opts.pBlur != null ? t.opts.pBlur : (reisMode(t.opts) === 'photo' ? 6 : 0), 0, 20, 1, 'tile', 'px'), 'Hoe wazig de achtergrond achter de vakjes is') +
+        F.row('Rand', F.range(`${P}.opts.pBorder`, t.opts.pBorder != null ? t.opts.pBorder : 0.14, 0, 1, 0.01, 'tile', '%'))) +
       `<div class="f col"><label>NS-sleutel<small data-nsstat>Gratis via apiportal.ns.nl. Wordt alleen op de NAS bewaard.</small></label><div class="x-ovsearch"><input type="password" placeholder="Plak hier je sleutel" data-nskey autocomplete="off"><button class="btn sm" data-nssave>Opslaan</button></div></div>`,
     bus: (t, P, F) => `<div class="f col"><label>Halte<small>${esc(t.opts.stopName || 'Nog geen halte gekozen')}</small></label><div class="x-ovsearch"><input type="search" placeholder="Zoek: Enschede, Het Oosterveld" data-ovq><div data-ovres></div></div></div>` +
       F.row('Lijn(en)', F.text(`${P}.opts.lines`, t.opts.lines, 'tile', 'bijv. 2'), 'Leeg = alle lijnen') +
@@ -523,7 +535,12 @@
       (reisMode(t.opts) === 'colors' ? F.row('Kleur boven', F.color(`${P}.opts.c1`, t.opts.c1 || '#3d0b17', 'tile')) + F.row('Kleur onder', F.color(`${P}.opts.c2`, t.opts.c2 || '#5a1526', 'tile'), 'Twee keer dezelfde kleur = effen') : '') +
       (reisMode(t.opts) === 'photo' ? `<div class="f col"><label>Foto<small>Kies een foto of upload een nieuwe (ook te gebruiken bij Scherm → Achtergrond)</small></label><div class="gallery" data-xrgal><div class="muted">Laden…</div></div><label class="btn sm upl">${icon('upload')}Foto uploaden<input type="file" accept="image/*" data-xrfile hidden></label></div>` +
         F.row('Donkerder maken', F.range(`${P}.opts.dim`, t.opts.dim != null ? t.opts.dim : 0.35, 0, 0.85, 0.01, 'tile', '%')) + F.row('Vervagen', F.range(`${P}.opts.blur`, t.opts.blur || 0, 0, 20, 1, 'tile', 'px')) : '') +
-      F.row('Vakjes donkerder', F.range(`${P}.opts.panel`, t.opts.panel != null ? t.opts.panel : (reisMode(t.opts) === 'photo' ? 0.35 : 0.05), 0, 0.85, 0.01, 'tile', '%'), 'Achtergrond van de vakken Vertrek en Storingen') +
+      F.row('Vakjes', F.seg(`${P}.opts.pMode`, t.opts.pMode || 'glass', [['glass', 'Glas'], ['color', 'Eigen kleur'], ['none', 'Geen']], 'tilepanel'), 'Achtergrond van de vakken Vertrek en Storingen') +
+      ((t.opts.pMode || 'glass') === 'none' ? '' :
+        ((t.opts.pMode === 'color') ? F.row('Kleur vakjes', F.color(`${P}.opts.pColor`, t.opts.pColor || '#000000', 'tile')) : '') +
+        F.row('Dekking vakjes', F.range(`${P}.opts.panel`, t.opts.panel != null ? t.opts.panel : (t.opts.pMode === 'color' ? 0.3 : reisMode(t.opts) === 'photo' ? 0.35 : 0.05), 0, 1, 0.01, 'tile', '%'), '0% = helemaal doorzichtig') +
+        F.row('Vervagen', F.range(`${P}.opts.pBlur`, t.opts.pBlur != null ? t.opts.pBlur : (reisMode(t.opts) === 'photo' ? 6 : 0), 0, 20, 1, 'tile', 'px'), 'Hoe wazig de achtergrond achter de vakjes is') +
+        F.row('Rand', F.range(`${P}.opts.pBorder`, t.opts.pBorder != null ? t.opts.pBorder : 0.14, 0, 1, 0.01, 'tile', '%'))) +
       '<p class="note">Live via OVapi (bus, tram, metro van alle vervoerders, ook Arriva).</p>',
     conn: (t, P, F) => F.row('Tekst eronder', F.toggle(`${P}.opts.info`, t.opts.info !== false, 'tile'), 'Reactietijden en back-up; vanaf 2 hoog') +
       '<p class="note">De vaste balk linksonder stel je in bij Scherm → Statusbalk linksonder.</p>',
