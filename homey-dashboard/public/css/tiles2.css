@@ -210,7 +210,6 @@ body.editing .tile.x-spacer { outline: 1px dashed rgba(255,255,255,.2); }
 .x-red { color: #ff6b6b; font-weight: 700; }
 .x-jn { flex: none; text-align: right; display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15; }
 .x-jn small { color: #ffb347; font-size: .78em; }
-.x-jam.closed .x-jl1 { color: #ff8a8a; }
 .x-jnone { color: var(--muted); font-size: .85em; padding: .3em 0 .4em; }
 .x-fb { margin-bottom: .2em; }
 .x-fs { display: flex; align-items: center; justify-content: space-between; gap: .6em; padding: .32em 0; border-bottom: 1px solid color-mix(in srgb, var(--text) 8%, transparent); }
