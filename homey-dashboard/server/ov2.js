@@ -49,6 +49,8 @@ class Reis {
     if (uic) v.push(['uicCode', `/reisinformatie-api/api/v2/departures?uicCode=${encodeURIComponent(uic)}`]);
     v.push(['alleen station', `/reisinformatie-api/api/v2/departures?station=${encodeURIComponent(station)}`]);
     v.push(['station (kleine letters)', `/reisinformatie-api/api/v2/departures?station=${encodeURIComponent(station.toLowerCase())}&lang=nl`]);
+    v.push(['v3 station', `/reisinformatie-api/api/v3/departures?station=${encodeURIComponent(station)}`]);
+    v.push(['met tijdstip', `/reisinformatie-api/api/v2/departures?station=${encodeURIComponent(station)}&dateTime=${encodeURIComponent(new Date().toISOString().replace(/\.\d+Z$/, 'Z'))}`]);
     return v;
   }
 
@@ -58,12 +60,20 @@ class Reis {
     return cached('ns:dep:' + station, 30e3, async () => {
       const vs = await this.depVariants(station); this.depOk = this.depOk || {};
       const order = this.depOk[station] != null ? [vs[this.depOk[station]], ...vs.filter((_, i) => i !== this.depOk[station])].filter(Boolean) : vs;
+      this.depFail = this.depFail || {};
+      const f = this.depFail[station]; if (f && Date.now() < f.until) throw f.err;
       let j = null, last = null;
       for (const [name, path] of order) {
         try { j = await this.ns(path); const i = vs.findIndex(x => x[0] === name); if (this.depOk[station] !== i) console.log(`[ns] vertrektijden werken via: ${name}`); this.depOk[station] = i; break; }
         catch (e) { last = e; if (e.auth) throw e; }
       }
-      if (!j) throw last || new Error('NS gaf geen vertrektijden');
+      if (!j) {
+        const down = last && last.status >= 500;
+        const err = down ? Object.assign(new Error('NS-vertrektijden zijn bij NS zelf tijdelijk niet beschikbaar (serverfout bij NS). Het dashboard probeert het elke 2 minuten opnieuw.'), { nsDown: true }) : (last || new Error('NS gaf geen vertrektijden'));
+        this.depFail[station] = { until: Date.now() + 2 * 60e3, err };
+        throw err;
+      }
+      delete this.depFail[station];
       const deps = arr((j.payload && j.payload.departures) || j.departures).map(d => {
         const p = d.product || {};
         const planned = d.plannedDateTime, actual = d.actualDateTime || planned;
@@ -87,9 +97,10 @@ class Reis {
     station = str(station).toUpperCase();
     return cached('ns:dis:' + station, 5 * 60e3, async () => {
       let j = await this.ns('/disruptions/v3?isActive=true');
-      let raw = arr(j && (j.payload || j.disruptions || j.data) || j);
-      if (!raw.length) { j = await this.ns('/disruptions/v3').catch(() => j); raw = arr(j && (j.payload || j.disruptions || j.data) || j); }
-      if (!raw.length && station) { j = await this.ns(`/disruptions/v3/station/${encodeURIComponent(station)}`).catch(() => null); raw = arr(j && (j.payload || j.disruptions || j.data) || j); }
+      const listOf = x => (Array.isArray(x) ? x : x && typeof x === 'object' ? arr(x.payload || x.disruptions || x.data) : []);
+      let raw = listOf(j);
+      if (!raw.length) { j = await this.ns('/disruptions/v3').catch(() => null); raw = listOf(j); }
+      if (!raw.length) { j = await this.ns('/reisinformatie-api/api/v3/disruptions?isActive=true').catch(() => null); raw = listOf(j); }
       const list = raw.filter(d => d && typeof d === 'object' && d.isActive !== false).map(d => {
         const ts = arr(d.timespans)[0] || {};
         const stations = new Set();
@@ -116,7 +127,7 @@ class Reis {
   // ---------- testpagina: wat antwoordt NS op elke manier van vragen? (zonder sleutel in de uitvoer) ----------
   async nsTest(station) {
     station = str(station || 'ES').toUpperCase(); const key = this.nsKey(); const out = { station, at: new Date().toISOString(), tests: [] };
-    const paths = [...(await this.depVariants(station)), ['storingen actief', '/disruptions/v3?isActive=true'], ['storingen alles', '/disruptions/v3'], ['storingen station', `/disruptions/v3/station/${encodeURIComponent(station)}`], ['stations', '/reisinformatie-api/api/v2/stations']];
+    const paths = [...(await this.depVariants(station)), ['storingen actief', '/disruptions/v3?isActive=true'], ['storingen alles', '/disruptions/v3'], ['storingen station', `/disruptions/v3/station/${encodeURIComponent(station)}`], ['storingen (reisinfo v3)', '/reisinformatie-api/api/v3/disruptions?isActive=true'], ['stations', '/reisinformatie-api/api/v2/stations']];
     for (const [name, path] of paths) {
       const t0 = Date.now();
       try {

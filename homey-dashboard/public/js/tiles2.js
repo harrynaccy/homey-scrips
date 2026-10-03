@@ -338,7 +338,7 @@
   const clockNow = () => new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
   const reisWrap = (t, cls, title, sub, body) => `<div class="x-reis ${cls}${t.opts.themeColors ? ' themed' : ''}"><div class="xr-hd"><div class="xr-ht"><h3>${esc(title)}</h3>${sub ? `<p>${esc(sub)}</p>` : ''}</div><b class="xr-clock">${clockNow()}</b></div>${body}</div>`;
   const panel = (cls, h, inner) => `<div class="xr-panel ${cls}"><h4>${esc(h)}</h4><div class="xr-list">${inner}</div></div>`;
-  const note = (r, what) => r && r.err ? `<div class="xr-warn">${esc(what)} nu niet bereikbaar (${esc(r.err)}). Nieuwe poging over 30 sec.</div>` : `<div class="xr-muted">Laden…</div>`;
+  const note = (r, what) => r && r.err ? (/^NS-vertrektijden zijn bij NS zelf/.test(r.err) ? `<div class="xr-warn">${esc(r.err)}</div>` : `<div class="xr-warn">${esc(what)} nu niet bereikbaar (${esc(r.err)}). Nieuwe poging over 30 sec.</div>`) : `<div class="xr-muted">Laden…</div>`;
   const staleNote = v => v && v.stale ? `<div class="xr-warn sm">Verbinding even weg; dit zijn de laatst bekende gegevens.</div>` : '';
   T.ns = {
     label: 'NS reisinformatie', icon: 'play', size: [6, 8], title: t => t.opts.title || 'NS reisinformatie',
