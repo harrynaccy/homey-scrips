@@ -241,7 +241,7 @@ app.get('/api/x/ov/departures', xr(r => extra.ovDepartures(r.query.code)));
 app.post('/api/x/travel', xr(r => extra.travel(r.body || {})));
 app.get('/api/x/nas', xr(() => extra.nas()));
 app.post('/api/x/nas/setup', guard, xr(r => { extra.setNas(r.body || {}); return extra.hasSecrets(); }));
-app.post('/api/x/key', guard, xr(r => { const b = r.body || {}; if (!['tomtom'].includes(b.name)) throw new Error('Onbekende sleutel'); extra.setKey(b.name, b.value); return extra.hasSecrets(); }));
+app.post('/api/x/key', guard, xr(r => { const b = r.body || {}; if (!['tomtom', 'ns'].includes(b.name)) throw new Error('Onbekende sleutel'); extra.setKey(b.name, b.value); return extra.hasSecrets(); }));
 app.get('/api/x/secrets', xr(() => extra.hasSecrets()));
 app.get('/api/x/homey', xr(() => extra.homeyInfo()));
 app.get('/api/x/notes/:id', xr(r => extra.notes(String(r.params.id))));
@@ -254,6 +254,13 @@ const p2000 = new P2000({ dataDir: DATA, fetchText: async u => {
   return r.text();
 } });
 app.get('/api/x/p2000', xr(() => p2000.list()));
+// NS- en busreisinformatie (NS-sleutel staat alleen op de NAS)
+const { Reis } = require('./ov2');
+const reis = new Reis({ secrets: () => extra.secrets() });
+app.get('/api/x/ns/stations', xr(r => reis.nsStations(r.query.q)));
+app.get('/api/x/ns/departures', xr(r => reis.nsDepartures(r.query.station)));
+app.get('/api/x/ns/disruptions', xr(r => reis.nsDisruptions(r.query.station)));
+app.get('/api/x/bus', xr(r => reis.bus({ code: r.query.code, lines: r.query.lines, dest: r.query.dest })));
 app.post('/api/appwidgets/scan', guard, async (req, res) => { try { res.json(await appscan.scan()); } catch (e) { fail(res, e); } });
 app.post('/api/appwidgets/install', guard, async (req, res) => { try { const b = req.body || {}; res.json(await appscan.install(String(b.appId || ''), String(b.widgetId || ''))); } catch (e) { fail(res, e); } });
 app.get('/api/appwidgets', wrap(() => ({ widgets: bridge.list(), status: bridge.status(), demo: homey.status.mode === 'demo' })));

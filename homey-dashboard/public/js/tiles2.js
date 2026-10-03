@@ -334,6 +334,57 @@
     },
   };
 
+  // ---------- NS- en busreisinformatie (los te plaatsen; opmaak als een reisinformatiebord) ----------
+  const clockNow = () => new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+  const reisWrap = (t, cls, title, sub, body) => `<div class="x-reis ${cls}${t.opts.themeColors ? ' themed' : ''}"><div class="xr-hd"><div class="xr-ht"><h3>${esc(title)}</h3>${sub ? `<p>${esc(sub)}</p>` : ''}</div><b class="xr-clock">${clockNow()}</b></div>${body}</div>`;
+  const panel = (cls, h, inner) => `<div class="xr-panel ${cls}"><h4>${esc(h)}</h4><div class="xr-list">${inner}</div></div>`;
+  const note = (r, what) => r && r.err ? `<div class="xr-warn">${esc(what)} nu niet bereikbaar (${esc(r.err)}). Nieuwe poging over 30 sec.</div>` : `<div class="xr-muted">Laden…</div>`;
+  const staleNote = v => v && v.stale ? `<div class="xr-warn sm">Verbinding even weg; dit zijn de laatst bekende gegevens.</div>` : '';
+  T.ns = {
+    label: 'NS reisinformatie', icon: 'play', size: [6, 8], title: t => t.opts.title || 'NS reisinformatie',
+    render(t, inner, el) {
+      const o = t.opts; const st = o.stationCode;
+      if (!st) { inner.innerHTML = reisWrap(t, 'ns', D.titleOf(t), '', '<div class="xr-muted pad">Kies bij Tegel je station (en vul je NS-sleutel in).</div>'); return; }
+      const r = X.get('ns:' + st, 30e3, () => D.api('GET', '/api/x/ns/departures?station=' + encodeURIComponent(st)), ['ns']);
+      const showDis = o.disruptions !== false;
+      const rd = showDis ? X.get('nsd:' + st, 5 * 60e3, () => D.api('GET', '/api/x/ns/disruptions?station=' + encodeURIComponent(st)), ['ns']) : null;
+      const n = Number(o.count) || 0;
+      const deps = r.v ? r.v.departures.slice(0, n || 12) : null;
+      const depHtml = !deps ? note(r, 'NS-vertrektijden') : staleNote(r.v) + (deps.map(d => `<div class="xr-row${d.cancelled ? ' gone' : ''}">
+          <span class="xr-time">${hm(d.planned)}${d.delay ? `<em>+${d.delay}</em>` : ''}</span>
+          <span class="xr-main"><b>${esc(d.dest)}</b><small>${esc([d.kind, d.cancelled ? 'rijdt niet' : '', d.via.length ? 'via ' + d.via.join(', ') : '', d.note].filter(Boolean).join(' · '))}</small></span>
+          <span class="xr-track${d.trackChanged ? ' chg' : ''}" title="Spoor">${esc(d.track || '–')}</span></div>`).join('') || '<div class="xr-muted">Geen vertrektijden</div>');
+      let disHtml = '';
+      if (showDis) {
+        const list = rd.v ? rd.v.list.filter(d => o.disMine ? d.mine : true) : null;
+        disHtml = panel('xr-dis', 'Storingen & stakingen', !list ? note(rd, 'Storingen') : (list.map(d => `<div class="xr-item"><div><span class="xr-badge ${d.type === 'MAINTENANCE' ? 'werk' : d.type === 'CALAMITY' ? 'letop' : 'storing'}">${esc(d.label)}</span><b>${esc(d.title)}</b>${d.mine ? '<span class="xr-mine">dit station</span>' : ''}</div>${d.text ? `<small>${esc(d.text)}</small>` : ''}${d.extra ? `<small>${esc(d.extra)}</small>` : ''}</div>`).join('') || '<div class="xr-muted">Geen storingen of werkzaamheden</div>'));
+      }
+      inner.innerHTML = reisWrap(t, 'ns', D.titleOf(t), 'Vertrektijden station ' + (o.stationName || st), panel('xr-dep', 'Vertrek', depHtml) + disHtml);
+    },
+  };
+  T.bus = {
+    label: 'Bus reisinformatie', icon: 'play', size: [6, 8], title: t => t.opts.title || 'Bus reisinformatie',
+    render(t, inner) {
+      const o = t.opts; const code = o.stopCode;
+      const lines = String(o.lines || '').trim(); const dest = String(o.dest || '').trim();
+      const sub = [lines ? 'Lijn ' + lines.split(/[,\s]+/).filter(Boolean).join(', ') : '', [o.stopName ? o.stopName.split(',').pop().trim() : '', dest].filter(Boolean).join(' → ')].filter(Boolean).join(' · ');
+      if (!code) { inner.innerHTML = reisWrap(t, 'bus', D.titleOf(t), '', '<div class="xr-muted pad">Kies bij Tegel je bushalte, lijn en richting.</div>'); return; }
+      const q = `code=${encodeURIComponent(code)}&lines=${encodeURIComponent(lines)}&dest=${encodeURIComponent(dest)}`;
+      const r = X.get('bus:' + q, 30e3, () => D.api('GET', '/api/x/bus?' + q), ['bus']);
+      const n = Number(o.count) || 0;
+      const mins = x => Math.round((new Date(x.expected) - Date.now()) / 6e4);
+      const deps = r.v ? r.v.departures.slice(0, n || 10) : null;
+      const depHtml = !deps ? note(r, 'Busgegevens') : staleNote(r.v) + (deps.map(d => `<div class="xr-row${d.cancelled ? ' gone' : ''}">
+          <span class="xr-line">${esc(d.line)}</span>
+          <span class="xr-main"><b>${esc(d.dest)}</b><small>${esc([hm(d.planned), d.delay ? '+' + d.delay + ' min' : 'op tijd', d.cancelled ? 'rijdt niet' : ''].filter(Boolean).join(' · '))}</small></span>
+          <span class="xr-in${d.delay ? ' late' : ''}">${mins(d) <= 0 ? 'nu' : mins(d) + ' min'}</span></div>`).join('') || '<div class="xr-muted">Geen vertrektijden</div>');
+      const msgs = r.v ? r.v.messages : null;
+      const disHtml = o.disruptions === false ? '' : panel('xr-dis', 'Storingen, stakingen & omleidingen', !msgs ? (r.err ? '' : '<div class="xr-muted">Laden…</div>') : (msgs.map(m => `<div class="xr-item"><div><span class="xr-badge letop">LET OP</span><b>${esc(m.text)}</b></div>${m.end ? `<small>t/m ${esc(new Date(m.end).toLocaleString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }))}</small>` : ''}</div>`).join('') || '<div class="xr-muted">Geen meldingen</div>'));
+      inner.innerHTML = reisWrap(t, 'bus', D.titleOf(t), sub, panel('xr-dep', lines ? 'Lijn ' + lines : 'Vertrek', depHtml) + disHtml);
+    },
+  };
+  setInterval(() => { if (D.cfg && !document.hidden) D.refreshWhere(t => t.type === 'ns' || t.type === 'bus'); }, 30e3);
+
   // ---------- 19. reistijd ----------
   T.travel = {
     label: 'Reistijd naar werk', icon: 'play', size: [3, 2], title: t => t.opts.title || 'Naar ' + (t.opts.label || 'werk'),
@@ -418,11 +469,11 @@
     ['price', 'Stroomprijs', 'Dynamische prijs per uur, goedkoopste uren'], ['solar', 'Zonnepanelen', 'Opbrengst nu en vandaag'], ['usage', 'Verbruik per dag', 'Stroom of gas per dag'],
     ['waste', 'Afvalkalender', 'Welke container wanneer (Twente Milieu)'], ['agenda', 'Agenda', 'Afspraken uit Google of iCloud'], ['countdown', 'Afteller', 'Aantal dagen tot …'],
     ['notes', 'Boodschappen en notities', 'Lijstje, gedeeld met alle schermen'], ['timer', 'Kookwekker', 'Timer met geluid'],
-    ['departures', 'Vertrektijden bus en tram', 'Bij jouw halte'], ['travel', 'Reistijd naar werk', 'Met de auto'], ['p2000', 'P2000 Twente', 'Meldingen brandweer, ambulance en politie'],
+    ['departures', 'Vertrektijden bus en tram', 'Bij jouw halte'], ['travel', 'Reistijd naar werk', 'Met de auto'], ['p2000', 'P2000 Twente', 'Meldingen brandweer, ambulance en politie'], ['ns', 'NS reisinformatie', 'Vertrektijden en storingen van je station'], ['bus', 'Bus reisinformatie', 'Live vertrektijden en omleidingen van je halte'],
     ['conn', 'Verbindingen', 'Scherm, NAS, Homey en back-up (zoals de balk linksonder)'], ['nas', 'NAS-status', 'Schijven, temperatuur, opslag'], ['homeyinfo', 'Homey-status', 'Versie, geheugen, aantallen'],
     ['heading', 'Kop of scheidingslijn', 'Tabblad in blokken verdelen'], ['spacer', 'Lege ruimte', 'Onzichtbare tegel als ruimte'], ['photos', 'Fotolijst', 'Diashow van je eigen foto\'s'], ['wifiqr', 'Wifi voor gasten', 'QR-code om te scannen'],
   ];
-  D.EXTRA2_DEFAULTS = { conn: { style: { hideTitle: true } }, heading: { opts: { text: 'Kop', line: 'under', size: 1.4 }, style: { frameless: true, hideTitle: true } }, spacer: { style: { frameless: true, hideTitle: true, opacity: 0 } }, photos: { style: { hideTitle: true } }, wifiqr: { opts: { enc: 'WPA' } } };
+  D.EXTRA2_DEFAULTS = { ns: { style: { frameless: true, hideTitle: true } }, bus: { style: { frameless: true, hideTitle: true } }, conn: { style: { hideTitle: true } }, heading: { opts: { text: 'Kop', line: 'under', size: 1.4 }, style: { frameless: true, hideTitle: true } }, spacer: { style: { frameless: true, hideTitle: true, opacity: 0 } }, photos: { style: { hideTitle: true } }, wifiqr: { opts: { enc: 'WPA' } } };
 
   // ---------- opties bij Tegel ----------
   const devSel = (P, F, cur, filter, label = 'Apparaat') => F.row(label, F.select(`${P}.opts.deviceId`, cur || '', [['', 'Kies…'], ...D.lib.devices.filter(filter).sort((a, b) => a.name.localeCompare(b.name)).map(d => [d.id, d.name])], 'tilepanel'));
@@ -442,6 +493,18 @@
     departures: (t, P, F) => `<div class="f col"><label>Halte<small>${esc(t.opts.stopName || 'Nog geen halte gekozen')}</small></label><div class="x-ovsearch"><input type="search" placeholder="Zoek: Enschede, Station" data-ovq><div data-ovres></div></div></div>` +
       F.row('Alleen lijnen', F.text(`${P}.opts.lines`, t.opts.lines, 'tile', 'bijv. 1, 9'), 'Leeg = alle lijnen') + '<p class="note">Bus, tram en metro (OVapi). Treinen van de NS zitten hier niet in.</p>',
     health: (t, P, F) => F.row('Tekst als alles goed is', F.text(`${P}.opts.okText`, (t.opts || {}).okText, 'tile', 'Alles in orde'), 'Leeg = "Alles in orde"'),
+    ns: (t, P, F) => `<div class="f col"><label>Station<small>${esc(t.opts.stationName ? t.opts.stationName + ' (' + t.opts.stationCode + ')' : 'Nog geen station gekozen')}</small></label><div class="x-ovsearch"><input type="search" placeholder="Zoek: Enschede" data-nsq><div data-nsres></div></div></div>` +
+      F.row('Aantal vertrektijden', F.num(`${P}.opts.count`, t.opts.count || 12, 3, 25, 'tile')) +
+      F.row('Storingen tonen', F.toggle(`${P}.opts.disruptions`, t.opts.disruptions !== false, 'tile')) + F.row('Alleen dit station', F.toggle(`${P}.opts.disMine`, !!t.opts.disMine, 'tile'), 'Uit = ook storingen en werkzaamheden elders (dit station bovenaan)') +
+      F.row('Kleuren van het thema', F.toggle(`${P}.opts.themeColors`, !!t.opts.themeColors, 'tile'), 'Uit = NS-blauw') +
+      `<div class="f col"><label>NS-sleutel<small data-nsstat>Gratis via apiportal.ns.nl. Wordt alleen op de NAS bewaard.</small></label><div class="x-ovsearch"><input type="password" placeholder="Plak hier je sleutel" data-nskey autocomplete="off"><button class="btn sm" data-nssave>Opslaan</button></div></div>`,
+    bus: (t, P, F) => `<div class="f col"><label>Halte<small>${esc(t.opts.stopName || 'Nog geen halte gekozen')}</small></label><div class="x-ovsearch"><input type="search" placeholder="Zoek: Enschede, Het Oosterveld" data-ovq><div data-ovres></div></div></div>` +
+      F.row('Lijn(en)', F.text(`${P}.opts.lines`, t.opts.lines, 'tile', 'bijv. 2'), 'Leeg = alle lijnen') +
+      F.row('Richting', F.text(`${P}.opts.dest`, t.opts.dest, 'tile', 'bijv. Deppenbroek'), 'Deel van de eindbestemming; leeg = beide richtingen') +
+      F.row('Aantal vertrektijden', F.num(`${P}.opts.count`, t.opts.count || 10, 3, 20, 'tile')) +
+      F.row('Meldingen tonen', F.toggle(`${P}.opts.disruptions`, t.opts.disruptions !== false, 'tile'), 'Storingen en omleidingen die de vervoerder op de halte zet') +
+      F.row('Kleuren van het thema', F.toggle(`${P}.opts.themeColors`, !!t.opts.themeColors, 'tile'), 'Uit = Arriva-rood') +
+      '<p class="note">Live via OVapi (bus, tram, metro van alle vervoerders, ook Arriva).</p>',
     conn: (t, P, F) => F.row('Tekst eronder', F.toggle(`${P}.opts.info`, t.opts.info !== false, 'tile'), 'Reactietijden en back-up; vanaf 2 hoog') +
       '<p class="note">De vaste balk linksonder stel je in bij Scherm → Statusbalk linksonder.</p>',
     p2000: (t, P, F) => F.row('Brandweer', F.toggle(`${P}.opts.fire`, t.opts.fire !== false, 'tile')) + F.row('Ambulance', F.toggle(`${P}.opts.ambu`, t.opts.ambu !== false, 'tile')) + F.row('Politie', F.toggle(`${P}.opts.pol`, t.opts.pol !== false, 'tile')) +
@@ -459,6 +522,16 @@
       F.row('Wachtwoord tonen', F.toggle(`${P}.opts.showPass`, t.opts.showPass !== false, 'tile')) + F.row('Verborgen netwerk', F.toggle(`${P}.opts.hidden`, !!t.opts.hidden, 'tile')) + '<p class="note">Let op: het wachtwoord staat in je indeling op de NAS.</p>',
   };
   D.tileWire = {
+    ns: (root, t) => {
+      const q = root.querySelector('[data-nsq]'), res = root.querySelector('[data-nsres]'); let tm;
+      if (q) q.oninput = () => { clearTimeout(tm); tm = setTimeout(async () => { if (q.value.trim().length < 2) { res.innerHTML = ''; return; } res.innerHTML = '<small class="muted">Zoeken…</small>';
+        try { const l = await D.api('GET', '/api/x/ns/stations?q=' + encodeURIComponent(q.value.trim())); res.innerHTML = l.map(s2 => `<button class="btn sm ghost" data-st="${esc(s2.code)}" data-name="${esc(s2.name)}">${esc(s2.name)}</button>`).join('') || '<small class="muted">Niets gevonden</small>';
+          res.querySelectorAll('[data-st]').forEach(b => b.onclick = () => D.editor.commit(null, () => { t.opts.stationCode = b.dataset.st; t.opts.stationName = b.dataset.name; }, () => { X.c.clear(); D.renderGrid(); D.editor.refreshPanel(); })); } catch (e) { res.innerHTML = `<small class="muted">${esc(e.message)}</small>`; } }, 400); };
+      const st = root.querySelector('[data-nsstat]'); D.api('GET', '/api/x/secrets').then(s2 => { if (st && s2.ns) st.textContent = 'Sleutel is ingesteld (staat alleen op de NAS). Opnieuw invullen vervangt hem.'; }).catch(() => {});
+      const b = root.querySelector('[data-nssave]'); if (b) b.onclick = async () => { const v = root.querySelector('[data-nskey]').value.trim(); if (!v) { D.toast('Plak eerst je sleutel', true); return; }
+        try { await D.api('POST', '/api/x/key', { name: 'ns', value: v }); root.querySelector('[data-nskey]').value = ''; D.toast('NS-sleutel opgeslagen op de NAS'); X.c.clear(); D.renderGrid(); D.editor.refreshPanel(); } catch (e) { D.toast(e.message, true); } };
+    },
+    bus: (root, t, P) => D.tileWire.departures(root, t, P),
     departures: (root, t, P) => {
       const q = root.querySelector('[data-ovq]'), res = root.querySelector('[data-ovres]'); if (!q) return; let tm;
       q.oninput = () => { clearTimeout(tm); tm = setTimeout(async () => { if (q.value.trim().length < 3) { res.innerHTML = ''; return; } res.innerHTML = '<small class="muted">Zoeken…</small>';
