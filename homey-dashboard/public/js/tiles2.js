@@ -336,7 +336,19 @@
 
   // ---------- NS- en busreisinformatie (los te plaatsen; opmaak als een reisinformatiebord) ----------
   const clockNow = () => new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
-  const reisWrap = (t, cls, title, sub, body) => `<div class="x-reis ${cls}${t.opts.themeColors ? ' themed' : ''}"><div class="xr-hd"><div class="xr-ht"><h3>${esc(title)}</h3>${sub ? `<p>${esc(sub)}</p>` : ''}</div><b class="xr-clock">${clockNow()}</b></div>${body}</div>`;
+  // achtergrond: std (NS-blauw / Arriva-rood), colors (eigen verloop), theme, photo (foto + donkerder/vervagen)
+  const reisMode = o => o.bgMode || (o.themeColors ? 'theme' : 'std');
+  const reisBg = o => {
+    const m = reisMode(o); const st = []; let layers = '';
+    const pa = o.panel != null ? Number(o.panel) : (m === 'photo' ? 0.35 : null);
+    if (pa != null) st.push(`--xr-panel:rgba(0,0,0,${pa})`);
+    if (m === 'colors') st.push(`background:linear-gradient(165deg, ${o.c1 || '#0e2a6e'}, ${o.c2 || o.c1 || '#0a1d52'})`);
+    if (m === 'photo' && o.photo) {
+      layers = `<div class="xr-photo" style="background-image:url('${esc(o.photo)}');${o.blur ? `filter:blur(${Number(o.blur)}px);inset:-${Number(o.blur) * 2}px;` : ''}"></div><div class="xr-dim" style="background:rgba(0,0,0,${o.dim != null ? Number(o.dim) : 0.35})"></div>`;
+    }
+    return { cls: m === 'theme' ? ' themed' : m === 'photo' ? ' photo' : m === 'colors' ? ' custom' : '', style: st.join(';'), layers };
+  };
+  const reisWrap = (t, cls, title, sub, body) => { const bg = reisBg(t.opts); return `<div class="x-reis ${cls}${bg.cls}" style="${esc(bg.style)}">${bg.layers}<div class="xr-hd"><div class="xr-ht"><h3>${esc(title)}</h3>${sub ? `<p>${esc(sub)}</p>` : ''}</div><b class="xr-clock">${clockNow()}</b></div>${body}</div>`; };
   const panel = (cls, h, inner) => `<div class="xr-panel ${cls}"><h4>${esc(h)}</h4><div class="xr-list">${inner}</div></div>`;
   const note = (r, what) => r && r.err ? (/^NS-vertrektijden zijn bij NS zelf/.test(r.err) ? `<div class="xr-warn">${esc(r.err)}</div>` : `<div class="xr-warn">${esc(what)} nu niet bereikbaar (${esc(r.err)}). Nieuwe poging over 30 sec.</div>`) : `<div class="xr-muted">Laden…</div>`;
   const staleNote = v => v && v.stale ? `<div class="xr-warn sm">Verbinding even weg; dit zijn de laatst bekende gegevens.</div>` : '';
@@ -496,14 +508,22 @@
     ns: (t, P, F) => `<div class="f col"><label>Station<small>${esc(t.opts.stationName ? t.opts.stationName + ' (' + t.opts.stationCode + ')' : 'Nog geen station gekozen')}</small></label><div class="x-ovsearch"><input type="search" placeholder="Zoek: Enschede" data-nsq><div data-nsres></div></div></div>` +
       F.row('Aantal vertrektijden', F.num(`${P}.opts.count`, t.opts.count || 12, 3, 25, 'tile')) +
       F.row('Storingen tonen', F.toggle(`${P}.opts.disruptions`, t.opts.disruptions !== false, 'tile')) + F.row('Alleen dit station', F.toggle(`${P}.opts.disMine`, !!t.opts.disMine, 'tile'), 'Uit = ook storingen en werkzaamheden elders (dit station bovenaan)') +
-      F.row('Kleuren van het thema', F.toggle(`${P}.opts.themeColors`, !!t.opts.themeColors, 'tile'), 'Uit = NS-blauw') +
+      F.row('Achtergrond', F.seg(`${P}.opts.bgMode`, reisMode(t.opts), [['std', 'NS-blauw'], ['colors', 'Kleuren'], ['theme', 'Thema'], ['photo', 'Foto']], 'tilepanel')) +
+      (reisMode(t.opts) === 'colors' ? F.row('Kleur boven', F.color(`${P}.opts.c1`, t.opts.c1 || '#0e2a6e', 'tile')) + F.row('Kleur onder', F.color(`${P}.opts.c2`, t.opts.c2 || '#0a1d52', 'tile'), 'Twee keer dezelfde kleur = effen') : '') +
+      (reisMode(t.opts) === 'photo' ? `<div class="f col"><label>Foto<small>Kies een foto of upload een nieuwe (ook te gebruiken bij Scherm → Achtergrond)</small></label><div class="gallery" data-xrgal><div class="muted">Laden…</div></div><label class="btn sm upl">${icon('upload')}Foto uploaden<input type="file" accept="image/*" data-xrfile hidden></label></div>` +
+        F.row('Donkerder maken', F.range(`${P}.opts.dim`, t.opts.dim != null ? t.opts.dim : 0.35, 0, 0.85, 0.01, 'tile', '%')) + F.row('Vervagen', F.range(`${P}.opts.blur`, t.opts.blur || 0, 0, 20, 1, 'tile', 'px')) : '') +
+      F.row('Vakjes donkerder', F.range(`${P}.opts.panel`, t.opts.panel != null ? t.opts.panel : (reisMode(t.opts) === 'photo' ? 0.35 : 0.05), 0, 0.85, 0.01, 'tile', '%'), 'Achtergrond van de vakken Vertrek en Storingen') +
       `<div class="f col"><label>NS-sleutel<small data-nsstat>Gratis via apiportal.ns.nl. Wordt alleen op de NAS bewaard.</small></label><div class="x-ovsearch"><input type="password" placeholder="Plak hier je sleutel" data-nskey autocomplete="off"><button class="btn sm" data-nssave>Opslaan</button></div></div>`,
     bus: (t, P, F) => `<div class="f col"><label>Halte<small>${esc(t.opts.stopName || 'Nog geen halte gekozen')}</small></label><div class="x-ovsearch"><input type="search" placeholder="Zoek: Enschede, Het Oosterveld" data-ovq><div data-ovres></div></div></div>` +
       F.row('Lijn(en)', F.text(`${P}.opts.lines`, t.opts.lines, 'tile', 'bijv. 2'), 'Leeg = alle lijnen') +
       F.row('Richting', F.text(`${P}.opts.dest`, t.opts.dest, 'tile', 'bijv. Deppenbroek'), 'Deel van de eindbestemming; leeg = beide richtingen') +
       F.row('Aantal vertrektijden', F.num(`${P}.opts.count`, t.opts.count || 10, 3, 20, 'tile')) +
       F.row('Meldingen tonen', F.toggle(`${P}.opts.disruptions`, t.opts.disruptions !== false, 'tile'), 'Storingen en omleidingen die de vervoerder op de halte zet') +
-      F.row('Kleuren van het thema', F.toggle(`${P}.opts.themeColors`, !!t.opts.themeColors, 'tile'), 'Uit = Arriva-rood') +
+      F.row('Achtergrond', F.seg(`${P}.opts.bgMode`, reisMode(t.opts), [['std', 'Arriva-rood'], ['colors', 'Kleuren'], ['theme', 'Thema'], ['photo', 'Foto']], 'tilepanel')) +
+      (reisMode(t.opts) === 'colors' ? F.row('Kleur boven', F.color(`${P}.opts.c1`, t.opts.c1 || '#3d0b17', 'tile')) + F.row('Kleur onder', F.color(`${P}.opts.c2`, t.opts.c2 || '#5a1526', 'tile'), 'Twee keer dezelfde kleur = effen') : '') +
+      (reisMode(t.opts) === 'photo' ? `<div class="f col"><label>Foto<small>Kies een foto of upload een nieuwe (ook te gebruiken bij Scherm → Achtergrond)</small></label><div class="gallery" data-xrgal><div class="muted">Laden…</div></div><label class="btn sm upl">${icon('upload')}Foto uploaden<input type="file" accept="image/*" data-xrfile hidden></label></div>` +
+        F.row('Donkerder maken', F.range(`${P}.opts.dim`, t.opts.dim != null ? t.opts.dim : 0.35, 0, 0.85, 0.01, 'tile', '%')) + F.row('Vervagen', F.range(`${P}.opts.blur`, t.opts.blur || 0, 0, 20, 1, 'tile', 'px')) : '') +
+      F.row('Vakjes donkerder', F.range(`${P}.opts.panel`, t.opts.panel != null ? t.opts.panel : (reisMode(t.opts) === 'photo' ? 0.35 : 0.05), 0, 0.85, 0.01, 'tile', '%'), 'Achtergrond van de vakken Vertrek en Storingen') +
       '<p class="note">Live via OVapi (bus, tram, metro van alle vervoerders, ook Arriva).</p>',
     conn: (t, P, F) => F.row('Tekst eronder', F.toggle(`${P}.opts.info`, t.opts.info !== false, 'tile'), 'Reactietijden en back-up; vanaf 2 hoog') +
       '<p class="note">De vaste balk linksonder stel je in bij Scherm → Statusbalk linksonder.</p>',
@@ -521,8 +541,27 @@
     wifiqr: (t, P, F) => F.row('Netwerknaam', F.text(`${P}.opts.ssid`, t.opts.ssid, 'tile')) + F.row('Wachtwoord', F.text(`${P}.opts.pass`, t.opts.pass, 'tile')) + F.row('Beveiliging', F.seg(`${P}.opts.enc`, t.opts.enc || 'WPA', [['WPA', 'WPA/WPA2/WPA3'], ['WEP', 'WEP'], ['nopass', 'Open']], 'tile')) +
       F.row('Wachtwoord tonen', F.toggle(`${P}.opts.showPass`, t.opts.showPass !== false, 'tile')) + F.row('Verborgen netwerk', F.toggle(`${P}.opts.hidden`, !!t.opts.hidden, 'tile')) + '<p class="note">Let op: het wachtwoord staat in je indeling op de NAS.</p>',
   };
+  // foto kiezen/uploaden voor de reistegels
+  const reisPhotoWire = async (root, t) => {
+    const gal = root.querySelector('[data-xrgal]'); if (!gal) return;
+    const pick = url => D.editor.commit(null, () => { t.opts.photo = url; t.opts.bgMode = 'photo'; }, () => { D.renderGrid(); D.editor.refreshPanel(); });
+    const list = await D.api('GET', '/api/backgrounds').catch(() => []);
+    gal.innerHTML = list.map(u => `<div class="thumb${u === t.opts.photo ? ' act' : ''}" data-img="${esc(u)}" style="background-image:url('${esc(u)}')"></div>`).join('') || '<div class="muted">Nog geen foto\'s. Upload er een.</div>';
+    gal.querySelectorAll('[data-img]').forEach(th => th.onclick = () => pick(th.dataset.img));
+    const f = root.querySelector('[data-xrfile]');
+    if (f) f.onchange = async () => {
+      const file = f.files[0]; if (!file) return; D.toast('Foto verwerken…');
+      try {
+        const bmp = await createImageBitmap(file); const r = Math.min(1, 1920 / Math.max(bmp.width, bmp.height));
+        const c = document.createElement('canvas'); c.width = Math.round(bmp.width * r); c.height = Math.round(bmp.height * r); c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+        const { url } = await D.api('POST', '/api/backgrounds', { name: file.name, dataUrl: c.toDataURL('image/jpeg', 0.86) });
+        pick(url); D.toast('Foto toegevoegd');
+      } catch (e) { D.toast('Uploaden mislukt: ' + e.message, true); }
+    };
+  };
   D.tileWire = {
     ns: (root, t) => {
+      reisPhotoWire(root, t);
       const q = root.querySelector('[data-nsq]'), res = root.querySelector('[data-nsres]'); let tm;
       if (q) q.oninput = () => { clearTimeout(tm); tm = setTimeout(async () => { if (q.value.trim().length < 2) { res.innerHTML = ''; return; } res.innerHTML = '<small class="muted">Zoeken…</small>';
         try { const l = await D.api('GET', '/api/x/ns/stations?q=' + encodeURIComponent(q.value.trim())); res.innerHTML = l.map(s2 => `<button class="btn sm ghost" data-st="${esc(s2.code)}" data-name="${esc(s2.name)}">${esc(s2.name)}</button>`).join('') || '<small class="muted">Niets gevonden</small>';
@@ -531,7 +570,7 @@
       const b = root.querySelector('[data-nssave]'); if (b) b.onclick = async () => { const v = root.querySelector('[data-nskey]').value.trim(); if (!v) { D.toast('Plak eerst je sleutel', true); return; }
         try { await D.api('POST', '/api/x/key', { name: 'ns', value: v }); root.querySelector('[data-nskey]').value = ''; D.toast('NS-sleutel opgeslagen op de NAS'); X.c.clear(); D.renderGrid(); D.editor.refreshPanel(); } catch (e) { D.toast(e.message, true); } };
     },
-    bus: (root, t, P) => D.tileWire.departures(root, t, P),
+    bus: (root, t, P) => { reisPhotoWire(root, t); D.tileWire.departures(root, t, P); },
     departures: (root, t, P) => {
       const q = root.querySelector('[data-ovq]'), res = root.querySelector('[data-ovres]'); if (!q) return; let tm;
       q.oninput = () => { clearTimeout(tm); tm = setTimeout(async () => { if (q.value.trim().length < 3) { res.innerHTML = ''; return; } res.innerHTML = '<small class="muted">Zoeken…</small>';

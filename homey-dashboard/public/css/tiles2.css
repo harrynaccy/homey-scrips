@@ -179,3 +179,11 @@ body.editing .tile.x-spacer { outline: 1px dashed rgba(255,255,255,.2); }
 .xr-warn.sm { font-size: .78em; margin-bottom: .3em; }
 .xr-muted { color: var(--xr-muted); }
 .xr-muted.pad { margin-top: 1em; }
+
+/* achtergrond van de reistegels: eigen kleuren of foto */
+.x-reis.custom { background: none; }
+.x-reis.photo { background: #111; }
+.x-reis .xr-photo { position: absolute; inset: 0; background-size: cover; background-position: center; z-index: 0; }
+.x-reis .xr-dim { position: absolute; inset: 0; z-index: 0; }
+.x-reis > .xr-hd, .x-reis > .xr-panel { position: relative; z-index: 1; }
+.x-reis.photo .xr-panel { backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
