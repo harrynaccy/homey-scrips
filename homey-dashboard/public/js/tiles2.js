@@ -356,7 +356,7 @@
     }
     return { cls: m === 'theme' ? ' themed' : m === 'photo' ? ' photo' : m === 'colors' ? ' custom' : '', style: st.join(';'), layers };
   };
-  const reisWrap = (t, cls, title, sub, body) => { const bg = reisBg(t.opts); return `<div class="x-reis ${cls}${bg.cls}" style="${esc(bg.style)}">${bg.layers}<div class="xr-hd"><div class="xr-ht"><h3>${esc(title)}</h3>${sub ? `<p>${esc(sub)}</p>` : ''}</div><b class="xr-clock">${clockNow()}</b></div>${body}</div>`; };
+  const reisWrap = (t, cls, title, sub, body) => { const bg = reisBg(t.opts); return `<div class="x-reis ${cls}${bg.cls}" style="${esc(bg.style)}">${bg.layers}<div class="xr-hd"><div class="xr-ht"><h3>${esc(title)}</h3>${sub ? `<p>${esc(sub)}</p>` : ''}</div><span class="xr-right">${cls === 'ns' && t.opts.heart !== false ? `<svg class="xr-heart" viewBox="0 0 24 24" style="color:${esc(t.opts.heartColor || '#e5304a')}" aria-hidden="true"><path fill="currentColor" d="M12 21s-7.5-4.6-10-9.3C.4 8.6 2.2 4.5 6.2 4.5c2.3 0 3.9 1.3 5.8 3.4 1.9-2.1 3.5-3.4 5.8-3.4 4 0 5.8 4.1 4.2 7.2C19.5 16.4 12 21 12 21z"/></svg>` : ''}<b class="xr-clock">${clockNow()}</b></span></div>${body}</div>`; };
   const panel = (cls, h, inner) => `<div class="xr-panel ${cls}"><h4>${esc(h)}</h4><div class="xr-list">${inner}</div></div>`;
   const note = (r, what) => r && r.err ? (/^(NS-vertrektijden zijn bij NS zelf|NS geeft nu geen)/.test(r.err) ? `<div class="xr-warn">${esc(r.err)}</div>` : `<div class="xr-warn">${esc(what)} nu niet bereikbaar (${esc(r.err)}). Nieuwe poging over 30 sec.</div>`) : `<div class="xr-muted">Laden…</div>`;
   const staleNote = v => v && v.stale ? `<div class="xr-warn sm">Verbinding even weg; dit zijn de laatst bekende gegevens.</div>` : '';
@@ -528,6 +528,8 @@
         F.row('Vervagen', F.range(`${P}.opts.pBlur`, t.opts.pBlur != null ? t.opts.pBlur : (reisMode(t.opts) === 'photo' ? 6 : 0), 0, 20, 1, 'tile', 'px'), 'Hoe wazig de achtergrond achter de vakjes is') +
         F.row('Rand', F.range(`${P}.opts.pBorder`, t.opts.pBorder != null ? t.opts.pBorder : 0.14, 0, 1, 0.01, 'tile', '%'))) +
       F.row('Kleur meldingen', F.colorOpt(`${P}.opts.warnColor`, t.opts.warnColor, '#ffcf4a', 'tile'), 'Bijv. "tijdelijk niet beschikbaar" en "verbinding even weg"') +
+      F.row('Hartje tonen', F.toggle(`${P}.opts.heart`, t.opts.heart !== false, 'tilepanel'), 'Rechtsboven, naast de klok') +
+      (t.opts.heart !== false ? F.row('Kleur hartje', F.color(`${P}.opts.heartColor`, t.opts.heartColor || '#e5304a', 'tile')) : '') +
       `<div class="f col"><label>NS-sleutel<small data-nsstat>Gratis via apiportal.ns.nl. Wordt alleen op de NAS bewaard.</small></label><div class="x-ovsearch"><input type="password" placeholder="Plak hier je sleutel" data-nskey autocomplete="off"><button class="btn sm" data-nssave>Opslaan</button></div></div>`,
     bus: (t, P, F) => `<div class="f col"><label>Halte<small>${esc(t.opts.stopName || 'Nog geen halte gekozen')}</small></label><div class="x-ovsearch"><input type="search" placeholder="Zoek: Enschede, Het Oosterveld" data-ovq><div data-ovres></div></div></div>` +
       F.row('Lijn(en)', F.text(`${P}.opts.lines`, t.opts.lines, 'tile', 'bijv. 2'), 'Leeg = alle lijnen') +
