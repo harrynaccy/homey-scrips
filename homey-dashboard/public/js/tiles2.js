@@ -390,17 +390,17 @@
     if (!hasPos(s2)) { sheet(s2.name || s2.full, addr, '<div class="empty">Van dit station is de plek onbekend; navigeren lukt niet.</div>'); return; }
     const app = navApp(); const use = app === 'both' ? ['waze', 'gmaps'] : [app];
     sheet(s2.name || s2.full, addr, `<div class="x-fsheet"><div class="x-fsp">${eur(s2.price)}</div>
-      <button class="btn" data-fphone>${icon('play')}Naar telefoon${use.length > 1 ? '' : ' (' + NAV[use[0]][0] + ')'}</button><small class="muted" data-fstat></small>
+      <div class="x-fbtns">${use.map(k => `<button class="btn" data-fphone="${k}">${icon('play')}${NAV[k][0]} → telefoon</button>`).join('')}</div><small class="muted" data-fstat></small>
       <div class="x-fqrs">${use.map(k => `<div class="x-fqrw"><div class="x-fqr" data-fqr="${k}"><div class="muted">QR-code laden…</div></div>${use.length > 1 ? `<b>${NAV[k][0]}</b>` : ''}</div>`).join('')}</div>
       <small class="muted">Of scan met je telefoon: opent ${use.map(k => NAV[k][0]).join(' of ')} met de route.</small></div>`);
     const root = document.querySelector('#sheet');
     const shut = setTimeout(() => { if (root.contains(root.querySelector('[data-fqr]'))) D.closeSheet(); }, 60e3);
     root.querySelector('[data-close]').addEventListener('click', () => clearTimeout(shut));
     qrLib().then(() => use.forEach(k => { const q = window.qrcode(0, 'M'); q.addData(NAV[k][1](s2)); q.make(); const box = root.querySelector(`[data-fqr="${k}"]`); if (box) box.innerHTML = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true }); })).catch(() => {});
-    const btn = root.querySelector('[data-fphone]'), st = root.querySelector('[data-fstat]');
-    btn.onclick = async () => { btn.disabled = true; st.textContent = 'Versturen…';
-      try { await D.api('POST', '/api/x/tanken/telefoon', { name: s2.name || s2.full, street: s2.street, place: s2.place, price: s2.price, lat: s2.lat, lon: s2.lon, app }); st.textContent = 'Verstuurd. Tik op de melding op je telefoon.'; D.toast('Naar je telefoon gestuurd'); }
-      catch (e) { st.textContent = e.message; btn.disabled = false; } };
+    const st = root.querySelector('[data-fstat]');
+    root.querySelectorAll('[data-fphone]').forEach(btn => { btn.onclick = async () => { const k = btn.dataset.fphone; btn.disabled = true; st.textContent = 'Versturen…';
+      try { await D.api('POST', '/api/x/tanken/telefoon', { name: s2.name || s2.full, street: s2.street, place: s2.place, price: s2.price, lat: s2.lat, lon: s2.lon, app: k }); st.textContent = `Verstuurd. Tik op de melding op je telefoon; die opent ${NAV[k][0]}.`; D.toast('Naar je telefoon gestuurd'); }
+      catch (e) { st.textContent = e.message; } btn.disabled = false; }; });
   };
   const fuelRow = (s2, i, key) => `<button class="x-fs nopress${i === 0 ? ' best' : ''}" data-fst="${esc(key)}"><div class="x-fn"><b>${esc(s2.name || s2.full)}</b><small>${esc([s2.street, s2.place].filter(Boolean).join(', '))}${s2.open === false ? ' · gesloten' : ''}</small></div><div class="x-fp">${eur(s2.price)}</div></button>`;
   const fuelCols = (t, v, n) => {
